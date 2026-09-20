@@ -4,14 +4,24 @@
 //! dimensionally invalid expressions fail to compile. See `docs/mvp-design.md`
 //! for the design that this implements.
 
+pub mod background;
 pub mod dimension;
+pub mod integrate;
+pub mod potential;
 pub mod quantity;
+pub mod scalar_field;
+pub mod state;
 
+pub use background::{BackgroundRun, Record, RunSettings, Termination};
 pub use dimension::{
     DimDiv, DimMul, DimSqrt, M0, M1, M2, M3, M3Over2, M4, M5Over2, MHalf, MMinus1, MMinus2,
     MassPower,
 };
+pub use integrate::{System, rk4_step};
+pub use potential::{Potential, QuadraticPotential};
 pub use quantity::{Quantity, Sqrt};
+pub use scalar_field::ScalarFieldSystem;
+pub use state::{State, StateDelta, StateDerivative};
 
 /// A dimensionless quantity, such as the scale factor.
 pub type Dimensionless<V = f64> = Quantity<M0, V>;
