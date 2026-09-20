@@ -1,0 +1,10 @@
+error[E0308]: mismatched types
+ --> tests/compile_fail/wrong_dimension_from_a_potential.rs:8:27
+  |
+8 |     let _invalid: Field = potential.value(Field::new(16.0));
+  |                   -----   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `typenum::uint::UTerm`, found `UInt<UInt<UTerm, B1>, B0>`
+  |                   |
+  |                   expected due to this
+  |
+  = note: expected struct `Quantity<MassPower<typenum::int::PInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>>>, f64>`
+             found struct `Quantity<MassPower<typenum::int::PInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>>>, f64>`

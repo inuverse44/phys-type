@@ -1,0 +1,13 @@
+error[E0599]: the method `sqrt` exists for struct `Quantity<MassPower<typenum::int::PInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>>>, f64>`, but its trait bounds were not satisfied
+ --> tests/compile_fail/sqrt_off_the_half_integer_grid.rs:8:25
+  |
+8 |     let _invalid = root.sqrt();
+  |                         ^^^^ method cannot be called due to unsatisfied trait bounds
+  |
+ ::: $CARGO/typenum-$VERSION/src/int.rs
+  |
+  | pub struct PInt<U: Unsigned + NonZero> {
+  | -------------------------------------- doesn't satisfy `<_ as Rem<PInt<UInt<UInt<UTerm, B1>, B0>>>>::Output = Z0`
+  |
+  = note: the following trait bounds were not satisfied:
+          `<typenum::int::PInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>> as Rem<typenum::int::PInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>>>>::Output = typenum::int::Z0`
