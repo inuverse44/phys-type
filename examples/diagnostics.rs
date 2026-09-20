@@ -62,10 +62,10 @@ fn attractor(dir: &Path) -> io::Result<()> {
     // Sample densely at early times, where the fast transient happens, and
     // sparsely later.
     let sampled = |step: usize| match step {
-        0..=200 => step % 5 == 0,
-        201..=2_000 => step % 50 == 0,
-        2_001..=20_000 => step % 500 == 0,
-        _ => step % 2_000 == 0,
+        0..=200 => step.is_multiple_of(5),
+        201..=2_000 => step.is_multiple_of(50),
+        2_001..=20_000 => step.is_multiple_of(500),
+        _ => step.is_multiple_of(2_000),
     };
 
     let dt = Time::new(20.0);
