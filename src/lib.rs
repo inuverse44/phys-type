@@ -1,115 +1,33 @@
 //! Dimension-aware physical quantities for numerical physics.
+//!
+//! The crate encodes physical dimensions in the type system so that
+//! dimensionally invalid expressions fail to compile. See `docs/mvp-design.md`
+//! for the design that this implements.
 
-use core::marker::PhantomData;
-use core::ops::{Add, Sub};
+pub mod dimension;
+pub mod quantity;
 
-use typenum::{N2, P1, P2, P3, P4, P6, P8, Z0};
+pub use dimension::{
+    DimDiv, DimMul, DimSqrt, M0, M1, M2, M3, M3Over2, M4, M5Over2, MHalf, MMinus1, MMinus2,
+    MassPower,
+};
+pub use quantity::{Quantity, Sqrt};
 
-/// A physical quantity whose dimension is checked at compile time.
-///
-/// `D` describes the physical dimension and `V` stores the numerical value.
-/// The dimension marker occupies no space at runtime.
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
-#[repr(transparent)]
-pub struct Quantity<D, V> {
-    value: V,
-    dimension: PhantomData<D>,
-}
-
-impl<D, V> Quantity<D, V> {
-    /// Attaches the dimension `D` to a raw numerical value.
-    pub const fn new(value: V) -> Self {
-        Self {
-            value,
-            dimension: PhantomData,
-        }
-    }
-
-    /// Borrows the stored numerical value without removing its dimension.
-    pub const fn value(&self) -> &V {
-        &self.value
-    }
-
-    /// Removes the dimension marker and returns the stored numerical value.
-    pub fn into_value(self) -> V {
-        self.value
-    }
-}
-
-impl<D, Lhs, Rhs> Add<Quantity<D, Rhs>> for Quantity<D, Lhs>
-where
-    Lhs: Add<Rhs>,
-{
-    type Output = Quantity<D, <Lhs as Add<Rhs>>::Output>;
-
-    fn add(self, rhs: Quantity<D, Rhs>) -> Self::Output {
-        Quantity::new(self.value + rhs.value)
-    }
-}
-
-impl<D, Lhs, Rhs> Sub<Quantity<D, Rhs>> for Quantity<D, Lhs>
-where
-    Lhs: Sub<Rhs>,
-{
-    type Output = Quantity<D, <Lhs as Sub<Rhs>>::Output>;
-
-    fn sub(self, rhs: Quantity<D, Rhs>) -> Self::Output {
-        Quantity::new(self.value - rhs.value)
-    }
-}
-
-/// A mass dimension whose exponent is encoded in half-power steps.
-///
-/// For example, `MassPower<P1>` is `M^(1/2)` and `MassPower<P2>` is `M^1`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct MassPower<E>(PhantomData<E>);
-
-pub type M0 = MassPower<Z0>;
-pub type MHalf = MassPower<P1>;
-pub type M1 = MassPower<P2>;
-pub type M3Over2 = MassPower<P3>;
-pub type M2 = MassPower<P4>;
-pub type M3 = MassPower<P6>;
-pub type M4 = MassPower<P8>;
-pub type MMinus1 = MassPower<N2>;
-
+/// A dimensionless quantity, such as the scale factor.
 pub type Dimensionless<V = f64> = Quantity<M0, V>;
+/// The scale factor `a`.
+pub type ScaleFactor<V = f64> = Quantity<M0, V>;
+/// A scalar field value `phi`.
 pub type Field<V = f64> = Quantity<M1, V>;
+/// A scalar field velocity `dphi/dt`.
 pub type FieldVelocity<V = f64> = Quantity<M2, V>;
+/// The Hubble rate `H`.
 pub type Hubble<V = f64> = Quantity<M1, V>;
+/// An energy density, such as `V(phi)`.
 pub type EnergyDensity<V = f64> = Quantity<M4, V>;
+/// The gradient of a potential, `dV/dphi`.
+pub type PotentialGradient<V = f64> = Quantity<M3, V>;
+/// A mass, such as the reduced Planck mass.
+pub type Mass<V = f64> = Quantity<M1, V>;
+/// Cosmic time `t`.
 pub type Time<V = f64> = Quantity<MMinus1, V>;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn creates_and_extracts_a_value() {
-        let phi = Field::new(0.17);
-
-        assert_eq!(*phi.value(), 0.17);
-        assert_eq!(phi.into_value(), 0.17);
-    }
-
-    #[test]
-    fn adds_quantities_with_the_same_dimension() {
-        let lhs = Field::new(1.25);
-        let rhs = Field::new(2.75);
-
-        assert_eq!((lhs + rhs).into_value(), 4.0);
-    }
-
-    #[test]
-    fn subtracts_quantities_with_the_same_dimension() {
-        let lhs = FieldVelocity::new(3.5);
-        let rhs = FieldVelocity::new(1.25);
-
-        assert_eq!((lhs - rhs).into_value(), 2.25);
-    }
-
-    #[test]
-    fn dimension_marker_has_no_runtime_size() {
-        assert_eq!(core::mem::size_of::<Field>(), core::mem::size_of::<f64>());
-    }
-}
