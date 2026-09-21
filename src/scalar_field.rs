@@ -111,27 +111,17 @@ impl<P: Potential> AdaptiveSystem for ScalarFieldSystem<P> {
         let relative = tolerances.relative;
         let absolute = &tolerances.absolute;
 
-        component_error_ratio(
-            error.phi.into_value(),
-            current.phi.into_value(),
-            next.phi.into_value(),
-            absolute.phi.into_value(),
-            relative,
-        )
-        .max(component_error_ratio(
-            error.pi.into_value(),
-            current.pi.into_value(),
-            next.pi.into_value(),
-            absolute.pi.into_value(),
-            relative,
-        ))
-        .max(component_error_ratio(
-            error.a.into_value(),
-            current.a.into_value(),
-            next.a.into_value(),
-            absolute.a.into_value(),
-            relative,
-        ))
+        component_error_ratio(error.phi, current.phi, next.phi, absolute.phi, relative)
+            .max(component_error_ratio(
+                error.pi,
+                current.pi,
+                next.pi,
+                absolute.pi,
+                relative,
+            ))
+            .max(component_error_ratio(
+                error.a, current.a, next.a, absolute.a, relative,
+            ))
     }
 }
 

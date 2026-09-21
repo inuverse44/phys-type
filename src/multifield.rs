@@ -358,29 +358,23 @@ pub(crate) fn multifield_error_ratio<const N: usize>(
     let absolute = &tolerances.absolute;
     let fields = (0..N).map(|index| {
         component_error_ratio(
-            error.phi[index].into_value(),
-            current.phi[index].into_value(),
-            next.phi[index].into_value(),
-            absolute.phi[index].into_value(),
+            error.phi[index],
+            current.phi[index],
+            next.phi[index],
+            absolute.phi[index],
             relative,
         )
     });
     let velocities = (0..N).map(|index| {
         component_error_ratio(
-            error.pi[index].into_value(),
-            current.pi[index].into_value(),
-            next.pi[index].into_value(),
-            absolute.pi[index].into_value(),
+            error.pi[index],
+            current.pi[index],
+            next.pi[index],
+            absolute.pi[index],
             relative,
         )
     });
-    let scale_factor = component_error_ratio(
-        error.a.into_value(),
-        current.a.into_value(),
-        next.a.into_value(),
-        absolute.a.into_value(),
-        relative,
-    );
+    let scale_factor = component_error_ratio(error.a, current.a, next.a, absolute.a, relative);
 
     fields.chain(velocities).fold(scale_factor, f64::max)
 }

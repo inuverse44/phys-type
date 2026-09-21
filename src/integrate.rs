@@ -6,6 +6,8 @@
 
 use core::ops::{Add, Mul};
 
+use crate::Quantity;
+
 /// A first-order system `dy/dt = f(y)` with dimension-checked state types.
 pub trait System {
     /// The independent variable, such as cosmic time `t` or e-folding `N`.
@@ -169,18 +171,24 @@ impl<A: Default> Default for ErrorTolerances<A> {
 /// The normalized error `|e| / (a_tol + r_tol max(|y|, |y_next|))` of one
 /// real component.
 ///
+/// Every argument but the relative tolerance carries the component's own
+/// dimension `D`, so a tolerance meant for one quantity cannot be used to
+/// bound another. The returned ratio is dimensionless.
+///
 /// Both endpoints of the step enter the scale, so a component passing through
 /// zero is still bounded by the absolute tolerance. A zero scale means the
 /// component is being controlled purely relatively and has vanished; a zero
 /// error there is exact, and anything else is unbounded.
-pub fn component_error_ratio(
-    error: f64,
-    current: f64,
-    next: f64,
-    absolute: f64,
+pub fn component_error_ratio<D>(
+    error: Quantity<D, f64>,
+    current: Quantity<D, f64>,
+    next: Quantity<D, f64>,
+    absolute: Quantity<D, f64>,
     relative: f64,
 ) -> f64 {
-    let scale = absolute + relative * current.abs().max(next.abs());
+    let error = error.into_value();
+    let scale =
+        absolute.into_value() + relative * current.into_value().abs().max(next.into_value().abs());
     if scale == 0.0 {
         return if error == 0.0 { 0.0 } else { f64::INFINITY };
     }
@@ -285,7 +293,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Time;
+    use crate::{Dimensionless, Time};
 
     #[derive(Clone)]
     struct NonCopyState(Box<f64>);
@@ -378,10 +386,10 @@ mod tests {
             tolerances: &ErrorTolerances<f64>,
         ) -> f64 {
             component_error_ratio(
-                *error.0,
-                *current.0,
-                *next.0,
-                tolerances.absolute,
+                Dimensionless::new(*error.0),
+                Dimensionless::new(*current.0),
+                Dimensionless::new(*next.0),
+                Dimensionless::new(tolerances.absolute),
                 tolerances.relative,
             )
         }
@@ -436,17 +444,34 @@ mod tests {
 
     #[test]
     fn a_component_passing_through_zero_is_bounded_by_the_absolute_tolerance() {
-        assert!(component_error_ratio(1.0e-13, 0.0, 0.0, 1.0e-12, 1.0e-8) < 1.0);
-        assert!(component_error_ratio(1.0e-11, 0.0, 0.0, 1.0e-12, 1.0e-8) > 1.0);
+        let ratio = |error: f64, absolute: f64| {
+            component_error_ratio(
+                Dimensionless::new(error),
+                Dimensionless::new(0.0),
+                Dimensionless::new(0.0),
+                Dimensionless::new(absolute),
+                1.0e-8,
+            )
+        };
+
+        assert!(ratio(1.0e-13, 1.0e-12) < 1.0);
+        assert!(ratio(1.0e-11, 1.0e-12) > 1.0);
     }
 
     #[test]
     fn a_vanished_component_with_no_absolute_floor_is_exact_or_unbounded() {
-        assert_eq!(component_error_ratio(0.0, 0.0, 0.0, 0.0, 1.0e-8), 0.0);
-        assert_eq!(
-            component_error_ratio(1.0e-30, 0.0, 0.0, 0.0, 1.0e-8),
-            f64::INFINITY
-        );
+        let ratio = |error: f64| {
+            component_error_ratio(
+                Dimensionless::new(error),
+                Dimensionless::new(0.0),
+                Dimensionless::new(0.0),
+                Dimensionless::new(0.0),
+                1.0e-8,
+            )
+        };
+
+        assert_eq!(ratio(0.0), 0.0);
+        assert_eq!(ratio(1.0e-30), f64::INFINITY);
     }
 
     #[test]
