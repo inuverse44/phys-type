@@ -55,6 +55,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A spectrum run starts each mode a stated number of e-folds before its own
   horizon exit, replacing the raw depth `x_init`, which is now derived and
   still recorded in the CSV metadata.
+- Absolute error tolerances are per group of components and carry each group's
+  dimension. `AdaptiveSystem` gains an `AbsoluteTolerance` associated type,
+  `ErrorTolerances` is generic over it, and mode components default to no
+  absolute floor because their modulus norm never vanishes.
 
 ## [0.1.0] - 2026-09-21
 

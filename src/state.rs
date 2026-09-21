@@ -52,6 +52,21 @@ pub struct StateDelta {
     pub a: ScaleFactor,
 }
 
+impl StateDelta {
+    /// Attaches the same raw Planck-unit number to every component.
+    ///
+    /// This is the convenient default, not the safe one: it is exactly the
+    /// assumption that one number suits every dimension, which holds only
+    /// while a state's components stay within a few orders of each other.
+    pub const fn from_planck_units(value: f64) -> Self {
+        Self {
+            phi: Field::new(value),
+            pi: FieldVelocity::new(value),
+            a: ScaleFactor::new(value),
+        }
+    }
+}
+
 impl State {
     /// Builds a state from its three background variables.
     pub const fn new(phi: Field, pi: FieldVelocity, a: ScaleFactor) -> Self {

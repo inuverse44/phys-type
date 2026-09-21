@@ -179,18 +179,18 @@ being silently discarded.
 
 `run_two_field_spectra` puts those pieces together. It surveys the background
 to the end of inflation, fixes `k_pivot = a_* H_*` a chosen number of e-folds
-earlier, carries every wavenumber to a fixed number of e-folds before its own horizon
-exit before initializing the vacuum there, and reports spectra at one output
-time. A mode
-that cannot be placed deep enough inside the horizon is a typed error, not a
-silently poor approximation. Note that the single absolute error tolerance
-applies to raw Planck-unit values across a run spanning some fifty orders of
-magnitude, so it must sit far below the smallest component. The modes are
-integrated rescaled as `v = a U`, which keeps the vacuum amplitude at
-`1/sqrt(2k)` instead of letting it decay with the scale factor, and leaves the
-answer unchanged across some thirty orders of absolute tolerance;
-`docs/two-field-perturbation-design.md` records the measurement and what is
-still left to do.
+earlier, carries every wavenumber to a stated number of e-folds before its own
+horizon exit before initializing the vacuum there, and reports spectra at one
+output time. A mode that cannot be placed deep enough inside the horizon is a
+typed error, not a silently poor approximation.
+
+A run spans tens of orders of magnitude, so absolute error tolerances are per
+group of components and carry each group's dimension: a tolerance meant for
+one quantity cannot bound another. The modes are integrated rescaled as
+`v = a U` and default to no absolute floor at all, because their error is
+normalized by a modulus that does not vanish, and a floor there would become
+their accuracy ceiling. `docs/two-field-perturbation-design.md` records the
+measurements behind both choices.
 
 ## Compile-fail tests
 

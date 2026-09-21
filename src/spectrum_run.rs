@@ -22,9 +22,9 @@ use crate::spectra::{
 };
 use crate::{
     ContravariantField, CovariantMultifieldSystem, CurvedFieldSpaceGeometry, KinematicBasisError,
-    M0, Mass, ModeInitializationError, MultifieldState, Time,
+    M0, Mass, ModeInitializationError, MultifieldState, MultifieldStateDelta, Time,
     TwiceDifferentiableMultifieldPotential, TwoFieldKinematics, TwoFieldPerturbationState,
-    TwoFieldPerturbationSystem,
+    TwoFieldPerturbationSystem, TwoFieldPerturbationTolerance,
 };
 
 /// Everything the run needs beyond the physical model and its initial state.
@@ -38,13 +38,11 @@ pub struct SpectrumRunSettings {
     pub max_dt: Time,
     /// Tolerances for the shared adaptive controller.
     ///
-    /// The absolute tolerance applies to raw Planck-unit values, so it has to
-    /// sit below every component of the state. Because the modes are
-    /// integrated rescaled as `v = a U`, the smallest of them starts at
-    /// `1 / sqrt(2k)` rather than at `1 / (a sqrt(2k))`, and the default
-    /// below has room to spare: the answer is unchanged up to about `1e-14`
-    /// and only degrades beyond it.
-    pub tolerances: ErrorTolerances,
+    /// The absolute part carries one tolerance per group of components, each
+    /// in that group's own dimension. The background gets a floor in Planck
+    /// units; the modes get none, because their norm is a modulus that does
+    /// not vanish and any floor there would become their accuracy ceiling.
+    pub tolerances: ErrorTolerances<TwoFieldPerturbationTolerance>,
     /// A safety limit on attempted steps in any one stage.
     pub max_steps: usize,
     /// Give up on inflation ending after this many e-folds.
@@ -81,10 +79,10 @@ impl Default for SpectrumRunSettings {
             initial_dt: Time::new(100.0),
             min_dt: Time::new(1.0e-6),
             max_dt: Time::new(1.0e5),
-            tolerances: ErrorTolerances {
-                absolute: 1.0e-20,
-                relative: 1.0e-10,
-            },
+            tolerances: ErrorTolerances::new(
+                TwoFieldPerturbationTolerance::background_in_planck_units(1.0e-20),
+                1.0e-10,
+            ),
             max_steps: 1_000_000,
             max_e_folds: 120.0,
             e_folds_before_exit: 5.0,
@@ -371,10 +369,33 @@ pub fn write_metadata<W: Write>(
         settings.e_folds_before_exit
     )?;
     writeln!(writer, "# x_init: {:e}", start_depth(settings))?;
+    // The absolute tolerances are per component group, so the metadata
+    // records each of them rather than one number.
+    let absolute = &settings.tolerances.absolute;
     writeln!(
         writer,
-        "# absolute_tolerance: {:e}",
-        settings.tolerances.absolute
+        "# absolute_tolerance_phi: {:e}",
+        absolute.background.phi[0].into_value()
+    )?;
+    writeln!(
+        writer,
+        "# absolute_tolerance_pi: {:e}",
+        absolute.background.pi[0].into_value()
+    )?;
+    writeln!(
+        writer,
+        "# absolute_tolerance_a: {:e}",
+        absolute.background.a.into_value()
+    )?;
+    writeln!(
+        writer,
+        "# absolute_tolerance_mode_amplitude: {:e}",
+        absolute.rescaled_amplitude.into_value()
+    )?;
+    writeln!(
+        writer,
+        "# absolute_tolerance_mode_velocity: {:e}",
+        absolute.rescaled_velocity.into_value()
     )?;
     writeln!(
         writer,
@@ -412,6 +433,7 @@ fn advance_until<S, Event, Observe>(
     initial_state: S::State,
     initial_time: Time,
     settings: &SpectrumRunSettings,
+    tolerances: &ErrorTolerances<S::AbsoluteTolerance>,
     mut event: Event,
     mut on_accepted: Observe,
 ) -> Result<(S::State, Time), SpectrumRunError>
@@ -434,7 +456,7 @@ where
     }
 
     for _ in 0..settings.max_steps {
-        let attempt = adaptive_step(system, time, &state, dt, settings.tolerances);
+        let attempt = adaptive_step(system, time, &state, dt, tolerances);
 
         if attempt.accepted {
             if event(&attempt.state) <= 0.0 {
@@ -581,6 +603,7 @@ where
             initial,
             Time::new(0.0),
             settings,
+            &background_tolerances(settings),
             |state| {
                 let remaining = settings.max_e_folds - state.e_folds(&initial);
                 let inflating = 1.0 - self.epsilon_h(state);
@@ -633,6 +656,7 @@ where
             initial,
             Time::new(0.0),
             settings,
+            &background_tolerances(settings),
             |state| target - state.e_folds(&initial),
             |_, _| {},
         )?;
@@ -677,6 +701,7 @@ where
             initial,
             Time::new(0.0),
             settings,
+            &background_tolerances(settings),
             |state| (k / (state.a * self.hubble(state))).into_value() - start_depth(settings),
             |_, _| {},
         )?;
@@ -706,6 +731,7 @@ where
             mode_state,
             start_time,
             settings,
+            &settings.tolerances,
             |state| e_folds_at_output - state.background.e_folds(&initial),
             |state, _| {
                 accepted += 1;
@@ -827,6 +853,16 @@ fn component_pair(vector: &ContravariantField<M0, f64, 2>) -> [f64; 2] {
     let components = vector.components();
 
     [components[0].into_value(), components[1].into_value()]
+}
+
+/// The background-only tolerances implied by a run's settings.
+fn background_tolerances(
+    settings: &SpectrumRunSettings,
+) -> ErrorTolerances<MultifieldStateDelta<2>> {
+    ErrorTolerances::new(
+        settings.tolerances.absolute.background,
+        settings.tolerances.relative,
+    )
 }
 
 /// The depth `x_init = k/(aH)` at which modes are initialized.
@@ -1171,11 +1207,9 @@ mod tests {
 
     #[test]
     fn the_answer_is_insensitive_to_the_absolute_tolerance() {
-        // Before the modes were rescaled by the scale factor, an absolute
-        // floor of 1e-30 already sat above the mode amplitudes and silently
-        // capped their accuracy. The rescaled amplitude starts at
-        // 1 / sqrt(2k) and grows with the scale factor afterwards, so the
-        // floor can be raised by many orders without moving the answer.
+        // The background floor and the mode components are now separate
+        // settings, so moving the background floor over thirty orders of
+        // magnitude cannot reach the modes at all.
         let system = system([1.0e-6, 1.5e-6]);
         let initial = slow_roll_start(&system, [12.0, 8.0]);
         let curvature = |absolute| {
@@ -1183,10 +1217,10 @@ mod tests {
                 .run_two_field_spectra(
                     initial,
                     &SpectrumRunSettings {
-                        tolerances: ErrorTolerances {
-                            absolute,
-                            relative: 1.0e-10,
-                        },
+                        tolerances: ErrorTolerances::new(
+                            TwoFieldPerturbationTolerance::background_in_planck_units(absolute),
+                            1.0e-10,
+                        ),
                         ..quick_settings()
                     },
                 )
@@ -1207,6 +1241,18 @@ mod tests {
                 "absolute {absolute:e} moved P_R by {relative:e}"
             );
         }
+    }
+
+    #[test]
+    fn the_default_leaves_the_modes_under_pure_relative_control() {
+        // A mode error is normalized by a modulus, which does not vanish for
+        // a physical mode, so no floor is needed to keep the ratio finite.
+        // A floor here would only cap the accuracy of the modes.
+        let absolute = SpectrumRunSettings::default().tolerances.absolute;
+
+        assert_eq!(absolute.rescaled_amplitude.into_value(), 0.0);
+        assert_eq!(absolute.rescaled_velocity.into_value(), 0.0);
+        assert!(absolute.background.phi[0].into_value() > 0.0);
     }
 
     #[test]

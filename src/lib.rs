@@ -36,7 +36,7 @@ pub use field_space::{
 };
 pub use integrate::{
     AdaptiveAttempt, AdaptiveSystem, EmbeddedStep, ErrorTolerances, StepSizeLimits, System,
-    adaptive_step, next_step_size, rk4_step, rk45_step,
+    adaptive_step, component_error_ratio, next_step_size, rk4_step, rk45_step,
 };
 pub use multifield::{
     CovariantMultifieldSystem, MultifieldState, MultifieldStateDelta, MultifieldStateDerivative,
@@ -46,7 +46,8 @@ pub use num_complex::Complex64;
 pub use perturbation::{
     ComplexMagnitude, ComplexMatrix2, ModeAcceleration, ModeAmplitude, ModeInitializationError,
     ModeVelocity, TwoFieldModes, TwoFieldPerturbationDelta, TwoFieldPerturbationDerivative,
-    TwoFieldPerturbationState, TwoFieldPerturbationSystem, normalized_mode_error,
+    TwoFieldPerturbationState, TwoFieldPerturbationSystem, TwoFieldPerturbationTolerance,
+    normalized_mode_error,
 };
 pub use potential::{
     MultifieldPotential, MultifieldPotentialValue, Potential, PotentialDerivatives, PotentialValue,

@@ -11,6 +11,7 @@ use crate::integrate::{ErrorTolerances, StepSizeLimits, adaptive_step, next_step
 use crate::potential::Potential;
 use crate::scalar_field::ScalarFieldSystem;
 use crate::state::State;
+use crate::state::StateDelta;
 use crate::{Field, FieldVelocity, ScaleFactor, Time};
 
 /// How far and how finely the background is integrated.
@@ -248,10 +249,13 @@ impl<P: Potential> ScalarFieldSystem<P> {
         assert!(settings.relative_tolerance > 0.0);
         assert!(settings.sample_every > 0);
 
-        let tolerances = ErrorTolerances {
-            absolute: settings.absolute_tolerance,
-            relative: settings.relative_tolerance,
-        };
+        // The single-field background keeps its scalar setting: its three
+        // components stay within a few orders of each other, so one raw
+        // Planck-unit number is an honest absolute floor for all of them.
+        let tolerances = ErrorTolerances::new(
+            StateDelta::from_planck_units(settings.absolute_tolerance),
+            settings.relative_tolerance,
+        );
         let limits = StepSizeLimits {
             min: settings.min_dt,
             max: settings.max_dt,
@@ -277,7 +281,7 @@ impl<P: Potential> ScalarFieldSystem<P> {
                 }
             }
 
-            let attempt = adaptive_step(self, time, &state, dt, tolerances);
+            let attempt = adaptive_step(self, time, &state, dt, &tolerances);
 
             adaptive_steps.push(AdaptiveStep {
                 start_time: time,

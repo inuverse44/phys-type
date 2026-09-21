@@ -434,12 +434,33 @@ system cannot separate them. The rescaling is therefore undone in exactly
 one place, `mode_covariance`, which takes the scale factor as an argument so
 that the conversion cannot be forgotten silently.
 
-Two things are deliberately left undone. The rescaled amplitude grows with
-`a` once a mode is outside the horizon, so the range is moved into a benign
-region rather than eliminated; a per-component absolute scale, which the
-dimensioned signature of `normalized_mode_error` already permits, would
-remove the hazard outright. And the independent variable is still cosmic
-time: conformal time would additionally make the sub-horizon frequency
+The rescaled amplitude still grows with `a` once a mode is outside the
+horizon, so the rescaling moves the range into a benign region rather than
+eliminating it. What removes the hazard outright is giving each group of
+components its own absolute tolerance, in that group's own dimension:
+
+```rust,ignore
+pub struct TwoFieldPerturbationTolerance {
+    pub background: MultifieldStateDelta<2>,
+    pub rescaled_amplitude: ModeAmplitude<f64>,
+    pub rescaled_velocity: ModeVelocity<f64>,
+}
+```
+
+`AdaptiveSystem` carries this as an associated type, so a tolerance meant for
+one quantity cannot bound another, and a compile-fail test holds that open.
+
+The mode tolerances default to zero, which is the point rather than an
+oversight. A mode component is complex and is normalized by its modulus,
+and the modulus of a physical mode does not vanish, so no floor is needed to
+keep the ratio finite. Any floor placed there becomes the accuracy ceiling of
+the modes instead, which is exactly how the run used to lose its convergence
+in `x_init` without anything failing. The background components are real and
+can pass through zero, so they keep a floor, and one raw Planck-unit number
+is honest for them because they stay within a few orders of each other.
+
+One thing is deliberately left undone. The independent variable is still
+cosmic time: conformal time would additionally make the sub-horizon frequency
 constant at `k`, but `Time` and a conformal time would share the dimension
 `M^-1` and so would be the same type, which needs its own marker to stay
 safe.
@@ -471,6 +492,11 @@ e-folds before exit   x_init   relative error   time
         6              403          5.8e-6      0.024 s
         7             1097          3.8e-7      0.061 s
 ```
+
+The first row is not an integration failure. The exact de Sitter mode has
+`|u|^2 = (1 + 1/x^2)/(2 k a^2)`, and the initialization keeps only the leading
+term, so at `x = 2.7` the discarded correction is `13.5%` against a measured
+`14.8%`. One e-fold before exit is simply not yet Bunch-Davies.
 
 From four e-folds onward the measured error tracks `1/x_init^2` closely. The
 default of five e-folds buys a systematic error around `2e-5`, well below the

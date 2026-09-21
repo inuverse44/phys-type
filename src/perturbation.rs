@@ -55,9 +55,19 @@ pub fn normalized_mode_error<D>(
     absolute_tolerance: Quantity<D, f64>,
     relative_tolerance: f64,
 ) -> f64 {
-    let scale = current.complex_magnitude().max(next.complex_magnitude());
+    let magnitude = current.complex_magnitude().max(next.complex_magnitude());
+    let scale = absolute_tolerance.into_value() + relative_tolerance * magnitude;
+    if scale == 0.0 {
+        // A vanished component under pure relative control: an exact zero
+        // error is fine, anything else is unbounded.
+        return if error.complex_magnitude() == 0.0 {
+            0.0
+        } else {
+            f64::INFINITY
+        };
+    }
 
-    error.complex_magnitude() / (absolute_tolerance.into_value() + relative_tolerance * scale)
+    error.complex_magnitude() / scale
 }
 
 /// The two independent complex two-field mode functions, rescaled by the
@@ -363,11 +373,42 @@ where
     }
 }
 
+/// Absolute tolerances for a background-plus-modes state.
+///
+/// The mode entries default to zero, which is not an oversight. A mode
+/// component is complex and is normalized by its modulus, and the modulus of
+/// a physical mode never vanishes, so no floor is needed to keep the ratio
+/// finite. Any floor placed there instead becomes the accuracy ceiling for
+/// the modes, which is how the run previously lost its convergence in
+/// `x_init` without failing.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TwoFieldPerturbationTolerance {
+    /// Absolute tolerances for the background components.
+    pub background: MultifieldStateDelta<2>,
+    /// Absolute tolerance for every rescaled mode amplitude.
+    pub rescaled_amplitude: ModeAmplitude<f64>,
+    /// Absolute tolerance for every rescaled mode velocity.
+    pub rescaled_velocity: ModeVelocity<f64>,
+}
+
+impl TwoFieldPerturbationTolerance {
+    /// Bounds the background in Planck units and leaves the modes under pure
+    /// relative control.
+    pub fn background_in_planck_units(value: f64) -> Self {
+        Self {
+            background: MultifieldStateDelta::from_planck_units(value),
+            ..Self::default()
+        }
+    }
+}
+
 impl<P, G> AdaptiveSystem for TwoFieldPerturbationSystem<P, G>
 where
     P: TwiceDifferentiableMultifieldPotential<2>,
     G: CurvedFieldSpaceGeometry<2>,
 {
+    type AbsoluteTolerance = TwoFieldPerturbationTolerance;
+
     /// Combines the background norm with the complex mode norms.
     ///
     /// Each mode component contributes the modulus of its whole complex
@@ -377,13 +418,13 @@ where
         current: &Self::State,
         next: &Self::State,
         error: &Self::Delta,
-        tolerances: ErrorTolerances,
+        tolerances: &ErrorTolerances<TwoFieldPerturbationTolerance>,
     ) -> f64 {
         let background = self.background.error_ratio(
             &current.background,
             &next.background,
             &error.background,
-            tolerances,
+            &ErrorTolerances::new(tolerances.absolute.background, tolerances.relative),
         );
 
         (0..2)
@@ -393,14 +434,14 @@ where
                     error.amplitude[field][mode],
                     current.modes.rescaled_amplitude[field][mode],
                     next.modes.rescaled_amplitude[field][mode],
-                    ModeAmplitude::<f64>::new(tolerances.absolute),
+                    tolerances.absolute.rescaled_amplitude,
                     tolerances.relative,
                 );
                 let velocity = normalized_mode_error(
                     error.velocity[field][mode],
                     current.modes.rescaled_velocity[field][mode],
                     next.modes.rescaled_velocity[field][mode],
-                    ModeVelocity::<f64>::new(tolerances.absolute),
+                    tolerances.absolute.rescaled_velocity,
                     tolerances.relative,
                 );
 
@@ -495,32 +536,38 @@ mod tests {
     fn a_purely_imaginary_mode_error_still_drives_the_step_decision() {
         let system = system();
         let state = system.bunch_davies_state(background(), 100.0).unwrap();
-        let tolerances = ErrorTolerances::default();
+        let tolerances = ErrorTolerances::new(
+            TwoFieldPerturbationTolerance::background_in_planck_units(1.0e-12),
+            1.0e-8,
+        );
 
         assert_eq!(
-            system.error_ratio(&state, &state, &zero_delta(), tolerances),
+            system.error_ratio(&state, &state, &zero_delta(), &tolerances),
             0.0
         );
 
         let mut imaginary = zero_delta();
         imaginary.amplitude[0][0] = ModeAmplitude::new(Complex64::new(0.0, 1.0));
 
-        assert!(system.error_ratio(&state, &state, &imaginary, tolerances) > 1.0);
+        assert!(system.error_ratio(&state, &state, &imaginary, &tolerances) > 1.0);
     }
 
     #[test]
     fn an_adaptive_step_accepts_a_small_step_and_rejects_a_huge_one() {
         let system = system();
         let state = system.bunch_davies_state(background(), 100.0).unwrap();
-        let tolerances = ErrorTolerances::default();
+        let tolerances = ErrorTolerances::new(
+            TwoFieldPerturbationTolerance::background_in_planck_units(1.0e-12),
+            1.0e-8,
+        );
 
-        let small = adaptive_step(&system, Time::new(0.0), &state, Time::new(1.0), tolerances);
+        let small = adaptive_step(&system, Time::new(0.0), &state, Time::new(1.0), &tolerances);
         let huge = adaptive_step(
             &system,
             Time::new(0.0),
             &state,
             Time::new(1.0e6),
-            tolerances,
+            &tolerances,
         );
 
         assert!(small.accepted);

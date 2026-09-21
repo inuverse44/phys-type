@@ -136,34 +136,56 @@ pub fn rk45_step<S: System>(
 /// Tolerances that turn an embedded error estimate into a dimensionless
 /// ratio.
 ///
-/// The absolute tolerance applies to raw Planck-unit component values, so a
-/// single pair of numbers covers every component of a state.
+/// `A` is a per-system container holding one absolute tolerance for each
+/// group of components, each carrying that group's own physical dimension.
+/// A single number cannot serve a whole state: in a spectrum run the scale
+/// factor and the mode amplitudes are tens of orders of magnitude apart, and
+/// one floor placed for the sake of the first silently caps the accuracy of
+/// the second.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ErrorTolerances {
-    /// Absolute tolerance applied to raw Planck-unit component values.
-    pub absolute: f64,
-    /// Relative tolerance applied component by component.
+pub struct ErrorTolerances<A> {
+    /// Absolute tolerances, in the dimensions of the components they bound.
+    pub absolute: A,
+    /// Relative tolerance, applied to every component alike.
     pub relative: f64,
 }
 
-impl Default for ErrorTolerances {
+impl<A> ErrorTolerances<A> {
+    /// Pairs a set of absolute tolerances with one relative tolerance.
+    pub const fn new(absolute: A, relative: f64) -> Self {
+        Self { absolute, relative }
+    }
+}
+
+impl<A: Default> Default for ErrorTolerances<A> {
     fn default() -> Self {
         Self {
-            absolute: 1.0e-12,
+            absolute: A::default(),
             relative: 1.0e-8,
         }
     }
 }
 
-impl ErrorTolerances {
-    /// The normalized error `|e| / (a_tol + r_tol max(|y|, |y_next|))` of one
-    /// real component.
-    ///
-    /// Both endpoints of the step enter the scale so that a component passing
-    /// through zero is still bounded by the absolute tolerance.
-    pub fn component_ratio(&self, error: f64, current: f64, next: f64) -> f64 {
-        error.abs() / (self.absolute + self.relative * current.abs().max(next.abs()))
+/// The normalized error `|e| / (a_tol + r_tol max(|y|, |y_next|))` of one
+/// real component.
+///
+/// Both endpoints of the step enter the scale, so a component passing through
+/// zero is still bounded by the absolute tolerance. A zero scale means the
+/// component is being controlled purely relatively and has vanished; a zero
+/// error there is exact, and anything else is unbounded.
+pub fn component_error_ratio(
+    error: f64,
+    current: f64,
+    next: f64,
+    absolute: f64,
+    relative: f64,
+) -> f64 {
+    let scale = absolute + relative * current.abs().max(next.abs());
+    if scale == 0.0 {
+        return if error == 0.0 { 0.0 } else { f64::INFINITY };
     }
+
+    error.abs() / scale
 }
 
 /// A system whose embedded step error can be normalized to a single ratio.
@@ -173,6 +195,13 @@ impl ErrorTolerances {
 /// implementation reduces the whole state to the largest normalized component
 /// error, so one acceptance decision covers the entire step.
 pub trait AdaptiveSystem: System {
+    /// One absolute tolerance per group of components, each in that group's
+    /// dimension.
+    ///
+    /// Giving this a type rather than a number is what stops a tolerance
+    /// meant for one quantity from bounding another.
+    type AbsoluteTolerance;
+
     /// The largest normalized component error of one embedded step.
     ///
     /// A step is accepted when this does not exceed one.
@@ -181,7 +210,7 @@ pub trait AdaptiveSystem: System {
         current: &Self::State,
         next: &Self::State,
         error: &Self::Delta,
-        tolerances: ErrorTolerances,
+        tolerances: &ErrorTolerances<Self::AbsoluteTolerance>,
     ) -> f64;
 }
 
@@ -214,7 +243,7 @@ pub fn adaptive_step<S: AdaptiveSystem>(
     independent: S::IndependentVariable,
     state: &S::State,
     step: S::IndependentVariable,
-    tolerances: ErrorTolerances,
+    tolerances: &ErrorTolerances<S::AbsoluteTolerance>,
 ) -> AdaptiveAttempt<S::State> {
     let attempt = rk45_step(system, independent, state, step);
     let error_ratio = system.error_ratio(state, &attempt.state, &attempt.error, tolerances);
@@ -339,14 +368,22 @@ mod tests {
     }
 
     impl AdaptiveSystem for ExponentialSystem {
+        type AbsoluteTolerance = f64;
+
         fn error_ratio(
             &self,
             current: &Self::State,
             next: &Self::State,
             error: &Self::Delta,
-            tolerances: ErrorTolerances,
+            tolerances: &ErrorTolerances<f64>,
         ) -> f64 {
-            tolerances.component_ratio(*error.0, *current.0, *next.0)
+            component_error_ratio(
+                *error.0,
+                *current.0,
+                *next.0,
+                tolerances.absolute,
+                tolerances.relative,
+            )
         }
     }
 
@@ -357,7 +394,7 @@ mod tests {
             Time::new(0.0),
             &NonCopyState(Box::new(1.0)),
             Time::new(0.01),
-            ErrorTolerances::default(),
+            &ErrorTolerances::new(1.0e-12, 1.0e-8),
         );
 
         assert!(attempt.accepted);
@@ -372,7 +409,7 @@ mod tests {
             Time::new(0.0),
             &NonCopyState(Box::new(1.0)),
             Time::new(5.0),
-            ErrorTolerances::default(),
+            &ErrorTolerances::new(1.0e-12, 1.0e-8),
         );
 
         assert!(!attempt.accepted);
@@ -399,13 +436,17 @@ mod tests {
 
     #[test]
     fn a_component_passing_through_zero_is_bounded_by_the_absolute_tolerance() {
-        let tolerances = ErrorTolerances {
-            absolute: 1.0e-12,
-            relative: 1.0e-8,
-        };
+        assert!(component_error_ratio(1.0e-13, 0.0, 0.0, 1.0e-12, 1.0e-8) < 1.0);
+        assert!(component_error_ratio(1.0e-11, 0.0, 0.0, 1.0e-12, 1.0e-8) > 1.0);
+    }
 
-        assert!(tolerances.component_ratio(1.0e-13, 0.0, 0.0) < 1.0);
-        assert!(tolerances.component_ratio(1.0e-11, 0.0, 0.0) > 1.0);
+    #[test]
+    fn a_vanished_component_with_no_absolute_floor_is_exact_or_unbounded() {
+        assert_eq!(component_error_ratio(0.0, 0.0, 0.0, 0.0, 1.0e-8), 0.0);
+        assert_eq!(
+            component_error_ratio(1.0e-30, 0.0, 0.0, 0.0, 1.0e-8),
+            f64::INFINITY
+        );
     }
 
     #[test]

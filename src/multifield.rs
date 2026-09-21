@@ -2,7 +2,7 @@
 
 use core::ops::{Add, Mul};
 
-use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
+use crate::integrate::{AdaptiveSystem, ErrorTolerances, System, component_error_ratio};
 use crate::potential::MultifieldPotential;
 use crate::{
     ContravariantField, CovariantPotentialHessian, CurvedFieldSpaceGeometry, EnergyDensity, Field,
@@ -54,6 +54,28 @@ pub struct MultifieldStateDelta<const N: usize> {
     pub pi: [FieldVelocity; N],
     /// Change in the scale factor.
     pub a: ScaleFactor,
+}
+
+// A const-generic array is not `Default`, so this is written out.
+impl<const N: usize> Default for MultifieldStateDelta<N> {
+    fn default() -> Self {
+        Self::from_planck_units(0.0)
+    }
+}
+
+impl<const N: usize> MultifieldStateDelta<N> {
+    /// Attaches the same raw Planck-unit number to every component.
+    ///
+    /// Convenient rather than safe: it assumes one number suits every
+    /// dimension, which holds only while a state's components stay within a
+    /// few orders of each other.
+    pub fn from_planck_units(value: f64) -> Self {
+        Self {
+            phi: [Field::new(value); N],
+            pi: [FieldVelocity::new(value); N],
+            a: ScaleFactor::new(value),
+        }
+    }
 }
 
 impl<const N: usize> Add<MultifieldStateDelta<N>> for MultifieldState<N> {
@@ -326,30 +348,38 @@ where
 /// The largest normalized component error of a multifield background step.
 ///
 /// Both background systems evolve the same state, so they share this norm.
-fn multifield_error_ratio<const N: usize>(
+pub(crate) fn multifield_error_ratio<const N: usize>(
     current: &MultifieldState<N>,
     next: &MultifieldState<N>,
     error: &MultifieldStateDelta<N>,
-    tolerances: ErrorTolerances,
+    tolerances: &ErrorTolerances<MultifieldStateDelta<N>>,
 ) -> f64 {
+    let relative = tolerances.relative;
+    let absolute = &tolerances.absolute;
     let fields = (0..N).map(|index| {
-        tolerances.component_ratio(
+        component_error_ratio(
             error.phi[index].into_value(),
             current.phi[index].into_value(),
             next.phi[index].into_value(),
+            absolute.phi[index].into_value(),
+            relative,
         )
     });
     let velocities = (0..N).map(|index| {
-        tolerances.component_ratio(
+        component_error_ratio(
             error.pi[index].into_value(),
             current.pi[index].into_value(),
             next.pi[index].into_value(),
+            absolute.pi[index].into_value(),
+            relative,
         )
     });
-    let scale_factor = tolerances.component_ratio(
+    let scale_factor = component_error_ratio(
         error.a.into_value(),
         current.a.into_value(),
         next.a.into_value(),
+        absolute.a.into_value(),
+        relative,
     );
 
     fields.chain(velocities).fold(scale_factor, f64::max)
@@ -395,12 +425,14 @@ where
     P: MultifieldPotential<N>,
     G: FieldSpaceGeometry<N>,
 {
+    type AbsoluteTolerance = MultifieldStateDelta<N>;
+
     fn error_ratio(
         &self,
         current: &Self::State,
         next: &Self::State,
         error: &Self::Delta,
-        tolerances: ErrorTolerances,
+        tolerances: &ErrorTolerances<MultifieldStateDelta<N>>,
     ) -> f64 {
         multifield_error_ratio(current, next, error, tolerances)
     }
@@ -487,12 +519,14 @@ impl<P, const N: usize> AdaptiveSystem for MultifieldSystem<P, N>
 where
     P: MultifieldPotential<N>,
 {
+    type AbsoluteTolerance = MultifieldStateDelta<N>;
+
     fn error_ratio(
         &self,
         current: &Self::State,
         next: &Self::State,
         error: &Self::Delta,
-        tolerances: ErrorTolerances,
+        tolerances: &ErrorTolerances<MultifieldStateDelta<N>>,
     ) -> f64 {
         multifield_error_ratio(current, next, error, tolerances)
     }
