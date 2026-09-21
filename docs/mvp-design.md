@@ -150,8 +150,10 @@ struct MultifieldState<const N: usize> {
 ```
 
 This first version assumes a flat field-space metric and canonical kinetic
-terms. Curved field-space geometry and dynamically sized tensors remain
-separate future extensions.
+terms. The staged design for tensor variance, covariant backgrounds, and
+two-field perturbations is specified in
+[`two-field-perturbation-design.md`](two-field-perturbation-design.md).
+Dynamically sized tensors remain a separate future extension.
 
 ## Potential
 

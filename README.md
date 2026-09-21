@@ -4,8 +4,10 @@ Dimension-aware physical quantities for numerical physics, in Rust.
 
 Physical dimensions live in the type system, so a dimensionally invalid
 expression fails to compile instead of producing a wrong number. The first
-target is single-field inflationary background evolution; see
-[`docs/mvp-design.md`](docs/mvp-design.md) for the design.
+target is inflationary background evolution; see
+[`docs/mvp-design.md`](docs/mvp-design.md). The next scientific target is a
+covariant two-field adiabatic/isocurvature spectrum, specified in
+[`docs/two-field-perturbation-design.md`](docs/two-field-perturbation-design.md).
 
 ## Running it
 
@@ -86,6 +88,11 @@ through `system.run(initial, RunSettings::default())`.
 Canonical multifield systems use fixed-size arrays and the same generic
 integrators. `QuadraticMultifieldPotential<N>` supplies one mass per field and
 obtains every gradient component through automatic differentiation.
+
+The current multifield solver is a flat, canonical background implementation.
+It does not yet evolve quantum perturbations or power spectra. Those stages,
+including typed upper/lower field-space indices, are tracked in the two-field
+perturbation design.
 
 ## Compile-fail tests
 
