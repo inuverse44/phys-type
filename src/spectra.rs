@@ -157,7 +157,7 @@ pub fn field_power_spectrum(k: Mass, covariance: &ModeCovariance) -> FieldPowerS
 
 /// The largest modulus in a spectrum matrix, used as the scale for every
 /// relative tolerance.
-fn spectrum_scale(spectrum: &FieldPowerSpectrum) -> f64 {
+pub(crate) fn spectrum_scale(spectrum: &FieldPowerSpectrum) -> f64 {
     spectrum
         .components()
         .iter()
@@ -214,7 +214,7 @@ fn project_complex(
 
 /// Discards the imaginary part of a projected spectrum after checking that it
 /// is negligible relative to `scale`.
-fn discard_imaginary(
+pub(crate) fn discard_imaginary(
     value: Quantity<M2, Complex64>,
     scale: f64,
     tolerance: f64,

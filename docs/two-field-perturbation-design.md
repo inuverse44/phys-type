@@ -261,7 +261,12 @@ imaginary components.
 
 Complex numbers are split into real and imaginary columns only at explicit
 interoperability boundaries such as CSV. Both columns are emitted, even when
-a particular observable is expected to be real.
+a particular observable is expected to be real, and the imaginary part is
+checked against the reality tolerance before the split. `Im P^12` is the one
+that matters: the diagonal entries of the spectrum matrix are sums of squared
+moduli and so are real by construction, while the off-diagonal entry is the
+equal-time field commutator, which vanishes in the vacuum and is conserved, so
+whatever appears in that column was produced by the integrator.
 
 ## Spectra and normalization
 
@@ -338,7 +343,7 @@ N, phi_1, phi_2, pi_1, pi_2, H, epsilon_H,
 e_sigma_1, e_sigma_2, e_s_1, e_s_2, eta_perp
 
 spectra.csv:
-k_over_pivot, k, P_11, P_22, Re_P_12,
+k_over_pivot, k, P_11, P_22, Re_P_12, Im_P_12,
 P_Qsigma, P_Qs, C_Qsigma_Qs, P_R, P_S, C_RS, r_C
 
 mode_evolution.csv:

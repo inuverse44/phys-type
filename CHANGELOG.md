@@ -62,6 +62,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `project_modes` reports the curvature and entropy amplitude of each
   independent mode, which the super-horizon transfer matrix needs.
 
+- `Im_P_12` is emitted alongside `Re_P_12`, and the imaginary part of the
+  off-diagonal spectrum entry is checked against the reality tolerance instead
+  of being discarded unexamined.
 - Mode step errors are normalized by the largest modulus in the mode matrix
   rather than by each component's own, so a component sitting at exactly zero
   cannot dominate the norm.

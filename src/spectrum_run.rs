@@ -220,6 +220,12 @@ pub struct SpectrumRecord {
     pub p_22: f64,
     /// `Re P^{12} / M_pl^2`.
     pub re_p_12: f64,
+    /// `Im P^{12} / M_pl^2`.
+    ///
+    /// Emitted even though it is expected to vanish: it is the equal-time
+    /// field commutator, which is zero in the vacuum and conserved, so what
+    /// survives here measures accumulated integration error.
+    pub im_p_12: f64,
     /// `P_{Q_sigma} / M_pl^2`.
     pub p_q_sigma: f64,
     /// `P_{Q_s} / M_pl^2`.
@@ -239,17 +245,19 @@ pub struct SpectrumRecord {
 impl SpectrumRecord {
     /// The CSV header matching [`SpectrumRecord::to_csv_row`].
     pub const CSV_HEADER: &'static str =
-        "k_over_pivot,k,P_11,P_22,Re_P_12,P_Qsigma,P_Qs,C_Qsigma_Qs,P_R,P_S,C_RS,r_C";
+        "k_over_pivot,k,P_11,P_22,Re_P_12,Im_P_12,P_Qsigma,P_Qs,C_Qsigma_Qs,P_R,P_S,C_RS,r_C";
 
     /// Formats the row as comma-separated values.
     pub fn to_csv_row(&self) -> String {
         format!(
-            "{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e}",
+            "{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},\
+             {:.9e}",
             self.k_over_pivot,
             self.k,
             self.p_11,
             self.p_22,
             self.re_p_12,
+            self.im_p_12,
             self.p_q_sigma,
             self.p_q_s,
             self.c_q_sigma_s,
@@ -806,12 +814,28 @@ where
         let components = matrix.components();
         let squared = (self.m_pl * self.m_pl).into_value();
 
+        // The diagonal entries are real by construction, being sums of squared
+        // moduli. The off-diagonal one is not, so its imaginary part is
+        // checked against the same tolerance as a projected spectrum before
+        // the two columns are written out.
+        let cross = components[0][1];
+        crate::spectra::discard_imaginary(
+            cross,
+            crate::spectra::spectrum_scale(&matrix),
+            settings.spectrum_tolerances.imaginary_residual,
+        )
+        .map_err(|source| SpectrumRunError::Spectrum {
+            k: k.into_value(),
+            source,
+        })?;
+
         let record = SpectrumRecord {
             k_over_pivot,
             k: (k / self.m_pl).into_value(),
             p_11: components[0][0].value().re / squared,
             p_22: components[1][1].value().re / squared,
-            re_p_12: components[0][1].value().re / squared,
+            re_p_12: cross.value().re / squared,
+            im_p_12: cross.value().im / squared,
             p_q_sigma: projected.field_adiabatic.into_value() / squared,
             p_q_s: projected.field_entropy.into_value() / squared,
             c_q_sigma_s: projected.field_cross.into_value() / squared,
@@ -1743,6 +1767,28 @@ mod tests {
         assert!(
             relative > 1.0e-3,
             "curvature moved P_R by only {relative}: {with_curvature} against {without_curvature}"
+        );
+    }
+
+    #[test]
+    fn the_cross_spectrum_reports_its_imaginary_part() {
+        // Im P^12 is the equal-time field commutator: zero in the vacuum and
+        // conserved, so it measures accumulated integration error rather than
+        // physics. It is emitted anyway, and checked before being split.
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let run = system
+            .run_two_field_spectra(initial, &quick_settings())
+            .unwrap();
+
+        let spectrum = run.spectra[0];
+        let scale = (spectrum.p_11 * spectrum.p_22).sqrt();
+
+        assert!(spectrum.re_p_12.abs() > 0.1 * scale);
+        assert!(
+            spectrum.im_p_12.abs() < 1.0e-6 * scale,
+            "Im P^12 = {}, scale {scale}",
+            spectrum.im_p_12
         );
     }
 
