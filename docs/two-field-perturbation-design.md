@@ -378,18 +378,50 @@ Reference curves and tolerances are stored with enough metadata to make a
 failure scientifically interpretable rather than merely a changed snapshot.
 
 Two limitations of the first implementation are recorded here rather than
-left to be rediscovered.
+left to be rediscovered. Neither blocks the current results; both shape what
+the next change should be.
+
+### The dynamic range of cosmic-time variables
 
 The absolute error tolerance is a single number applied to raw Planck-unit
-component values, while a run spans roughly fifty orders of magnitude: the
-scale factor reaches `1e20` and mode amplitudes, which carry
-`1 / (a sqrt(2k))`, fall below `1e-27`. An absolute floor anywhere near the
-mode amplitudes caps their accuracy regardless of the relative tolerance, and
-the symptom is subtle: results stop converging as `x_init` grows, settling on
-a plateau near `1e-3` instead. The driver therefore defaults to an absolute
-tolerance far below every component. A per-component absolute scale would
-remove the hazard, and the dimensioned signature of `normalized_mode_error`
-already permits one.
+component values, and a run spans an enormous range of them. In the example
+model, inflation lasts `N = 100.8`, so the scale factor reaches `3e43` while
+the mode amplitude, carrying `1 / (a sqrt(2k))`, falls to `1e-51`: about
+ninety-five orders of magnitude between the largest and smallest evolved
+number.
+
+An absolute floor anywhere near the mode amplitudes caps their accuracy no
+matter how small the relative tolerance is. The symptom is subtle, because
+nothing fails: the spectra simply stop converging as `x_init` grows, settling
+on a plateau near `1e-3`. The driver therefore defaults to an absolute
+tolerance far below every component, which is a workaround rather than a fix.
+
+The fix is to stop evolving quantities with that range. In conformal time,
+with the rescaled mode variable
+
+```math
+v^I = a\,U^I,
+\qquad
+\mathrm d\tau = \frac{\mathrm dt}{a},
+```
+
+the sub-horizon solution is `v ~ e^{-ik tau} / sqrt(2k)`, which oscillates
+with no secular decay, so one relative tolerance is appropriate for every
+mode component. Evolving `ln a` instead of `a`, or taking `N` as the
+independent variable, does the same for the background. The dimensional
+bookkeeping barely moves: `a` is dimensionless and conformal time keeps
+`M^-1`, so this is numerical conditioning rather than a change to the
+type-level contract.
+
+A per-component absolute scale is the smaller, complementary change; the
+dimensioned signature of `normalized_mode_error` already permits one.
+
+Relatedly, normalizing `a = 1` at the initial state rather than at the end of
+inflation is what makes `k_pivot` print as `5.5e14 M_pl`. The number is
+correct but unreadable, and an end-of-inflation normalization would keep
+reported wavenumbers close to unity.
+
+### The Bunch-Davies approximation
 
 Bunch-Davies initialization is leading order in `1/x_init`, so a spectrum
 carries a systematic error that falls off as `1/x_init^2`. This is a genuine
@@ -421,6 +453,9 @@ Work proceeds in this order, one independently reviewable feature at a time:
     output, and physical validation against the analytic limits.
 11. `feature/two-field-spectrum-plots` -- the four-panel scientific figure and
     reproducible generation command.
+12. `feature/conformal-time-modes` -- conformal time with `v^I = a U^I`, and a
+    background evolved in `ln a`, removing the dynamic range that currently
+    limits mode accuracy.
 
 Each branch starts from the updated default branch, contains one conceptual
 change, passes `cargo fmt --check`, `cargo clippy --all-targets`, and
