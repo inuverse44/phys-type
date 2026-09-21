@@ -14,12 +14,14 @@ pub mod scalar_field;
 pub mod state;
 
 pub use autodiff::Dual;
-pub use background::{BackgroundRun, Record, RunSettings, Termination};
+pub use background::{
+    AdaptiveRunSettings, AdaptiveStep, BackgroundRun, Record, RunSettings, Termination,
+};
 pub use dimension::{
     DimDiv, DimMul, DimSqrt, M0, M1, M2, M3, M3Over2, M4, M5Over2, MHalf, MMinus1, MMinus2,
     MassPower,
 };
-pub use integrate::{System, rk4_step};
+pub use integrate::{EmbeddedStep, System, rk4_step, rk45_step};
 pub use potential::{Potential, PotentialValue, QuadraticPotential};
 pub use quantity::{Quantity, Sqrt};
 pub use scalar_field::ScalarFieldSystem;

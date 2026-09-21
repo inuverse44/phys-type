@@ -18,9 +18,9 @@ integrated while dimensionally invalid expressions fail at compile time.
 - Numerical calculations initially use `f64`.
 - The core representation remains generic over its stored value so that
   `ndarray` and automatic-differentiation number types can be added later.
-- A small, fixed-step RK4 implementation is used initially.
-- Existing ODE solvers, adaptive stepping, automatic differentiation, and
-  multifield tensors are outside the MVP.
+- A small, fixed-step RK4 implementation establishes the numerical baseline.
+- Post-MVP extensions add first-order automatic differentiation and adaptive
+  Dormand-Prince 5(4). Multifield tensors remain future work.
 
 ## Core quantity
 
@@ -212,9 +212,11 @@ evaluation, the expanding branch is computed from the current state:
 H = +sqrt(((1/2) pi^2 + V(phi)) / (3 M_pl^2))
 ```
 
-The generic RK4 layer only requires the ability to calculate a state
-derivative. Knowledge of potentials and Friedmann dynamics belongs to the
-concrete scalar-field system, not to the integrator.
+The generic integration layer only requires the ability to calculate a state
+derivative. It provides fixed-step RK4 and an embedded Dormand-Prince 5(4)
+estimate. Knowledge of potentials, Friedmann dynamics, and component-specific
+error scales belongs to the concrete scalar-field system, not to the generic
+integrator.
 
 The integrator receives both the current independent-variable value and the
 step size. The MVP uses cosmic time, while a later system may use a
@@ -230,7 +232,7 @@ flowchart LR
     S --> SYS
     SYS --> H["Compute H from<br/>the Friedmann equation"]
     H --> D["StateDerivative<br/>dphi, dpi, da"]
-    D --> RK["Fixed-step RK4"]
+    D --> RK["RK4 or adaptive RK45"]
     RK --> S
     S --> CSV["CSV<br/>t, a, N, phi, dphi, H, epsilon_H"]
 ```
@@ -288,7 +290,7 @@ managed by `uv`. The detailed design is recorded in
 ## MVP success criteria
 
 1. The quadratic single-field background reaches the requested termination
-   condition using fixed-step RK4.
+   condition using fixed-step RK4 or adaptive Dormand-Prince 5(4).
 2. Results can be exported as CSV and plotted externally with the documented
    Python and Matplotlib workflow.
 3. A deliberately invalid expression with mismatched dimensions fails to

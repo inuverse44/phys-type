@@ -54,7 +54,7 @@ checks are documented in
 | `quantity` | `Quantity<D, V>` and its arithmetic |
 | `state` | `State`, `StateDerivative`, `StateDelta` |
 | `potential` | Automatically differentiated potentials and `QuadraticPotential` |
-| `integrate` | The `System` trait and fixed-step `rk4_step` |
+| `integrate` | The `System` trait, fixed RK4, and embedded Dormand-Prince 5(4) |
 | `scalar_field` | `ScalarFieldSystem`, including the Friedmann constraint |
 | `background` | The integration driver, termination conditions, and CSV export |
 
@@ -63,12 +63,16 @@ power of mass. Exponents are stored in half-power steps, which keeps
 `sqrt(M^1) = M^(1/2)` representable.
 
 ```rust
-use phys_type::{Field, Mass, QuadraticPotential, ScalarFieldSystem, ScaleFactor, RunSettings};
+use phys_type::{AdaptiveRunSettings, Field, Mass, QuadraticPotential, ScalarFieldSystem, ScaleFactor};
 
 let system = ScalarFieldSystem::in_planck_units(QuadraticPotential::new(Mass::new(1.0e-6)));
 let initial = system.slow_roll_initial_state(Field::new(16.0), ScaleFactor::new(1.0));
-let run = system.run(initial, RunSettings::default());
+let run = system.run_adaptive(initial, AdaptiveRunSettings::default());
 ```
+
+Each adaptive attempt records its step size, normalized local error, and
+acceptance decision in `run.adaptive_steps`. Fixed-step RK4 remains available
+through `system.run(initial, RunSettings::default())`.
 
 ## Compile-fail tests
 

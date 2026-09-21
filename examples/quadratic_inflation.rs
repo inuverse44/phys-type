@@ -17,7 +17,8 @@
 use std::io::{self, Write};
 
 use phys_type::{
-    Field, Mass, QuadraticPotential, RunSettings, ScalarFieldSystem, ScaleFactor, Termination,
+    AdaptiveRunSettings, Field, Mass, QuadraticPotential, ScalarFieldSystem, ScaleFactor,
+    Termination,
 };
 
 fn main() -> io::Result<()> {
@@ -28,7 +29,7 @@ fn main() -> io::Result<()> {
     // have to be chosen.
     let initial = system.slow_roll_initial_state(Field::new(16.0), ScaleFactor::new(1.0));
 
-    let run = system.run(initial, RunSettings::default());
+    let run = system.run_adaptive(initial, AdaptiveRunSettings::default());
 
     let stdout = io::stdout();
     let mut out = stdout.lock();
@@ -43,9 +44,11 @@ fn main() -> io::Result<()> {
         Termination::EFoldsReached => "reached the requested e-folding number",
         Termination::InflationEnded => "inflation ended (epsilon_H >= 1)",
         Termination::StepLimitReached => "hit the step limit",
+        Termination::MinimumStepReached => "hit the minimum adaptive step size",
     };
 
     eprintln!("steps        {}", run.steps);
+    eprintln!("attempts     {}", run.adaptive_steps.len());
     eprintln!("rows         {}", run.records.len());
     eprintln!("stopped      {reason}");
     eprintln!("final N      {:.4}", last.e_folds);

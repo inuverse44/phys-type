@@ -7,7 +7,7 @@
 
 use std::io::{self, Write};
 
-use crate::integrate::rk4_step;
+use crate::integrate::{rk4_step, rk45_step};
 use crate::potential::Potential;
 use crate::scalar_field::ScalarFieldSystem;
 use crate::state::State;
@@ -37,6 +37,42 @@ impl Default for RunSettings {
     }
 }
 
+/// Error tolerances and step-size limits for adaptive Dormand-Prince 5(4).
+#[derive(Clone, Copy, Debug)]
+pub struct AdaptiveRunSettings {
+    /// Step size attempted first.
+    pub initial_dt: Time,
+    /// Smallest permitted step size.
+    pub min_dt: Time,
+    /// Largest permitted step size.
+    pub max_dt: Time,
+    /// Absolute tolerance applied to raw Planck-unit component values.
+    pub absolute_tolerance: f64,
+    /// Relative tolerance applied component by component.
+    pub relative_tolerance: f64,
+    /// Integration stops once this e-folding number is reached.
+    pub max_e_folds: f64,
+    /// A safety limit on attempted steps, including rejected steps.
+    pub max_steps: usize,
+    /// One row is recorded every `sample_every` accepted steps.
+    pub sample_every: usize,
+}
+
+impl Default for AdaptiveRunSettings {
+    fn default() -> Self {
+        Self {
+            initial_dt: Time::new(100.0),
+            min_dt: Time::new(1.0e-6),
+            max_dt: Time::new(1.0e5),
+            absolute_tolerance: 1.0e-12,
+            relative_tolerance: 1.0e-8,
+            max_e_folds: 60.0,
+            max_steps: 1_000_000,
+            sample_every: 10,
+        }
+    }
+}
+
 /// Why the integration stopped.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Termination {
@@ -46,6 +82,21 @@ pub enum Termination {
     InflationEnded,
     /// The step limit was hit before either physical condition.
     StepLimitReached,
+    /// The requested accuracy could not be met at the minimum step size.
+    MinimumStepReached,
+}
+
+/// One attempted adaptive step and its normalized local error.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AdaptiveStep {
+    /// Time at the start of the attempted step.
+    pub start_time: Time,
+    /// Attempted step size.
+    pub dt: Time,
+    /// Largest component error divided by its allowed error.
+    pub error_ratio: f64,
+    /// Whether the step was accepted.
+    pub accepted: bool,
 }
 
 /// One exported row, in Planck units.
@@ -93,6 +144,8 @@ pub struct BackgroundRun {
     pub final_time: Time,
     /// The number of steps actually taken.
     pub steps: usize,
+    /// Adaptive attempts and error estimates; empty for fixed-step runs.
+    pub adaptive_steps: Vec<AdaptiveStep>,
 }
 
 impl BackgroundRun {
@@ -173,8 +226,154 @@ impl<P: Potential> ScalarFieldSystem<P> {
             final_state: state,
             final_time: time,
             steps,
+            adaptive_steps: Vec::new(),
         }
     }
+
+    /// Integrates the background with adaptive Dormand-Prince 5(4).
+    pub fn run_adaptive(&self, initial: State, settings: AdaptiveRunSettings) -> BackgroundRun {
+        assert!(
+            settings.min_dt.into_value() > 0.0,
+            "min_dt must be positive"
+        );
+        assert!(
+            settings.initial_dt.into_value() >= settings.min_dt.into_value(),
+            "initial_dt must not be smaller than min_dt"
+        );
+        assert!(
+            settings.max_dt.into_value() >= settings.initial_dt.into_value(),
+            "max_dt must not be smaller than initial_dt"
+        );
+        assert!(settings.absolute_tolerance > 0.0);
+        assert!(settings.relative_tolerance > 0.0);
+        assert!(settings.sample_every > 0);
+
+        let mut state = initial;
+        let mut time = Time::new(0.0);
+        let mut dt = settings.initial_dt;
+        let mut records = vec![self.record(&initial, &state, time)];
+        let mut adaptive_steps = Vec::new();
+        let mut termination = Termination::StepLimitReached;
+        let mut accepted_steps = 0;
+
+        for _ in 0..settings.max_steps {
+            let remaining_e_folds = settings.max_e_folds - state.e_folds(&initial);
+            if remaining_e_folds > 0.0 {
+                // H = dN/dt. Limit the final attempt so a large adaptive step
+                // does not substantially overshoot the requested N. The tiny
+                // margin avoids asymptotically approaching the event from
+                // below as H decreases.
+                let event_dt = 1.001 * remaining_e_folds / self.hubble(&state).into_value();
+                if event_dt < dt.into_value() {
+                    dt = Time::new(event_dt);
+                }
+            }
+
+            let attempt = rk45_step(self, time, &state, dt);
+            let error_ratio = state_error_ratio(
+                &state,
+                &attempt.state,
+                &attempt.error,
+                settings.absolute_tolerance,
+                settings.relative_tolerance,
+            );
+            let accepted = error_ratio <= 1.0;
+
+            adaptive_steps.push(AdaptiveStep {
+                start_time: time,
+                dt,
+                error_ratio,
+                accepted,
+            });
+
+            if accepted {
+                state = attempt.state;
+                time = time + dt;
+                accepted_steps += 1;
+
+                let e_folds = state.e_folds(&initial);
+                let epsilon_h = self.epsilon_h(&state);
+                let finished = if epsilon_h >= 1.0 {
+                    termination = Termination::InflationEnded;
+                    true
+                } else if e_folds >= settings.max_e_folds {
+                    termination = Termination::EFoldsReached;
+                    true
+                } else {
+                    false
+                };
+
+                if finished || accepted_steps % settings.sample_every == 0 {
+                    records.push(self.record(&initial, &state, time));
+                }
+
+                if finished {
+                    break;
+                }
+            } else if dt.into_value() <= settings.min_dt.into_value() {
+                termination = Termination::MinimumStepReached;
+                break;
+            }
+
+            dt = next_step_size(dt, error_ratio, settings.min_dt, settings.max_dt);
+        }
+
+        BackgroundRun {
+            records,
+            termination,
+            final_state: state,
+            final_time: time,
+            steps: accepted_steps,
+            adaptive_steps,
+        }
+    }
+}
+
+fn state_error_ratio(
+    current: &State,
+    next: &State,
+    error: &crate::StateDelta,
+    absolute_tolerance: f64,
+    relative_tolerance: f64,
+) -> f64 {
+    fn component(error: f64, current: f64, next: f64, absolute: f64, relative: f64) -> f64 {
+        error.abs() / (absolute + relative * current.abs().max(next.abs()))
+    }
+
+    component(
+        error.phi.into_value(),
+        current.phi.into_value(),
+        next.phi.into_value(),
+        absolute_tolerance,
+        relative_tolerance,
+    )
+    .max(component(
+        error.pi.into_value(),
+        current.pi.into_value(),
+        next.pi.into_value(),
+        absolute_tolerance,
+        relative_tolerance,
+    ))
+    .max(component(
+        error.a.into_value(),
+        current.a.into_value(),
+        next.a.into_value(),
+        absolute_tolerance,
+        relative_tolerance,
+    ))
+}
+
+fn next_step_size(dt: Time, error_ratio: f64, min_dt: Time, max_dt: Time) -> Time {
+    let factor = if error_ratio == 0.0 {
+        5.0
+    } else if error_ratio.is_finite() {
+        (0.9 * error_ratio.powf(-0.2)).clamp(0.2, 5.0)
+    } else {
+        0.2
+    };
+    let proposed = dt.into_value() * factor;
+
+    Time::new(proposed.clamp(min_dt.into_value(), max_dt.into_value()))
 }
 
 #[cfg(test)]
@@ -252,5 +451,57 @@ mod tests {
         let expected = RunSettings::default().dt.into_value() * run.steps as f64;
 
         assert_eq!(run.final_time.into_value(), expected);
+    }
+
+    #[test]
+    fn adaptive_run_agrees_with_fixed_rk4_using_fewer_steps() {
+        let system = ScalarFieldSystem::in_planck_units(QuadraticPotential::new(Mass::new(1.0e-6)));
+        let initial = system.slow_roll_initial_state(Field::new(16.0), ScaleFactor::new(1.0));
+        let fixed = system.run(initial, RunSettings::default());
+        let adaptive = system.run_adaptive(initial, AdaptiveRunSettings::default());
+
+        assert_eq!(adaptive.termination, Termination::EFoldsReached);
+        assert!(adaptive.steps < fixed.steps / 10);
+        assert!(!adaptive.adaptive_steps.is_empty());
+        assert!(
+            adaptive
+                .adaptive_steps
+                .iter()
+                .filter(|step| step.accepted)
+                .all(|step| step.error_ratio <= 1.0)
+        );
+
+        let fixed_last = fixed.records.last().expect("a final fixed row");
+        let adaptive_last = adaptive.records.last().expect("a final adaptive row");
+        assert!(
+            (adaptive_last.e_folds - fixed_last.e_folds).abs() < 0.01,
+            "fixed N={}, adaptive N={}",
+            fixed_last.e_folds,
+            adaptive_last.e_folds
+        );
+        assert!(
+            (adaptive_last.phi - fixed_last.phi).abs() < 0.01,
+            "fixed phi={}, adaptive phi={}",
+            fixed_last.phi,
+            adaptive_last.phi
+        );
+    }
+
+    #[test]
+    fn adaptive_controller_can_reject_and_retry_a_step() {
+        let system = ScalarFieldSystem::in_planck_units(QuadraticPotential::new(Mass::new(1.0e-6)));
+        let initial = system.slow_roll_initial_state(Field::new(16.0), ScaleFactor::new(1.0));
+        let settings = AdaptiveRunSettings {
+            initial_dt: Time::new(1.0e6),
+            max_dt: Time::new(1.0e6),
+            absolute_tolerance: 1.0e-14,
+            relative_tolerance: 1.0e-12,
+            ..AdaptiveRunSettings::default()
+        };
+
+        let run = system.run_adaptive(initial, settings);
+
+        assert!(run.adaptive_steps.iter().any(|step| !step.accepted));
+        assert!(run.adaptive_steps.iter().any(|step| step.accepted));
     }
 }
