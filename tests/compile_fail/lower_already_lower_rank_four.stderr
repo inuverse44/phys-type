@@ -1,0 +1,18 @@
+error[E0277]: the trait bound `FieldTensor2<phys_type::Lower, phys_type::Lower, MassPower<typenum::int::Z0>, f64, 2>: LowerFirst<FieldTensor4<phys_type::Lower, phys_type::Lower, phys_type::Lower, phys_type::Lower, MassPower<typenum::int::NInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>>>, f64, 2>>` is not satisfied
+ --> tests/compile_fail/lower_already_lower_rank_four.rs:9:39
+  |
+9 |     let _invalid = metric.lower_first(&tensor);
+  |                           ----------- ^^^^^^^ unsatisfied trait bound
+  |                           |
+  |                           required by a bound introduced by this call
+  |
+  = help: the trait `LowerFirst<FieldTensor4<phys_type::Lower, phys_type::Lower, phys_type::Lower, phys_type::Lower, MassPower<typenum::int::NInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>>>, f64, 2>>` is not implemented for `FieldTensor2<phys_type::Lower, phys_type::Lower, MassPower<typenum::int::Z0>, f64, 2>`
+help: `FieldTensor2<phys_type::Lower, phys_type::Lower, MassPower<typenum::int::Z0>, f64, N>` implements trait `LowerFirst<Tensor>`
+ --> src/field_space.rs
+  |
+  |   impl<J, K, D, const N: usize> LowerFirst<FieldTensor3<Upper, J, K, D, f64, N>> for FieldMetric<N> {
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `LowerFirst<FieldTensor3<phys_type::Upper, J, K, D, f64, N>>`
+...
+  | / impl<J, K, L, D, const N: usize> LowerFirst<FieldTensor4<Upper, J, K, L, D, f64, N>>
+  | |     for FieldMetric<N>
+  | |______________________^ `LowerFirst<FieldTensor4<phys_type::Upper, J, K, L, D, f64, N>>`

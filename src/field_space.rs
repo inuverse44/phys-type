@@ -10,6 +10,12 @@ use core::ops::{Add, Mul, Neg, Sub};
 use crate::dimension::DimMul;
 use crate::{Field, FieldVelocity, M0, M2, M3, MMinus1, Quantity};
 
+/// Dense components of a rank-three field-space tensor.
+pub type Tensor3Components<D, V, const N: usize> = [[[Quantity<D, V>; N]; N]; N];
+
+/// Dense components of a rank-four field-space tensor.
+pub type Tensor4Components<D, V, const N: usize> = [[[[Quantity<D, V>; N]; N]; N]; N];
+
 /// Marker for a contravariant (upper) field-space index.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Upper;
@@ -127,6 +133,284 @@ impl<Dl, const N: usize> FieldVector<Lower, Dl, f64, N> {
 pub struct FieldTensor2<I, J, D, V, const N: usize> {
     components: [[Quantity<D, V>; N]; N],
     variance: PhantomData<(I, J)>,
+}
+
+/// A fixed-size rank-three field-space tensor.
+///
+/// This type is only for genuine tensors. Coordinate-dependent objects such
+/// as [`ChristoffelSymbols`] intentionally use a separate type.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FieldTensor3<I, J, K, D, V, const N: usize> {
+    components: Tensor3Components<D, V, N>,
+    variance: PhantomData<(I, J, K)>,
+}
+
+impl<I, J, K, D, V, const N: usize> FieldTensor3<I, J, K, D, V, N> {
+    /// Builds a rank-three tensor in first-second-third index order.
+    pub const fn new(components: Tensor3Components<D, V, N>) -> Self {
+        Self {
+            components,
+            variance: PhantomData,
+        }
+    }
+
+    /// Borrows all components.
+    pub const fn components(&self) -> &Tensor3Components<D, V, N> {
+        &self.components
+    }
+
+    /// Removes the variance wrapper and returns all components.
+    pub fn into_components(self) -> Tensor3Components<D, V, N> {
+        self.components
+    }
+}
+
+impl<I, J, K, D: Copy, const N: usize> Add for FieldTensor3<I, J, K, D, f64, N> {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::new(core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|third| {
+                    self.components[first][second][third] + rhs.components[first][second][third]
+                })
+            })
+        }))
+    }
+}
+
+impl<I, J, K, D: Copy, const N: usize> Sub for FieldTensor3<I, J, K, D, f64, N> {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::new(core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|third| {
+                    self.components[first][second][third] - rhs.components[first][second][third]
+                })
+            })
+        }))
+    }
+}
+
+impl<I, J, K, D, const N: usize> Neg for FieldTensor3<I, J, K, D, f64, N> {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self::new(
+            self.components
+                .map(|matrix| matrix.map(|row| row.map(Neg::neg))),
+        )
+    }
+}
+
+impl<I, J, K, D, const N: usize> Mul<f64> for FieldTensor3<I, J, K, D, f64, N> {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self::new(
+            self.components
+                .map(|matrix| matrix.map(|row| row.map(|component| component * rhs))),
+        )
+    }
+}
+
+/// A fixed-size rank-four field-space tensor.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FieldTensor4<I, J, K, L, D, V, const N: usize> {
+    components: Tensor4Components<D, V, N>,
+    variance: PhantomData<(I, J, K, L)>,
+}
+
+impl<I, J, K, L, D, V, const N: usize> FieldTensor4<I, J, K, L, D, V, N> {
+    /// Builds a rank-four tensor in first-second-third-fourth index order.
+    pub const fn new(components: Tensor4Components<D, V, N>) -> Self {
+        Self {
+            components,
+            variance: PhantomData,
+        }
+    }
+
+    /// Borrows all components.
+    pub const fn components(&self) -> &Tensor4Components<D, V, N> {
+        &self.components
+    }
+
+    /// Removes the variance wrapper and returns all components.
+    pub fn into_components(self) -> Tensor4Components<D, V, N> {
+        self.components
+    }
+}
+
+impl<I, J, K, L, D: Copy, const N: usize> Add for FieldTensor4<I, J, K, L, D, f64, N> {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::new(core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|third| {
+                    core::array::from_fn(|fourth| {
+                        self.components[first][second][third][fourth]
+                            + rhs.components[first][second][third][fourth]
+                    })
+                })
+            })
+        }))
+    }
+}
+
+impl<I, J, K, L, D: Copy, const N: usize> Sub for FieldTensor4<I, J, K, L, D, f64, N> {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::new(core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|third| {
+                    core::array::from_fn(|fourth| {
+                        self.components[first][second][third][fourth]
+                            - rhs.components[first][second][third][fourth]
+                    })
+                })
+            })
+        }))
+    }
+}
+
+impl<I, J, K, L, D, const N: usize> Neg for FieldTensor4<I, J, K, L, D, f64, N> {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self::new(
+            self.components
+                .map(|cube| cube.map(|matrix| matrix.map(|row| row.map(Neg::neg)))),
+        )
+    }
+}
+
+impl<I, J, K, L, D, const N: usize> Mul<f64> for FieldTensor4<I, J, K, L, D, f64, N> {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self::new(
+            self.components.map(|cube| {
+                cube.map(|matrix| matrix.map(|row| row.map(|component| component * rhs)))
+            }),
+        )
+    }
+}
+
+/// Lowers the first upper index of a tensor using a metric.
+pub trait LowerFirst<Tensor> {
+    /// Tensor type after lowering the first index.
+    type Output;
+
+    /// Applies `G_AI` to the first index.
+    fn lower_first(&self, tensor: &Tensor) -> Self::Output;
+}
+
+/// Raises the first lower index of a tensor using an inverse metric.
+pub trait RaiseFirst<Tensor> {
+    /// Tensor type after raising the first index.
+    type Output;
+
+    /// Applies `G^AI` to the first index.
+    fn raise_first(&self, tensor: &Tensor) -> Self::Output;
+}
+
+impl<J, K, D, const N: usize> LowerFirst<FieldTensor3<Upper, J, K, D, f64, N>> for FieldMetric<N> {
+    type Output = FieldTensor3<Lower, J, K, D, f64, N>;
+
+    fn lower_first(&self, tensor: &FieldTensor3<Upper, J, K, D, f64, N>) -> Self::Output {
+        FieldTensor3::new(core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|third| {
+                    Quantity::new(
+                        (0..N)
+                            .map(|contracted| {
+                                self.components[first][contracted].value()
+                                    * tensor.components[contracted][second][third].value()
+                            })
+                            .sum(),
+                    )
+                })
+            })
+        }))
+    }
+}
+
+impl<J, K, D, const N: usize> RaiseFirst<FieldTensor3<Lower, J, K, D, f64, N>>
+    for InverseFieldMetric<N>
+{
+    type Output = FieldTensor3<Upper, J, K, D, f64, N>;
+
+    fn raise_first(&self, tensor: &FieldTensor3<Lower, J, K, D, f64, N>) -> Self::Output {
+        FieldTensor3::new(core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|third| {
+                    Quantity::new(
+                        (0..N)
+                            .map(|contracted| {
+                                self.components[first][contracted].value()
+                                    * tensor.components[contracted][second][third].value()
+                            })
+                            .sum(),
+                    )
+                })
+            })
+        }))
+    }
+}
+
+impl<J, K, L, D, const N: usize> LowerFirst<FieldTensor4<Upper, J, K, L, D, f64, N>>
+    for FieldMetric<N>
+{
+    type Output = FieldTensor4<Lower, J, K, L, D, f64, N>;
+
+    fn lower_first(&self, tensor: &FieldTensor4<Upper, J, K, L, D, f64, N>) -> Self::Output {
+        FieldTensor4::new(core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|third| {
+                    core::array::from_fn(|fourth| {
+                        Quantity::new(
+                            (0..N)
+                                .map(|contracted| {
+                                    self.components[first][contracted].value()
+                                        * tensor.components[contracted][second][third][fourth]
+                                            .value()
+                                })
+                                .sum(),
+                        )
+                    })
+                })
+            })
+        }))
+    }
+}
+
+impl<J, K, L, D, const N: usize> RaiseFirst<FieldTensor4<Lower, J, K, L, D, f64, N>>
+    for InverseFieldMetric<N>
+{
+    type Output = FieldTensor4<Upper, J, K, L, D, f64, N>;
+
+    fn raise_first(&self, tensor: &FieldTensor4<Lower, J, K, L, D, f64, N>) -> Self::Output {
+        FieldTensor4::new(core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|third| {
+                    core::array::from_fn(|fourth| {
+                        Quantity::new(
+                            (0..N)
+                                .map(|contracted| {
+                                    self.components[first][contracted].value()
+                                        * tensor.components[contracted][second][third][fourth]
+                                            .value()
+                                })
+                                .sum(),
+                        )
+                    })
+                })
+            })
+        }))
+    }
 }
 
 impl<I, J, D, V, const N: usize> FieldTensor2<I, J, D, V, N> {
@@ -375,7 +659,7 @@ pub type CovariantField<D, V, const N: usize> = FieldVector<Lower, D, V, N>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{M1, M2, M3};
+    use crate::{M1, M2, M3, MMinus2};
 
     #[test]
     fn euclidean_metric_lowers_and_raises_an_index() {
@@ -480,5 +764,42 @@ mod tests {
         let basis = KinematicBasis2::from_velocity(&metric, &velocity, Some(&previous)).unwrap();
 
         assert_eq!(basis.normal, previous);
+    }
+
+    #[test]
+    fn rank_three_arithmetic_preserves_every_index() {
+        let mut lhs_components = [[[Quantity::new(0.0); 2]; 2]; 2];
+        let mut rhs_components = [[[Quantity::new(0.0); 2]; 2]; 2];
+        lhs_components[1][0][1] = Quantity::new(2.0);
+        rhs_components[1][0][1] = Quantity::new(3.0);
+        let lhs = FieldTensor3::<Upper, Lower, Lower, M1, f64, 2>::new(lhs_components);
+        let rhs = FieldTensor3::<Upper, Lower, Lower, M1, f64, 2>::new(rhs_components);
+
+        let result = (lhs + rhs) * 2.0;
+
+        assert_eq!(result.components()[1][0][1].into_value(), 10.0);
+    }
+
+    #[test]
+    fn rank_four_first_index_lowering_and_raising_round_trip() {
+        let metric = FieldMetric::<2>::new([
+            [Quantity::new(2.0), Quantity::new(0.0)],
+            [Quantity::new(0.0), Quantity::new(3.0)],
+        ]);
+        let inverse = InverseFieldMetric::<2>::new([
+            [Quantity::new(0.5), Quantity::new(0.0)],
+            [Quantity::new(0.0), Quantity::new(1.0 / 3.0)],
+        ]);
+        let mut components = [[[[Quantity::new(0.0); 2]; 2]; 2]; 2];
+        components[0][0][1][1] = Quantity::new(5.0);
+        components[1][0][1][1] = Quantity::new(7.0);
+        let tensor = FieldTensor4::<Upper, Lower, Lower, Lower, MMinus2, f64, 2>::new(components);
+
+        let lowered = metric.lower_first(&tensor);
+        let restored = inverse.raise_first(&lowered);
+
+        assert_eq!(lowered.components()[0][0][1][1].into_value(), 10.0);
+        assert_eq!(lowered.components()[1][0][1][1].into_value(), 21.0);
+        assert_eq!(restored, tensor);
     }
 }

@@ -18,6 +18,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Second-order `Jet<N>` automatic differentiation for a potential's value,
   complete gradient, and Hessian in one evaluation.
 - Covariant potential Hessians including the Christoffel correction.
+- Dense rank-three and rank-four field-space tensors with typed variance and
+  physical dimension.
+- Slot-specific first-index raising/lowering for higher-rank tensors, with
+  compile-fail coverage for variance errors and connection/tensor confusion.
 
 ## [0.1.0] - 2026-09-21
 

@@ -1,0 +1,8 @@
+error[E0308]: mismatched types
+  --> tests/compile_fail/add_different_rank_four_variance.rs:11:28
+   |
+11 |     let _invalid = upper + lower;
+   |                            ^^^^^ expected `phys_type::Upper`, found `phys_type::Lower`
+   |
+   = note: expected struct `FieldTensor4<phys_type::Upper, phys_type::Lower, phys_type::Lower, phys_type::Lower, MassPower<typenum::int::NInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>>>, f64, 2>`
+              found struct `FieldTensor4<phys_type::Lower, phys_type::Lower, phys_type::Lower, phys_type::Lower, MassPower<typenum::int::NInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>>>, f64, 2>`
