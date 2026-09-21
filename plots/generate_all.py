@@ -20,12 +20,23 @@ PLOTS = (
     ("oscillation.py", "oscillation.csv", "oscillation"),
 )
 
+# The two-field figure reads three CSV files, so it takes the directory
+# rather than one input file.
+TWO_FIELD_PLOT = ("two_field_spectra.py", "two_field_spectra")
+
 
 def run(command: list[str], cwd: Path) -> None:
     try:
         subprocess.run(command, cwd=cwd, check=True)
     except (OSError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"command failed: {' '.join(command)}\n{error}") from error
+
+
+def verify(output: Path, stem: str) -> None:
+    for suffix in ("png", "pdf"):
+        artifact = output / f"{stem}.{suffix}"
+        if not artifact.is_file() or artifact.stat().st_size == 0:
+            raise SystemExit(f"expected plot was not generated: {artifact}")
 
 
 def main() -> None:
@@ -43,19 +54,21 @@ def main() -> None:
     scripts = Path(__file__).resolve().parent
     output = args.output.resolve()
 
-    run(
-        ["cargo", "run", "--release", "--example", "diagnostics", "--", str(output)],
-        repository,
-    )
+    for example in ("diagnostics", "two_field_spectra"):
+        run(
+            ["cargo", "run", "--release", "--example", example, "--", str(output)],
+            repository,
+        )
 
     for script, csv, stem in PLOTS:
         run([sys.executable, str(scripts / script), str(output / csv)], repository)
-        for suffix in ("png", "pdf"):
-            artifact = output / f"{stem}.{suffix}"
-            if not artifact.is_file() or artifact.stat().st_size == 0:
-                raise SystemExit(f"expected plot was not generated: {artifact}")
+        verify(output, stem)
 
-    print(f"verified {len(PLOTS) * 2} plot files in {output}")
+    script, stem = TWO_FIELD_PLOT
+    run([sys.executable, str(scripts / script), str(output)], repository)
+    verify(output, stem)
+
+    print(f"verified {(len(PLOTS) + 1) * 2} plot files in {output}")
 
 
 if __name__ == "__main__":

@@ -45,6 +45,14 @@ metadata:
 cargo run --release --example two_field_spectra
 ```
 
+The matching four-panel figure, showing the trajectory and its frame, the
+field spectra, the curvature/entropy spectra with the signed cross spectrum,
+and selected modes through horizon exit:
+
+```sh
+uv run plots/two_field_spectra.py diagnostics
+```
+
 Generate every diagnostic CSV and publication-quality PNG/PDF figure with one
 command:
 
@@ -59,6 +67,7 @@ uv run plots/background.py diagnostics/trajectory.csv
 uv run plots/attractor.py diagnostics/attractor.csv
 uv run plots/convergence.py diagnostics/convergence.csv
 uv run plots/oscillation.py diagnostics/oscillation.csv
+uv run plots/two_field_spectra.py diagnostics
 ```
 
 The plotting scripts declare their own Python dependencies, so `uv` creates an

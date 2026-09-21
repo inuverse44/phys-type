@@ -378,6 +378,31 @@ convergence  RK4の大域誤差と経験的収束次数
 oscillation  振動、wの平均、matter-likeな膨張
 ```
 
+## 二場スペクトルの四パネル図
+
+`two_field_spectra`の三つのCSVから一枚の図を作る。仕様は
+[`two-field-perturbation-design.md`](two-field-perturbation-design.md)に
+従う。
+
+```text
+左上  phi^1-phi^2平面の軌道。疎な点でe_sigmaとe_sを矢印表示する。
+右上  P^11、P^22、P_Qsigma、P_Qs を k/k_pivot に対して両対数で。
+左下  P_R、P_S、符号付きC_RS。右軸にr_C。
+右下  代表的なkのmode発展をNに対して。地平線交差点を丸で示し、
+      右軸にeta_perp。
+```
+
+交差スペクトルは符号を持つので、`abs`を取らず対称対数軸に載せる。線形域の
+閾値は全系列の最小絶対値より下に置く。閾値が系列と重なると、その系列だけが
+線形域で平らに潰れて読めなくなる。
+
+CSVの先頭にある`# key: value`のprovenanceブロックは`load_metadata`で読み、
+revisionとx_init、pivot位置を図のキャプションに出す。図だけを見て、どの実行
+から出たかが分かる状態にする。
+
+`load_csv`はこのブロックの行数を数えて読み飛ばす。numpyの`names=True`は
+コメント処理に任せると先頭のコメント行を列名として読んでしまう。
+
 ## MVP後の候補
 
 - Plotlyによる対話的な探索

@@ -6,10 +6,39 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+def _leading_comments(path: Path) -> list[str]:
+    """The `# key: value` provenance block some CSV files open with."""
+    lines = []
+    try:
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                if not line.startswith("#"):
+                    break
+                lines.append(line[1:].strip())
+    except OSError as error:
+        raise SystemExit(f"could not read {path}: {error}") from error
+
+    return lines
+
+
+def load_metadata(path: Path) -> dict[str, str]:
+    """Parses the leading comment block into key/value pairs."""
+    metadata = {}
+    for line in _leading_comments(path):
+        key, separator, value = line.partition(":")
+        if separator:
+            metadata[key.strip()] = value.strip()
+
+    return metadata
+
+
 def load_csv(path: Path, required: set[str]) -> np.ndarray:
     if not path.is_file():
         raise SystemExit(f"input CSV does not exist: {path}")
 
+    # The header row follows the provenance block, so the comment lines are
+    # skipped by count rather than left to the parser's comment handling,
+    # which would otherwise read the first of them as the column names.
     try:
         data = np.genfromtxt(
             path,
@@ -17,6 +46,7 @@ def load_csv(path: Path, required: set[str]) -> np.ndarray:
             names=True,
             dtype=None,
             encoding="utf-8",
+            skip_header=len(_leading_comments(path)),
         )
     except (OSError, ValueError) as error:
         raise SystemExit(f"could not read {path}: {error}") from error
