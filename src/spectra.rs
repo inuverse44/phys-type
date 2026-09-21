@@ -118,13 +118,18 @@ pub struct ProjectedSpectra {
     pub correlation: f64,
 }
 
-/// Builds `Sigma^{IJ} = sum_A U^I_A U^{J*}_A` from a rescaled mode matrix.
+/// Builds `Sigma^{IJ} = sum_A U^I_A U^{J*}_A` from a perturbation state.
 ///
 /// The modes are integrated as `v^I_A = a U^I_A`, so this is the one place
 /// where the rescaling is undone: the sum carries `1 / a^2`. It runs over the
 /// independent vacuum oscillators, so the result is Hermitian by construction
-/// up to floating-point rounding.
-pub fn mode_covariance(modes: &TwoFieldModes, scale_factor: ScaleFactor) -> ModeCovariance {
+/// up to floating-point rounding. Taking the complete state prevents modes
+/// from accidentally being paired with a scale factor from another time.
+pub fn mode_covariance(state: &TwoFieldPerturbationState) -> ModeCovariance {
+    mode_covariance_from_modes(&state.modes, state.background.a)
+}
+
+fn mode_covariance_from_modes(modes: &TwoFieldModes, scale_factor: ScaleFactor) -> ModeCovariance {
     let squared = scale_factor * scale_factor;
 
     ModeCovariance::new(core::array::from_fn(|row| {
@@ -245,7 +250,7 @@ pub(crate) fn discard_imaginary(
 pub type ModeProjections = [[Complex64; 2]; 2];
 
 /// Projects each independent mode onto the curvature and entropy directions.
-pub fn project_modes(
+fn project_modes_in_basis(
     modes: &TwoFieldModes,
     scale_factor: ScaleFactor,
     metric: &FieldMetric<2>,
@@ -369,6 +374,34 @@ where
     P: TwiceDifferentiableMultifieldPotential<2>,
     G: CurvedFieldSpaceGeometry<2>,
 {
+    /// Projects every independent solution onto the instantaneous curvature
+    /// and entropy directions.
+    ///
+    /// The system and complete state supply `k`, `a`, the metric, the basis,
+    /// and `H` together, so values belonging to different evolution times
+    /// cannot be combined accidentally.
+    pub fn mode_projections(
+        &self,
+        state: &TwoFieldPerturbationState,
+        previous_normal: Option<&ContravariantField<M0, f64, 2>>,
+    ) -> Result<ModeProjections, SpectrumError> {
+        let kinematics = self
+            .background
+            .kinematics(&state.background, previous_normal)
+            .map_err(SpectrumError::KinematicBasis)?;
+        let metric = self.background.geometry.metric(&state.background.phi);
+        let hubble = self.background.hubble(&state.background);
+
+        Ok(project_modes_in_basis(
+            &state.modes,
+            state.background.a,
+            &metric,
+            &kinematics.basis,
+            hubble,
+            self.k,
+        ))
+    }
+
     /// Projects the spectra of one evolved state onto its instantaneous
     /// adiabatic and entropy directions.
     ///
@@ -386,8 +419,7 @@ where
             .map_err(SpectrumError::KinematicBasis)?;
         let metric = self.background.geometry.metric(&state.background.phi);
         let hubble = self.background.hubble(&state.background);
-        let spectrum =
-            field_power_spectrum(self.k, &mode_covariance(&state.modes, state.background.a));
+        let spectrum = field_power_spectrum(self.k, &mode_covariance(state));
 
         project(&spectrum, &metric, &kinematics.basis, hubble, tolerances)
     }
@@ -433,8 +465,7 @@ mod tests {
     fn mode_covariance_is_hermitian() {
         let system = system();
         let state = system.bunch_davies_state(background(), 100.0).unwrap();
-        let spectrum =
-            field_power_spectrum(system.k, &mode_covariance(&state.modes, state.background.a));
+        let spectrum = field_power_spectrum(system.k, &mode_covariance(&state));
 
         assert!(hermiticity_residual(&spectrum) < 1.0e-14);
     }
@@ -444,8 +475,7 @@ mod tests {
         let system = system();
         let initial = background();
         let state = system.bunch_davies_state(initial, 100.0).unwrap();
-        let spectrum =
-            field_power_spectrum(system.k, &mode_covariance(&state.modes, state.background.a));
+        let spectrum = field_power_spectrum(system.k, &mode_covariance(&state));
 
         // With U^I_A = e_A^I / (a sqrt(2k)), the covariance is the inverse
         // metric over 2 k a^2, so P^{IJ} = (k/a)^2 G^{IJ} / (4 pi^2).
@@ -613,7 +643,7 @@ mod tests {
         // any growth measures integration error rather than physics.
         let system = system();
         let state = system.bunch_davies_state(background(), 100.0).unwrap();
-        let initial = mode_covariance(&state.modes, state.background.a);
+        let initial = mode_covariance(&state);
 
         for row in initial.components() {
             for entry in row {
@@ -622,7 +652,7 @@ mod tests {
         }
 
         let advanced = rk4_step(&system, Time::new(0.0), &state, Time::new(1.0));
-        let evolved = mode_covariance(&advanced.modes, advanced.background.a);
+        let evolved = mode_covariance(&advanced);
         let scale = evolved
             .components()
             .iter()
@@ -656,10 +686,10 @@ mod tests {
     fn mode_velocities_do_not_enter_the_covariance() {
         let system = system();
         let mut state = system.bunch_davies_state(background(), 100.0).unwrap();
-        let before = mode_covariance(&state.modes, state.background.a);
+        let before = mode_covariance(&state);
 
         state.modes.rescaled_velocity = [[ModeVelocity::new(Complex64::new(7.0, -3.0)); 2]; 2];
 
-        assert_eq!(mode_covariance(&state.modes, state.background.a), before);
+        assert_eq!(mode_covariance(&state), before);
     }
 }

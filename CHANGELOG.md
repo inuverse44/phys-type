@@ -56,7 +56,8 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Two-field modes are integrated as `v = a U` rather than `U`, so the absolute
   error tolerance no longer has to sit below decaying mode amplitudes.
   `TwoFieldModes` exposes `rescaled_amplitude` and `rescaled_velocity`, and
-  `mode_covariance` takes the scale factor that undoes the rescaling.
+  `mode_covariance` takes the complete state so the scale factor that undoes
+  the rescaling cannot be mismatched with the modes.
 - A spectrum run starts each mode a stated number of e-folds before its own
   horizon exit, replacing the raw depth `x_init`, which is now derived and
   still recorded in the CSV metadata.

@@ -58,7 +58,7 @@ pub use scalar_field::ScalarFieldSystem;
 pub use spectra::{
     DimensionlessSpectrum, FieldPowerSpectrum, ModeCovariance, ModeProjections, ProjectedSpectra,
     SpectrumError, SpectrumTolerances, field_power_spectrum, hermiticity_residual, mode_covariance,
-    project, project_modes,
+    project,
 };
 pub use spectrum_run::{
     BackgroundRecord, ModeEvolutionRecord, Pivot, SpectrumRecord, SpectrumRun, SpectrumRunError,

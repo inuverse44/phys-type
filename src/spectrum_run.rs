@@ -807,10 +807,7 @@ where
             &kinematics,
         ));
 
-        let matrix = field_power_spectrum(
-            k,
-            &mode_covariance(&final_state.modes, final_state.background.a),
-        );
+        let matrix = field_power_spectrum(k, &mode_covariance(&final_state));
         let components = matrix.components();
         let squared = (self.m_pl * self.m_pl).into_value();
 
@@ -884,8 +881,7 @@ where
             .map_err(SpectrumRunError::KinematicBasis)?;
         let metric = self.geometry.metric(&state.background.phi);
         let hubble = self.hubble(&state.background);
-        let matrix =
-            field_power_spectrum(system.k, &mode_covariance(&state.modes, state.background.a));
+        let matrix = field_power_spectrum(system.k, &mode_covariance(state));
         let projected = project(
             &matrix,
             &metric,
@@ -1486,19 +1482,7 @@ mod tests {
         P: TwiceDifferentiableMultifieldPotential<2> + Clone,
         G: CurvedFieldSpaceGeometry<2> + Clone,
     {
-        let kinematics = system
-            .background
-            .kinematics(&state.background, None)
-            .unwrap();
-
-        crate::project_modes(
-            &state.modes,
-            state.background.a,
-            &system.background.geometry.metric(&state.background.phi),
-            &kinematics.basis,
-            system.background.hubble(&state.background),
-            system.k,
-        )
+        system.mode_projections(state, None).unwrap()
     }
 
     #[test]

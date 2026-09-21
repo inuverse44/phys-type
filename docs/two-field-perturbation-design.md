@@ -477,8 +477,8 @@ form.
 This is conditioning, not a change to the type-level contract: `a` is
 dimensionless, so `v` and `U` share the dimension `M^-1/2` and the type
 system cannot separate them. The rescaling is therefore undone in exactly
-one place, `mode_covariance`, which takes the scale factor as an argument so
-that the conversion cannot be forgotten silently.
+one place, `mode_covariance`, which takes the complete perturbation state so
+that modes cannot be paired with a scale factor from another evolution time.
 
 The rescaled amplitude still grows with `a` once a mode is outside the
 horizon, so the rescaling moves the range into a benign region rather than
