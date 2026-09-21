@@ -56,8 +56,9 @@ pub use potential::{
 pub use quantity::{Quantity, Sqrt};
 pub use scalar_field::ScalarFieldSystem;
 pub use spectra::{
-    DimensionlessSpectrum, FieldPowerSpectrum, ModeCovariance, ProjectedSpectra, SpectrumError,
-    SpectrumTolerances, field_power_spectrum, hermiticity_residual, mode_covariance, project,
+    DimensionlessSpectrum, FieldPowerSpectrum, ModeCovariance, ModeProjections, ProjectedSpectra,
+    SpectrumError, SpectrumTolerances, field_power_spectrum, hermiticity_residual, mode_covariance,
+    project, project_modes,
 };
 pub use spectrum_run::{
     BackgroundRecord, ModeEvolutionRecord, Pivot, SpectrumRecord, SpectrumRun, SpectrumRunError,

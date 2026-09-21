@@ -366,6 +366,15 @@ Every implementation stage adds tests appropriate to its layer:
   approach the Bunch-Davies form.
 - Near horizon exit, two light canonical modes satisfy
   `P_Qsigma ~= P_Qs ~= (H_*/2pi)^2` within a documented slow-roll tolerance.
+  The comparison needs a window rather than an instant. Before about two
+  e-folds after exit the exact mode still carries its `1 + x^2` correction,
+  which is the mirror of the `1 + 1/x^2` correction at initialization. After
+  that window both spectra drift for physical reasons, at rates that are
+  themselves checked: the entropy spectrum decays as a light field of its own
+  mass, `P_S ~ a^(-2 m^2 / 3 H^2)`, and the adiabatic field spectrum grows
+  with `2 epsilon` because `Q_sigma = (dot sigma / H) R` while `R` is
+  conserved. Measured over six e-folds, the decay is `0.71` against a
+  predicted `0.70` and the growth is `1.26` against a predicted `1.27`.
 - The effectively single-field limit satisfies
   `P_R ~= H_*^2/(8 pi^2 epsilon_* M_pl^2)`.
 - Results are stable under `x_init = 50, 100`, tighter RK tolerances, denser
@@ -374,7 +383,15 @@ Every implementation stage adds tests appropriate to its layer:
   `|r_C| <= 1` up to numerical tolerance.
 - On super-horizon scales, the transfer matrix has the triangular Wands form:
   entropy can source curvature, while a purely adiabatic mode does not create
-  entropy. This statement is not applied to sub-horizon evolution.
+  entropy. This statement is not applied to sub-horizon evolution. Two
+  independent solutions determine the matrix as `T = M_late M_early^-1`, where
+  `M = [[R_1, R_2], [S_1, S_2]]` comes from `project_modes`, so no special
+  initial condition has to be constructed. The forbidden entry is not exactly
+  zero, because the early time is a finite distance outside the horizon:
+  measured two e-folds out, `T_SR / T_SS = 8e-5` against gradient corrections
+  of order `(k/aH)^2 = 0.018`, while the permitted sourcing `T_RS` is five
+  hundred times larger than `T_SR`. The triangle therefore has a direction,
+  rather than every off-diagonal entry being small.
 
 Reference curves and tolerances are stored with enough metadata to make a
 failure scientifically interpretable rather than merely a changed snapshot.

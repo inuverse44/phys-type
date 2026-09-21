@@ -12,9 +12,9 @@ use num_complex::Complex64;
 
 use crate::{
     ComplexMagnitude, ContravariantField, CovariantField, CurvedFieldSpaceGeometry, Dimensionless,
-    FieldMetric, FieldTensor2, Hubble, KinematicBasis2, KinematicBasisError, M0, M2, MMinus1, Mass,
-    ModeAmplitude, Quantity, ScaleFactor, TwiceDifferentiableMultifieldPotential, TwoFieldModes,
-    TwoFieldPerturbationState, TwoFieldPerturbationSystem, Upper,
+    FieldMetric, FieldTensor2, Hubble, KinematicBasis2, KinematicBasisError, M0, M2, MMinus1,
+    MMinusHalf, Mass, ModeAmplitude, Quantity, ScaleFactor, TwiceDifferentiableMultifieldPotential,
+    TwoFieldModes, TwoFieldPerturbationState, TwoFieldPerturbationSystem, Upper,
 };
 
 /// Mode covariance `Sigma^{IJ} = sum_A U^I_A U^{J*}_A`.
@@ -231,6 +231,51 @@ fn discard_imaginary(
     }
 
     Ok(Quantity::new(value.re))
+}
+
+/// The dimensionless curvature and entropy amplitude of each independent
+/// mode, as `[[R_1, R_2], [S_1, S_2]]`.
+///
+/// Summing `|R_A|^2` over the independent modes reproduces `P_R`, and
+/// likewise for the entropy row, so this is the same content as
+/// [`ProjectedSpectra`] before the sum over vacuum oscillators discards which
+/// solution each contribution came from. The super-horizon transfer matrix
+/// needs that information, because it relates two independent solutions
+/// rather than their sum.
+pub type ModeProjections = [[Complex64; 2]; 2];
+
+/// Projects each independent mode onto the curvature and entropy directions.
+pub fn project_modes(
+    modes: &TwoFieldModes,
+    scale_factor: ScaleFactor,
+    metric: &FieldMetric<2>,
+    basis: &KinematicBasis2,
+    hubble: Hubble,
+    k: Mass,
+) -> ModeProjections {
+    let adiabatic = metric.lower(&basis.tangent);
+    let entropy = metric.lower(&basis.normal);
+    let directions = [adiabatic, entropy];
+    // R = (H / dot_sigma) Q_sigma, and P_R = (k^3 / 2 pi^2) |R|^2 summed over
+    // modes, so each amplitude carries k^(3/2) / (pi sqrt 2).
+    let normalization = (k * k * k).sqrt() / (PI * 2.0_f64.sqrt());
+    let transfer = hubble / basis.speed;
+
+    core::array::from_fn(|direction| {
+        core::array::from_fn(|mode| {
+            let projected = (0..2).fold(
+                Quantity::<MMinusHalf, Complex64>::new(Complex64::new(0.0, 0.0)),
+                |sum, field| {
+                    let weight = *directions[direction].components()[field].value();
+                    let amplitude = modes.rescaled_amplitude[field][mode] / scale_factor;
+
+                    sum + amplitude * weight
+                },
+            );
+
+            (normalization * transfer * projected).into_value()
+        })
+    })
 }
 
 /// Projects a spectrum matrix onto an adiabatic and entropy basis.

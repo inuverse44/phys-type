@@ -59,6 +59,8 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   dimension. `AdaptiveSystem` gains an `AbsoluteTolerance` associated type,
   `ErrorTolerances` is generic over it, and mode components default to no
   absolute floor because their modulus norm never vanishes.
+- `project_modes` reports the curvature and entropy amplitude of each
+  independent mode, which the super-horizon transfer matrix needs.
 
 ## [0.1.0] - 2026-09-21
 

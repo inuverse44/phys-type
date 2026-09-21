@@ -1255,6 +1255,270 @@ mod tests {
         assert!(absolute.background.phi[0].into_value() > 0.0);
     }
 
+    /// Advances a mode state to a requested e-folding number.
+    fn advance_modes<P, G>(
+        system: &TwoFieldPerturbationSystem<P, G>,
+        settings: &SpectrumRunSettings,
+        initial: &MultifieldState<2>,
+        state: TwoFieldPerturbationState,
+        time: Time,
+        target: f64,
+    ) -> (TwoFieldPerturbationState, Time)
+    where
+        P: TwiceDifferentiableMultifieldPotential<2> + Clone,
+        G: CurvedFieldSpaceGeometry<2> + Clone,
+    {
+        advance_until(
+            system,
+            state,
+            time,
+            settings,
+            &settings.tolerances,
+            |state| target - state.background.e_folds(initial),
+            |_, _| {},
+        )
+        .unwrap()
+    }
+
+    /// `[[R_1, R_2], [S_1, S_2]]` for one evolved state.
+    fn projections<P, G>(
+        system: &TwoFieldPerturbationSystem<P, G>,
+        state: &TwoFieldPerturbationState,
+    ) -> crate::ModeProjections
+    where
+        P: TwiceDifferentiableMultifieldPotential<2> + Clone,
+        G: CurvedFieldSpaceGeometry<2> + Clone,
+    {
+        let kinematics = system
+            .background
+            .kinematics(&state.background, None)
+            .unwrap();
+
+        crate::project_modes(
+            &state.modes,
+            state.background.a,
+            &system.background.geometry.metric(&state.background.phi),
+            &kinematics.basis,
+            system.background.hubble(&state.background),
+            system.k,
+        )
+    }
+
+    #[test]
+    fn two_light_fields_freeze_at_the_de_sitter_amplitude() {
+        // The `(H_*/2 pi)^2` result needs a window: earlier than about two
+        // e-folds after exit the exact mode still carries its `1 + x^2`
+        // correction, and later the entropy field decays under its own mass
+        // while the adiabatic one grows with `2 epsilon`. Both effects are
+        // measured in the next test; here the window is used.
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let run = system
+            .run_two_field_spectra(
+                initial,
+                &SpectrumRunSettings {
+                    pivot_e_folds_before_end: 30.0,
+                    output_e_folds_before_end: 28.0,
+                    ..quick_settings()
+                },
+            )
+            .unwrap();
+
+        let hubble = run.pivot.hubble.into_value();
+        let de_sitter = (hubble / (2.0 * PI)).powi(2);
+        let spectrum = run.spectra[0];
+
+        for (name, value) in [("P_Qsigma", spectrum.p_q_sigma), ("P_Qs", spectrum.p_q_s)] {
+            let ratio = value / de_sitter;
+            assert!(
+                (ratio - 1.0).abs() < 0.15,
+                "{name} / (H/2pi)^2 = {ratio}, heaviest m^2/H^2 = {}",
+                (1.5e-6 / hubble).powi(2)
+            );
+        }
+    }
+
+    #[test]
+    fn super_horizon_drift_follows_the_analytic_rates() {
+        // Between two and eight e-folds after exit the entropy spectrum decays
+        // as a light field of mass m does, and the adiabatic field spectrum
+        // grows with 2 epsilon because Q_sigma = (dot sigma / H) R and R is
+        // conserved.
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let at = |after: f64| {
+            system
+                .run_two_field_spectra(
+                    initial,
+                    &SpectrumRunSettings {
+                        pivot_e_folds_before_end: 30.0,
+                        output_e_folds_before_end: 30.0 - after,
+                        ..quick_settings()
+                    },
+                )
+                .unwrap()
+        };
+
+        let early = at(2.0);
+        let late = at(8.0);
+        let elapsed = 6.0;
+
+        // A light entropy field decays as P_S ~ a^(-2 m^2 / 3 H^2).
+        let mass_ratio = (1.5e-6 / early.pivot.hubble.into_value()).powi(2);
+        let predicted_decay = (-2.0 * mass_ratio * elapsed / 3.0).exp();
+        let measured_decay = late.spectra[0].p_q_s / early.spectra[0].p_q_s;
+        assert!(
+            (measured_decay / predicted_decay - 1.0).abs() < 0.1,
+            "entropy decayed by {measured_decay}, predicted {predicted_decay}"
+        );
+
+        // The adiabatic field spectrum tracks 2 epsilon, which for a quadratic
+        // model is 1/N e-folds before the end.
+        let predicted_growth = (30.0 - 2.0) / (30.0 - 8.0);
+        let measured_growth = late.spectra[0].p_q_sigma / early.spectra[0].p_q_sigma;
+        assert!(
+            (measured_growth / predicted_growth - 1.0).abs() < 0.1,
+            "adiabatic grew by {measured_growth}, predicted {predicted_growth}"
+        );
+    }
+
+    #[test]
+    fn the_super_horizon_transfer_matrix_is_triangular() {
+        // Wands' statement: entropy can source curvature, but a purely
+        // adiabatic perturbation creates no entropy. Two independent
+        // solutions determine the transfer matrix as T = M_late M_early^-1,
+        // whose entropy-from-curvature entry must vanish.
+        let background = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&background, [12.0, 8.0]);
+        let settings = quick_settings();
+        let perturbation = TwoFieldPerturbationSystem::new(background, Mass::new(6.0e-5));
+
+        let (start, start_time) = advance_until(
+            &background,
+            initial,
+            Time::new(0.0),
+            &settings,
+            &background_tolerances(&settings),
+            |state| {
+                (perturbation.k / (state.a * background.hubble(state))).into_value()
+                    - start_depth(&settings)
+            },
+            |_, _| {},
+        )
+        .unwrap();
+        let exit = start.e_folds(&initial) + settings.e_folds_before_exit;
+        let mode_state = perturbation
+            .bunch_davies_state(start, start_depth(&settings))
+            .unwrap();
+
+        let (early, early_time) = advance_modes(
+            &perturbation,
+            &settings,
+            &initial,
+            mode_state,
+            start_time,
+            exit + 2.0,
+        );
+        let (late, _) = advance_modes(
+            &perturbation,
+            &settings,
+            &initial,
+            early,
+            early_time,
+            exit + 6.0,
+        );
+
+        let m_early = projections(&perturbation, &early);
+        let m_late = projections(&perturbation, &late);
+        let determinant = m_early[0][0] * m_early[1][1] - m_early[0][1] * m_early[1][0];
+        let inverse = [
+            [m_early[1][1] / determinant, -m_early[0][1] / determinant],
+            [-m_early[1][0] / determinant, m_early[0][0] / determinant],
+        ];
+        let transfer: [[_; 2]; 2] = core::array::from_fn(|row| {
+            core::array::from_fn(|column| {
+                m_late[row][0] * inverse[0][column] + m_late[row][1] * inverse[1][column]
+            })
+        });
+
+        let entropy_from_curvature = transfer[1][0].norm();
+        let entropy_from_entropy = transfer[1][1].norm();
+        let curvature_from_entropy = transfer[0][1].norm();
+
+        // The forbidden entry is not exactly zero, because the early time is
+        // two e-folds outside the horizon rather than infinitely far, leaving
+        // gradient corrections of order `(k/aH)^2 ~= 0.018`. It comes out far
+        // below even that.
+        assert!(
+            entropy_from_curvature < 1.0e-3 * entropy_from_entropy,
+            "T_SR = {entropy_from_curvature}, T_SS = {entropy_from_entropy}"
+        );
+        // The other off-diagonal entry is the physical sourcing, which a
+        // turning trajectory must actually produce, so the triangle has a
+        // direction rather than simply being small everywhere.
+        assert!(
+            curvature_from_entropy > 100.0 * entropy_from_curvature,
+            "T_RS = {curvature_from_entropy}, T_SR = {entropy_from_curvature}"
+        );
+    }
+
+    #[test]
+    fn tighter_tolerances_do_not_move_the_answer() {
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let curvature = |relative| {
+            system
+                .run_two_field_spectra(
+                    initial,
+                    &SpectrumRunSettings {
+                        tolerances: ErrorTolerances::new(
+                            TwoFieldPerturbationTolerance::background_in_planck_units(1.0e-20),
+                            relative,
+                        ),
+                        ..quick_settings()
+                    },
+                )
+                .unwrap()
+                .spectra[0]
+                .p_r
+        };
+
+        let loose = curvature(1.0e-9);
+        let tight = curvature(1.0e-12);
+
+        assert!((loose - tight).abs() / tight < 1.0e-7);
+    }
+
+    #[test]
+    fn a_denser_grid_does_not_disturb_the_wavenumbers_it_shares() {
+        // Each wavenumber is integrated from the same initial state, so a
+        // denser grid must reproduce the coarser one exactly. Anything else
+        // would mean state leaking between grid points.
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let grid = |count| {
+            system
+                .run_two_field_spectra(
+                    initial,
+                    &SpectrumRunSettings {
+                        k_min_over_pivot: 0.5,
+                        k_max_over_pivot: 2.0,
+                        k_count: count,
+                        ..quick_settings()
+                    },
+                )
+                .unwrap()
+                .spectra
+        };
+
+        let coarse = grid(3);
+        let dense = grid(5);
+
+        assert_eq!(coarse[1].k_over_pivot, dense[2].k_over_pivot);
+        assert_eq!(coarse[1].p_r, dense[2].p_r);
+        assert_eq!(coarse[1].p_s, dense[2].p_s);
+    }
+
     #[test]
     fn csv_rows_match_their_headers() {
         let system = system([1.0e-6, 1.5e-6]);
