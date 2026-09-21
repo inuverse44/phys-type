@@ -28,6 +28,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   gravitational contributions.
 - Joint background and complex two-mode evolution with dimension-safe Fourier
   amplitudes, Bunch-Davies initialization, and Wronskian diagnostics.
+- Dimensioned `Complex64` mode values, native conjugation/Hermitian algebra,
+  and a modulus-based normalized error whose absolute tolerance keeps the
+  physical dimension of the component it bounds.
 
 ## [0.1.0] - 2026-09-21
 

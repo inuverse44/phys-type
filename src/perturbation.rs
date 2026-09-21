@@ -2,33 +2,69 @@
 
 use core::ops::{Add, Mul};
 
+use num_complex::Complex64;
+
 use crate::integrate::System;
 use crate::{
-    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, KinematicBasisError,
+    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, KinematicBasisError, M1,
     M3Over2, MHalf, MMinusHalf, Mass, MultifieldState, MultifieldStateDelta,
     MultifieldStateDerivative, Quantity, Time, TwiceDifferentiableMultifieldPotential,
 };
 
 /// Fourier mode amplitude `U^I_A`, with dimension fixed by
 /// `P_Q = k^3 |U|^2 / (2 pi^2)`.
-pub type ModeAmplitude = Quantity<MMinusHalf, f64>;
+pub type ModeAmplitude<V = Complex64> = Quantity<MMinusHalf, V>;
 /// Covariant time derivative `D_t U^I_A`.
-pub type ModeVelocity = Quantity<MHalf, f64>;
+pub type ModeVelocity<V = Complex64> = Quantity<MHalf, V>;
 /// Covariant second derivative of a mode amplitude.
-pub type ModeAcceleration = Quantity<M3Over2, f64>;
+pub type ModeAcceleration<V = Complex64> = Quantity<M3Over2, V>;
+/// A dimensionless complex `2 x 2` diagnostic matrix.
+pub type ComplexMatrix2 = [[Complex64; 2]; 2];
 
-/// Real and imaginary parts of the two independent two-field mode functions.
+/// Converts a dimensioned complex value to a real magnitude for error norms.
+///
+/// The caller supplies an absolute tolerance with the same dimension before
+/// combining this magnitude into a dimensionless normalized error.
+pub trait ComplexMagnitude {
+    /// Returns the complex modulus of the stored numerical value.
+    fn complex_magnitude(&self) -> f64;
+}
+
+impl<D> ComplexMagnitude for Quantity<D, Complex64> {
+    fn complex_magnitude(&self) -> f64 {
+        self.value().norm()
+    }
+}
+
+/// The dimensionless normalized error of one complex component,
+/// `|dz| / (a_tol + r_tol |z|)`.
+///
+/// The absolute tolerance carries the component's own dimension, so a
+/// tolerance meant for a mode amplitude cannot be applied to a mode velocity.
+/// The relative tolerance and the returned error are dimensionless. Both the
+/// current and the advanced value enter the scale, matching the background
+/// integrator, and the modulus keeps a single acceptance decision for the real
+/// and imaginary parts together.
+pub fn normalized_mode_error<D>(
+    error: Quantity<D, Complex64>,
+    current: Quantity<D, Complex64>,
+    next: Quantity<D, Complex64>,
+    absolute_tolerance: Quantity<D, f64>,
+    relative_tolerance: f64,
+) -> f64 {
+    let scale = current.complex_magnitude().max(next.complex_magnitude());
+
+    error.complex_magnitude() / (absolute_tolerance.into_value() + relative_tolerance * scale)
+}
+
+/// The two independent complex two-field mode functions.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TwoFieldModes {
-    /// Real part of `U^I_A`; first index is field space and second labels the
+    /// `U^I_A`; first index is field space and the second labels the
     /// independent vacuum oscillator.
-    pub real: [[ModeAmplitude; 2]; 2],
-    /// Imaginary part of `U^I_A`.
-    pub imaginary: [[ModeAmplitude; 2]; 2],
-    /// Real part of `D_t U^I_A`.
-    pub velocity_real: [[ModeVelocity; 2]; 2],
-    /// Imaginary part of `D_t U^I_A`.
-    pub velocity_imaginary: [[ModeVelocity; 2]; 2],
+    pub amplitude: [[ModeAmplitude; 2]; 2],
+    /// `D_t U^I_A` with the same index order.
+    pub velocity: [[ModeVelocity; 2]; 2],
 }
 
 /// Background and mode matrix for one comoving wavenumber.
@@ -45,14 +81,10 @@ pub struct TwoFieldPerturbationState {
 pub struct TwoFieldPerturbationDerivative {
     /// Background derivative.
     pub background: MultifieldStateDerivative<2>,
-    /// Coordinate time derivative of the real mode matrix.
-    pub real: [[ModeVelocity; 2]; 2],
-    /// Coordinate time derivative of the imaginary mode matrix.
-    pub imaginary: [[ModeVelocity; 2]; 2],
-    /// Coordinate time derivative of the real covariant mode velocity.
-    pub velocity_real: [[ModeAcceleration; 2]; 2],
-    /// Coordinate time derivative of the imaginary covariant mode velocity.
-    pub velocity_imaginary: [[ModeAcceleration; 2]; 2],
+    /// Coordinate time derivative of the mode matrix.
+    pub amplitude: [[ModeVelocity; 2]; 2],
+    /// Coordinate time derivative of the covariant mode velocity.
+    pub velocity: [[ModeAcceleration; 2]; 2],
 }
 
 /// Finite change of a background-plus-modes state.
@@ -60,14 +92,10 @@ pub struct TwoFieldPerturbationDerivative {
 pub struct TwoFieldPerturbationDelta {
     /// Background change.
     pub background: MultifieldStateDelta<2>,
-    /// Change in real mode amplitudes.
-    pub real: [[ModeAmplitude; 2]; 2],
-    /// Change in imaginary mode amplitudes.
-    pub imaginary: [[ModeAmplitude; 2]; 2],
-    /// Change in real covariant mode velocities.
-    pub velocity_real: [[ModeVelocity; 2]; 2],
-    /// Change in imaginary covariant mode velocities.
-    pub velocity_imaginary: [[ModeVelocity; 2]; 2],
+    /// Change in mode amplitudes.
+    pub amplitude: [[ModeAmplitude; 2]; 2],
+    /// Change in covariant mode velocities.
+    pub velocity: [[ModeVelocity; 2]; 2],
 }
 
 impl Add<TwoFieldPerturbationDelta> for TwoFieldPerturbationState {
@@ -77,13 +105,8 @@ impl Add<TwoFieldPerturbationDelta> for TwoFieldPerturbationState {
         Self {
             background: self.background + rhs.background,
             modes: TwoFieldModes {
-                real: add_matrices(self.modes.real, rhs.real),
-                imaginary: add_matrices(self.modes.imaginary, rhs.imaginary),
-                velocity_real: add_matrices(self.modes.velocity_real, rhs.velocity_real),
-                velocity_imaginary: add_matrices(
-                    self.modes.velocity_imaginary,
-                    rhs.velocity_imaginary,
-                ),
+                amplitude: add_matrices(self.modes.amplitude, rhs.amplitude),
+                velocity: add_matrices(self.modes.velocity, rhs.velocity),
             },
         }
     }
@@ -95,10 +118,8 @@ impl Add for TwoFieldPerturbationDerivative {
     fn add(self, rhs: Self) -> Self::Output {
         Self {
             background: self.background + rhs.background,
-            real: add_matrices(self.real, rhs.real),
-            imaginary: add_matrices(self.imaginary, rhs.imaginary),
-            velocity_real: add_matrices(self.velocity_real, rhs.velocity_real),
-            velocity_imaginary: add_matrices(self.velocity_imaginary, rhs.velocity_imaginary),
+            amplitude: add_matrices(self.amplitude, rhs.amplitude),
+            velocity: add_matrices(self.velocity, rhs.velocity),
         }
     }
 }
@@ -109,10 +130,8 @@ impl Mul<f64> for TwoFieldPerturbationDerivative {
     fn mul(self, rhs: f64) -> Self::Output {
         Self {
             background: self.background * rhs,
-            real: scale_matrix(self.real, rhs),
-            imaginary: scale_matrix(self.imaginary, rhs),
-            velocity_real: scale_matrix(self.velocity_real, rhs),
-            velocity_imaginary: scale_matrix(self.velocity_imaginary, rhs),
+            amplitude: scale_matrix(self.amplitude, rhs),
+            velocity: scale_matrix(self.velocity, rhs),
         }
     }
 }
@@ -123,27 +142,23 @@ impl Mul<Time> for TwoFieldPerturbationDerivative {
     fn mul(self, rhs: Time) -> Self::Output {
         TwoFieldPerturbationDelta {
             background: self.background * rhs,
-            real: self.real.map(|row| row.map(|entry| entry * rhs)),
-            imaginary: self.imaginary.map(|row| row.map(|entry| entry * rhs)),
-            velocity_real: self.velocity_real.map(|row| row.map(|entry| entry * rhs)),
-            velocity_imaginary: self
-                .velocity_imaginary
-                .map(|row| row.map(|entry| entry * rhs)),
+            amplitude: self.amplitude.map(|row| row.map(|entry| entry * rhs)),
+            velocity: self.velocity.map(|row| row.map(|entry| entry * rhs)),
         }
     }
 }
 
 fn add_matrices<D: Copy>(
-    lhs: [[Quantity<D, f64>; 2]; 2],
-    rhs: [[Quantity<D, f64>; 2]; 2],
-) -> [[Quantity<D, f64>; 2]; 2] {
+    lhs: [[Quantity<D, Complex64>; 2]; 2],
+    rhs: [[Quantity<D, Complex64>; 2]; 2],
+) -> [[Quantity<D, Complex64>; 2]; 2] {
     core::array::from_fn(|row| core::array::from_fn(|column| lhs[row][column] + rhs[row][column]))
 }
 
 fn scale_matrix<D>(
-    matrix: [[Quantity<D, f64>; 2]; 2],
+    matrix: [[Quantity<D, Complex64>; 2]; 2],
     coefficient: f64,
-) -> [[Quantity<D, f64>; 2]; 2] {
+) -> [[Quantity<D, Complex64>; 2]; 2] {
     matrix.map(|row| row.map(|entry| entry * coefficient))
 }
 
@@ -206,24 +221,27 @@ where
             .map_err(ModeInitializationError::KinematicBasis)?
             .basis;
         let normalization = (self.k * 2.0).sqrt();
-        let amplitude: ModeAmplitude = Dimensionless::new(1.0) / (background.a * normalization);
+        let scalar_amplitude: ModeAmplitude<f64> =
+            Dimensionless::new(1.0) / (background.a * normalization);
         let physical_wavenumber = self.k / background.a;
+        let frequency = Quantity::<M1, Complex64>::new(Complex64::new(
+            -hubble.into_value(),
+            -physical_wavenumber.into_value(),
+        ));
         let frames = [basis.tangent, basis.normal];
-        let real = core::array::from_fn(|field| {
-            core::array::from_fn(|mode| frames[mode].components()[field] * amplitude)
+        let amplitude = core::array::from_fn(|field| {
+            core::array::from_fn(|mode| {
+                let value = (frames[mode].components()[field] * scalar_amplitude).into_value();
+                ModeAmplitude::new(Complex64::new(value, 0.0))
+            })
         });
-        let imaginary = [[ModeAmplitude::new(0.0); 2]; 2];
-        let velocity_real = real.map(|row| row.map(|entry| entry * hubble * -1.0));
-        let velocity_imaginary =
-            real.map(|row| row.map(|entry| entry * physical_wavenumber * -1.0));
+        let velocity = amplitude.map(|row| row.map(|entry| entry * frequency));
 
         Ok(TwoFieldPerturbationState {
             background,
             modes: TwoFieldModes {
-                real,
-                imaginary,
-                velocity_real,
-                velocity_imaginary,
+                amplitude,
+                velocity,
             },
         })
     }
@@ -232,47 +250,24 @@ where
     /// the identity matrix.
     pub fn wronskian(&self, state: &TwoFieldPerturbationState) -> ComplexMatrix2 {
         let metric = self.background.geometry.metric(&state.background.phi);
-        let mut result = ComplexMatrix2::default();
         let a_cubed = state.background.a.into_value().powi(3);
-
-        for left_mode in 0..2 {
-            for right_mode in 0..2 {
-                let mut difference_real = 0.0;
-                let mut difference_imaginary = 0.0;
-                for first in 0..2 {
-                    for second in 0..2 {
+        core::array::from_fn(|left_mode| {
+            core::array::from_fn(|right_mode| {
+                let difference = (0..2)
+                    .flat_map(|first| (0..2).map(move |second| (first, second)))
+                    .fold(Complex64::new(0.0, 0.0), |sum, (first, second)| {
                         let g = *metric.components()[first][second].value();
-                        let ur_a = state.modes.real[first][left_mode].into_value();
-                        let ui_a = state.modes.imaginary[first][left_mode].into_value();
-                        let pr_a = state.modes.velocity_real[first][left_mode].into_value();
-                        let pi_a = state.modes.velocity_imaginary[first][left_mode].into_value();
-                        let ur_b = state.modes.real[second][right_mode].into_value();
-                        let ui_b = state.modes.imaginary[second][right_mode].into_value();
-                        let pr_b = state.modes.velocity_real[second][right_mode].into_value();
-                        let pi_b = state.modes.velocity_imaginary[second][right_mode].into_value();
+                        let u_left = state.modes.amplitude[first][left_mode].into_value();
+                        let p_left = state.modes.velocity[first][left_mode].into_value();
+                        let u_right = state.modes.amplitude[second][right_mode].into_value();
+                        let p_right = state.modes.velocity[second][right_mode].into_value();
+                        sum + g * (u_left.conj() * p_right - p_left.conj() * u_right)
+                    });
 
-                        difference_real +=
-                            g * (ur_a * pr_b + ui_a * pi_b - pr_a * ur_b - pi_a * ui_b);
-                        difference_imaginary +=
-                            g * (ur_a * pi_b - ui_a * pr_b - pr_a * ui_b + pi_a * ur_b);
-                    }
-                }
-                result.real[left_mode][right_mode] = -a_cubed * difference_imaginary;
-                result.imaginary[left_mode][right_mode] = a_cubed * difference_real;
-            }
-        }
-
-        result
+                Complex64::new(0.0, a_cubed) * difference
+            })
+        })
     }
-}
-
-/// A raw complex `2 x 2` diagnostic matrix.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct ComplexMatrix2 {
-    /// Real components.
-    pub real: [[f64; 2]; 2],
-    /// Imaginary components.
-    pub imaginary: [[f64; 2]; 2],
 }
 
 impl<P, G> System for TwoFieldPerturbationSystem<P, G>
@@ -292,55 +287,53 @@ where
         let mass = self.background.perturbation_mass_matrix(&state.background);
         let physical_wavenumber = self.k / state.background.a;
         let wave_number_squared = physical_wavenumber * physical_wavenumber;
-
-        let mode_derivative = |amplitude: &[[ModeAmplitude; 2]; 2],
-                               velocity: &[[ModeVelocity; 2]; 2]| {
-            let coordinate_velocity = core::array::from_fn(|upper| {
-                core::array::from_fn(|mode| {
-                    let connection_term = (0..2)
-                        .flat_map(|first| (0..2).map(move |second| (first, second)))
-                        .fold(ModeVelocity::new(0.0), |sum, (first, second)| {
+        let amplitude = core::array::from_fn(|upper| {
+            core::array::from_fn(|mode| {
+                let connection_term = (0..2)
+                    .flat_map(|first| (0..2).map(move |second| (first, second)))
+                    .fold(
+                        ModeVelocity::new(Complex64::new(0.0, 0.0)),
+                        |sum, (first, second)| {
                             sum + connection.components()[upper][first][second]
                                 * state.background.pi[first]
-                                * amplitude[second][mode]
-                        });
-                    velocity[upper][mode] - connection_term
-                })
-            });
-            let coordinate_acceleration = core::array::from_fn(|upper| {
-                core::array::from_fn(|mode| {
-                    let restoring = (0..2).fold(ModeAcceleration::new(0.0), |sum, lower| {
+                                * state.modes.amplitude[second][mode]
+                        },
+                    );
+                state.modes.velocity[upper][mode] - connection_term
+            })
+        });
+        let velocity = core::array::from_fn(|upper| {
+            core::array::from_fn(|mode| {
+                let restoring = (0..2).fold(
+                    ModeAcceleration::new(Complex64::new(0.0, 0.0)),
+                    |sum, lower| {
                         let entry = if upper == lower {
                             mass.components()[upper][lower] + wave_number_squared
                         } else {
                             mass.components()[upper][lower]
                         };
-                        sum + entry * amplitude[lower][mode]
-                    });
-                    let connection_term = (0..2)
-                        .flat_map(|first| (0..2).map(move |second| (first, second)))
-                        .fold(ModeAcceleration::new(0.0), |sum, (first, second)| {
+                        sum + entry * state.modes.amplitude[lower][mode]
+                    },
+                );
+                let connection_term = (0..2)
+                    .flat_map(|first| (0..2).map(move |second| (first, second)))
+                    .fold(
+                        ModeAcceleration::new(Complex64::new(0.0, 0.0)),
+                        |sum, (first, second)| {
                             sum + connection.components()[upper][first][second]
                                 * state.background.pi[first]
-                                * velocity[second][mode]
-                        });
+                                * state.modes.velocity[second][mode]
+                        },
+                    );
 
-                    velocity[upper][mode] * hubble * -3.0 - restoring - connection_term
-                })
-            });
-
-            (coordinate_velocity, coordinate_acceleration)
-        };
-        let (real, velocity_real) = mode_derivative(&state.modes.real, &state.modes.velocity_real);
-        let (imaginary, velocity_imaginary) =
-            mode_derivative(&state.modes.imaginary, &state.modes.velocity_imaginary);
+                state.modes.velocity[upper][mode] * hubble * -3.0 - restoring - connection_term
+            })
+        });
 
         TwoFieldPerturbationDerivative {
             background: background_derivative,
-            real,
-            imaginary,
-            velocity_real,
-            velocity_imaginary,
+            amplitude,
+            velocity,
         }
     }
 }
@@ -369,16 +362,61 @@ mod tests {
     }
 
     #[test]
+    fn complex_quantity_retains_dimension_and_uses_modulus() {
+        let value = ModeAmplitude::new(Complex64::new(3.0, 4.0));
+        assert_eq!(value.complex_magnitude(), 5.0);
+    }
+
+    #[test]
+    fn normalized_error_uses_the_modulus_of_the_whole_complex_component() {
+        let error = ModeAmplitude::new(Complex64::new(3.0e-9, 4.0e-9));
+        let current = ModeAmplitude::new(Complex64::new(1.0, 0.0));
+        let next = ModeAmplitude::new(Complex64::new(0.0, 2.0));
+        let absolute = ModeAmplitude::<f64>::new(0.0);
+
+        // |error| = 5e-9 and the scale is max(1, 2) = 2.
+        let ratio = normalized_mode_error(error, current, next, absolute, 1.0e-9);
+
+        assert!((ratio - 2.5).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn a_purely_imaginary_error_is_not_ignored() {
+        let current = ModeAmplitude::new(Complex64::new(1.0, 0.0));
+        let absolute = ModeAmplitude::<f64>::new(0.0);
+        let real_error = ModeAmplitude::new(Complex64::new(1.0e-6, 0.0));
+        let imaginary_error = ModeAmplitude::new(Complex64::new(0.0, 1.0e-6));
+
+        let from_real = normalized_mode_error(real_error, current, current, absolute, 1.0e-9);
+        let from_imaginary =
+            normalized_mode_error(imaginary_error, current, current, absolute, 1.0e-9);
+
+        assert_eq!(from_real, from_imaginary);
+        assert!(from_real > 1.0);
+    }
+
+    #[test]
+    fn a_vanishing_component_falls_back_to_the_absolute_tolerance() {
+        let error = ModeAmplitude::new(Complex64::new(1.0e-13, 0.0));
+        let zero = ModeAmplitude::new(Complex64::new(0.0, 0.0));
+        let absolute = ModeAmplitude::<f64>::new(1.0e-12);
+
+        let ratio = normalized_mode_error(error, zero, zero, absolute, 1.0e-9);
+
+        assert!(ratio < 1.0);
+    }
+
+    #[test]
     fn bunch_davies_modes_have_identity_wronskian() {
         let system = system();
         let state = system.bunch_davies_state(background(), 100.0).unwrap();
         let wronskian = system.wronskian(&state);
 
-        for row in 0..2 {
-            for column in 0..2 {
+        for (row, entries) in wronskian.iter().enumerate() {
+            for (column, value) in entries.iter().enumerate() {
                 let expected = f64::from(row == column);
-                assert!((wronskian.real[row][column] - expected).abs() < 1.0e-12);
-                assert!(wronskian.imaginary[row][column].abs() < 1.0e-12);
+                assert!((value.re - expected).abs() < 1.0e-12);
+                assert!(value.im.abs() < 1.0e-12);
             }
         }
     }
@@ -401,8 +439,7 @@ mod tests {
         let advanced = rk4_step(&system, Time::new(0.0), &initial, Time::new(1.0));
 
         assert!(advanced.background.a.into_value() > initial.background.a.into_value());
-        assert_ne!(advanced.modes.real, initial.modes.real);
-        assert_ne!(advanced.modes.imaginary, initial.modes.imaginary);
+        assert_ne!(advanced.modes.amplitude, initial.modes.amplitude);
     }
 
     #[test]
@@ -413,11 +450,11 @@ mod tests {
         let advanced = rk4_step(&system, Time::new(0.0), &initial, Time::new(1.0e-3));
         let wronskian = system.wronskian(&advanced);
 
-        for row in 0..2 {
-            for column in 0..2 {
+        for (row, entries) in wronskian.iter().enumerate() {
+            for (column, value) in entries.iter().enumerate() {
                 let expected = f64::from(row == column);
-                assert!((wronskian.real[row][column] - expected).abs() < 1.0e-12);
-                assert!(wronskian.imaginary[row][column].abs() < 1.0e-12);
+                assert!((value.re - expected).abs() < 1.0e-12);
+                assert!(value.im.abs() < 1.0e-12);
             }
         }
     }

@@ -137,6 +137,10 @@ canonical Wronskian is available as a numerical invariant.
 Mode values are specified as `Quantity<D, Complex64>` so complex conjugation
 and Hermitian products remain explicit without sacrificing compile-time
 physical dimensions. Real and imaginary parts are separated only for output.
+`normalized_mode_error` turns a complex step error into the dimensionless
+ratio `|dz| / (a_tol + r_tol |z|)`, where the absolute tolerance carries the
+dimension of the component it bounds and the modulus keeps one acceptance
+decision for both parts.
 
 ## Compile-fail tests
 

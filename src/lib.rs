@@ -37,10 +37,11 @@ pub use multifield::{
     CovariantMultifieldSystem, MultifieldState, MultifieldStateDelta, MultifieldStateDerivative,
     MultifieldSystem, TwoFieldKinematics,
 };
+pub use num_complex::Complex64;
 pub use perturbation::{
-    ComplexMatrix2, ModeAcceleration, ModeAmplitude, ModeInitializationError, ModeVelocity,
-    TwoFieldModes, TwoFieldPerturbationDelta, TwoFieldPerturbationDerivative,
-    TwoFieldPerturbationState, TwoFieldPerturbationSystem,
+    ComplexMagnitude, ComplexMatrix2, ModeAcceleration, ModeAmplitude, ModeInitializationError,
+    ModeVelocity, TwoFieldModes, TwoFieldPerturbationDelta, TwoFieldPerturbationDerivative,
+    TwoFieldPerturbationState, TwoFieldPerturbationSystem, normalized_mode_error,
 };
 pub use potential::{
     MultifieldPotential, MultifieldPotentialValue, Potential, PotentialDerivatives, PotentialValue,
