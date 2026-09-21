@@ -9,7 +9,7 @@ Create one short-lived branch per independently reviewable change:
 - `docs/<name>` for documentation-only work
 - `chore/<name>` for maintenance and release preparation
 
-Branch from the latest `master`. Keep commits focused, push the feature branch,
+Branch from the latest `main`. Keep commits focused, push the feature branch,
 and merge only after the checks below pass. Prefer fast-forward integration for
 local linear work; use a reviewed pull request when collaborating.
 
