@@ -594,6 +594,11 @@ Work proceeds in this order, one independently reviewable feature at a time:
     component group, removing the remaining dependence on one global floor.
 14. `feature/conformal-time-modes` -- conformal time as a distinct
     independent-variable type, and a background evolved in `ln a`.
+15. `feature/two-field-observational-benchmark` -- evolve the pivot mode
+    through the double-quadratic turn, calibrate the common mass scale to the
+    declared scalar amplitude target, and regenerate the reference spectra as
+    specified in
+    [`two-field-observational-benchmark.md`](two-field-observational-benchmark.md).
 
 Each branch starts from the updated default branch, contains one conceptual
 change, passes `cargo fmt --check`, `cargo clippy --all-targets`, and

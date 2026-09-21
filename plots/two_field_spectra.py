@@ -145,7 +145,10 @@ def curvature_panel(axes: plt.Axes, spectra: np.ndarray) -> None:
 def evolution_panel(axes: plt.Axes, modes: np.ndarray) -> None:
     """Selected modes evolving through horizon exit, against the turn rate."""
     wavenumbers = np.unique(modes["k_over_pivot"])
-    selected = wavenumbers[:: max(len(wavenumbers) // 3, 1)]
+    targets = (0.1, 1.0, 10.0)
+    selected = np.unique(
+        [wavenumbers[np.argmin(np.abs(np.log(wavenumbers / target)))] for target in targets]
+    )
     colors = plt.cm.viridis(np.linspace(0.0, 0.85, len(selected)))
 
     for wavenumber, color in zip(selected, colors):

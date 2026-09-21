@@ -24,6 +24,7 @@ PLOTS = (
 # rather than one input file.
 TWO_FIELD_PLOT = ("two_field_spectra.py", "two_field_spectra")
 FINAL_SPECTRUM_PLOT = ("final_spectra.py", "two_field_final_spectra")
+PIVOT_EVOLUTION_PLOT = ("pivot_mode_evolution.py", "two_field_pivot_evolution")
 
 
 def run(command: list[str], cwd: Path) -> None:
@@ -76,7 +77,14 @@ def main() -> None:
     )
     verify(output, stem)
 
-    print(f"verified {(len(PLOTS) + 2) * 2} plot files in {output}")
+    script, stem = PIVOT_EVOLUTION_PLOT
+    run(
+        [sys.executable, str(scripts / script), str(output)],
+        repository,
+    )
+    verify(output, stem)
+
+    print(f"verified {(len(PLOTS) + 3) * 2} plot files in {output}")
 
 
 if __name__ == "__main__":

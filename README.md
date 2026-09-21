@@ -8,6 +8,9 @@ target is inflationary background evolution; see
 [`docs/mvp-design.md`](docs/mvp-design.md). The next scientific target is a
 covariant two-field adiabatic/isocurvature spectrum, specified in
 [`docs/two-field-perturbation-design.md`](docs/two-field-perturbation-design.md).
+The runnable double-quadratic reference model and its scalar-amplitude
+normalization are specified in
+[`docs/two-field-observational-benchmark.md`](docs/two-field-observational-benchmark.md).
 Higher-rank tensors, field-space Riemann curvature, and the extension boundary
 toward non-Gaussianity are specified in
 [`docs/field-space-curvature-design.md`](docs/field-space-curvature-design.md).
@@ -53,17 +56,30 @@ and selected modes through horizon exit:
 uv run plots/two_field_spectra.py diagnostics
 ```
 
-The focused final spectrum figure puts `P_R(k)` and `P_S(k)` on one log-log
-axis at the end of inflation:
+The focused final spectrum figure puts `P_R(k)` and `P_S(k)` in two aligned
+log-log panels at the end of inflation, so a strongly decayed entropy spectrum
+does not flatten the visible curvature-spectrum shape:
 
 ```sh
 uv run plots/final_spectra.py diagnostics/two_field_spectra.csv
+```
+
+The time-domain figure corresponding to the familiar mass-ratio-seven
+double-inflation plot follows the pivot mode through entropy decay and the
+turn-induced growth of curvature power:
+
+```sh
+uv run plots/pivot_mode_evolution.py diagnostics
 ```
 
 A reference result generated at the end of inflation is tracked as
 [`docs/figures/two_field_final_spectra.png`](docs/figures/two_field_final_spectra.png)
 with a vector
 [`PDF`](docs/figures/two_field_final_spectra.pdf).
+The corresponding pivot-mode history is tracked as
+[`docs/figures/two_field_pivot_evolution.png`](docs/figures/two_field_pivot_evolution.png)
+with a vector
+[`PDF`](docs/figures/two_field_pivot_evolution.pdf).
 
 Generate every diagnostic CSV and publication-quality PNG/PDF figure with one
 command:
@@ -81,6 +97,7 @@ uv run plots/convergence.py diagnostics/convergence.csv
 uv run plots/oscillation.py diagnostics/oscillation.csv
 uv run plots/two_field_spectra.py diagnostics
 uv run plots/final_spectra.py diagnostics/two_field_spectra.csv
+uv run plots/pivot_mode_evolution.py diagnostics
 ```
 
 The plotting scripts declare their own Python dependencies, so `uv` creates an

@@ -418,9 +418,23 @@ diagnostics/two_field_final_spectra.pdf
 直接参照する版という役割分担にする。
 
 横軸は`k/k_pivot`、縦軸は無次元の`P_R`と`P_S`で、両方とも対数軸とする。
+最終時刻に`P_S`が何桁も減衰するbenchmarkでは、共有した横軸の上下二段に
+分ける。同じ縦軸に押し込んで`P_R`の形を潰さない。
 二つの系列を単純に足したものを曲率スペクトルとは呼ばない。図中の`P_R`は、
 等曲率modeからのsourceを含めて終了時まで発展させた曲率modeから直接構成する。
 相関はpivotでの`r_C`を注記し、完全な`C_RS(k)`は四パネル図とCSVに残す。
+
+mass-ratio-seven benchmarkでは、pivot modeの時間発展も別図にする。
+
+```text
+diagnostics/two_field_pivot_evolution.png
+diagnostics/two_field_pivot_evolution.pdf
+```
+
+横軸は`N - N_*`、縦軸は
+`P_* = H_*^2 / (8 pi^2 epsilon_*)`で規格化した`P_R`と`P_S`とする。
+地平線脱出を`N - N_* = 0`、最大`|eta_perp|`のturnを別の縦線で示す。
+これにより、最終`k`スペクトルと単一modeの時間発展を混同しない。
 
 exampleは`output_e_folds_before_end = 0`を指定する。タイトルには出力時刻とGit
 revisionを表示し、未コミット変更を含む実行ではrevisionに`-dirty`を付ける。

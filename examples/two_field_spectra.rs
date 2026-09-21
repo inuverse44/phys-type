@@ -22,22 +22,29 @@ use phys_type::{
     QuadraticMultifieldPotential, ScaleFactor, SpectrumRun, SpectrumRunSettings, write_metadata,
 };
 
-/// Unequal masses bend the trajectory in field space, so the entropy
-/// direction has something to source.
-const MASSES: [f64; 2] = [1.0e-6, 2.0e-6];
-const PHI_START: [f64; 2] = [16.0, 12.0];
+/// Shape parameters for the observationally normalized double-quadratic
+/// benchmark. The hierarchy makes the pivot mode cross before, and then
+/// experience, the heavy-to-light transition for these initial fields.
+const MASS_RATIO: f64 = 7.0;
+const PHI_START: [f64; 2] = [14.0, 12.0];
+const REFERENCE_LIGHT_MASS: f64 = 1.0e-6;
+const TARGET_SCALAR_AMPLITUDE: f64 = 2.1e-9;
 
-fn model() -> CovariantMultifieldSystem<QuadraticMultifieldPotential<2>, FlatFieldSpace, 2> {
+type BenchmarkSystem =
+    CovariantMultifieldSystem<QuadraticMultifieldPotential<2>, FlatFieldSpace, 2>;
+
+fn model(light_mass: f64) -> BenchmarkSystem {
     CovariantMultifieldSystem::in_planck_units(
-        QuadraticMultifieldPotential::new([Mass::new(MASSES[0]), Mass::new(MASSES[1])]),
+        QuadraticMultifieldPotential::new([
+            Mass::new(light_mass),
+            Mass::new(MASS_RATIO * light_mass),
+        ]),
         FlatFieldSpace,
     )
 }
 
 /// The slow-roll initial state at `PHI_START`.
-fn initial_state(
-    system: &CovariantMultifieldSystem<QuadraticMultifieldPotential<2>, FlatFieldSpace, 2>,
-) -> MultifieldState<2> {
+fn initial_state(system: &BenchmarkSystem) -> MultifieldState<2> {
     let resting = MultifieldState::new(
         [Field::new(PHI_START[0]), Field::new(PHI_START[1])],
         [FieldVelocity::new(0.0); 2],
@@ -78,19 +85,84 @@ fn write_file(
     path: &Path,
     settings: &SpectrumRunSettings,
     run: &SpectrumRun,
+    calibration: &Calibration,
     revision: Option<&str>,
     rows: impl Fn(&SpectrumRun, &mut fs::File) -> io::Result<()>,
 ) -> io::Result<()> {
     let mut file = fs::File::create(path)?;
-    writeln!(file, "# masses_over_m_pl: {:e},{:e}", MASSES[0], MASSES[1])?;
+    writeln!(file, "# benchmark: canonical_double_quadratic")?;
+    writeln!(file, "# mass_ratio_m2_over_m1: {:e}", MASS_RATIO)?;
+    writeln!(
+        file,
+        "# masses_over_m_pl: {:e},{:e}",
+        calibration.light_mass,
+        MASS_RATIO * calibration.light_mass
+    )?;
     writeln!(
         file,
         "# phi_start_over_m_pl: {:e},{:e}",
         PHI_START[0], PHI_START[1]
     )?;
+    writeln!(
+        file,
+        "# target_scalar_amplitude: {:e}",
+        TARGET_SCALAR_AMPLITUDE
+    )?;
+    writeln!(file, "# pilot_p_r_at_pivot: {:e}", calibration.pilot_p_r)?;
+    writeln!(
+        file,
+        "# common_mass_rescaling: {:e}",
+        calibration.mass_rescaling
+    )?;
     write_metadata(&mut file, settings, &run.pivot, revision)?;
 
     rows(run, &mut file)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Calibration {
+    pilot_p_r: f64,
+    mass_rescaling: f64,
+    light_mass: f64,
+}
+
+fn run_or_exit(
+    system: &BenchmarkSystem,
+    settings: &SpectrumRunSettings,
+    stage: &str,
+) -> SpectrumRun {
+    match system.run_two_field_spectra(initial_state(system), settings) {
+        Ok(run) => run,
+        Err(error) => {
+            eprintln!("the {stage} run could not be completed: {error}");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn calibrate(settings: &SpectrumRunSettings) -> Calibration {
+    let pilot_settings = SpectrumRunSettings {
+        k_min_over_pivot: 1.0,
+        k_max_over_pivot: 1.0,
+        k_count: 1,
+        background_sample_every: settings.background_sample_every,
+        mode_sample_every: settings.mode_sample_every,
+        ..*settings
+    };
+    let system = model(REFERENCE_LIGHT_MASS);
+    let pilot = run_or_exit(&system, &pilot_settings, "amplitude-calibration pilot");
+    let pilot_p_r = pilot.spectra[0].p_r;
+    if !pilot_p_r.is_finite() || pilot_p_r <= 0.0 {
+        eprintln!("the pilot returned an invalid pivot spectrum: {pilot_p_r:e}");
+        std::process::exit(1);
+    }
+    let mass_rescaling = (TARGET_SCALAR_AMPLITUDE / pilot_p_r).sqrt();
+
+    Calibration {
+        pilot_p_r,
+        mass_rescaling,
+        light_mass: REFERENCE_LIGHT_MASS * mass_rescaling,
+    }
 }
 
 fn main() -> io::Result<()> {
@@ -98,21 +170,19 @@ fn main() -> io::Result<()> {
     let directory = Path::new(&directory);
     fs::create_dir_all(directory)?;
 
-    let system = model();
     // The example reports the final inflationary spectra, after the entropy
     // mode has had the full inflationary interval in which to source the
     // curvature mode.
     let settings = SpectrumRunSettings {
         output_e_folds_before_end: 0.0,
+        k_min_over_pivot: 0.01,
+        k_max_over_pivot: 100.0,
+        k_count: 41,
         ..SpectrumRunSettings::default()
     };
-    let run = match system.run_two_field_spectra(initial_state(&system), &settings) {
-        Ok(run) => run,
-        Err(error) => {
-            eprintln!("the run could not be completed: {error}");
-            std::process::exit(1);
-        }
-    };
+    let calibration = calibrate(&settings);
+    let system = model(calibration.light_mass);
+    let run = run_or_exit(&system, &settings, "calibrated spectrum");
     let revision = revision();
     let revision = revision.as_deref();
 
@@ -120,6 +190,7 @@ fn main() -> io::Result<()> {
         &directory.join("two_field_background.csv"),
         &settings,
         &run,
+        &calibration,
         revision,
         |run, file| run.write_background_csv(file),
     )?;
@@ -127,6 +198,7 @@ fn main() -> io::Result<()> {
         &directory.join("two_field_spectra.csv"),
         &settings,
         &run,
+        &calibration,
         revision,
         |run, file| run.write_spectra_csv(file),
     )?;
@@ -134,6 +206,7 @@ fn main() -> io::Result<()> {
         &directory.join("two_field_modes.csv"),
         &settings,
         &run,
+        &calibration,
         revision,
         |run, file| run.write_mode_evolution_csv(file),
     )?;
@@ -146,6 +219,14 @@ fn main() -> io::Result<()> {
         run.pivot.hubble.into_value()
     );
     eprintln!("epsilon_H at pivot     {:e}", run.pivot.epsilon_h);
+    eprintln!("target P_R(k_pivot)    {:e}", TARGET_SCALAR_AMPLITUDE);
+    eprintln!("pilot P_R(k_pivot)     {:e}", calibration.pilot_p_r);
+    eprintln!("common mass rescaling {:.8}", calibration.mass_rescaling);
+    eprintln!(
+        "calibrated masses      [{:e}, {:e}] M_pl",
+        calibration.light_mass,
+        MASS_RATIO * calibration.light_mass
+    );
     eprintln!("background rows        {}", run.background.len());
     eprintln!("mode evolution rows    {}", run.mode_evolution.len());
     eprintln!();
