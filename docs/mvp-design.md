@@ -158,16 +158,18 @@ trait PotentialValue<V> {
     fn value(&self, phi: Field<V>) -> Quantity<M4, V>;
 }
 
-trait Potential: PotentialValue<f64> {
-    fn gradient(&self, phi: Field) -> Quantity<M3, f64>;
+trait Potential: PotentialValue<f64> + PotentialValue<Dual> {
+    fn gradient(&self, phi: Field) -> Quantity<M3, f64> {
+        // Evaluate V with d(phi)/d(phi) = 1 and return the derivative part.
+    }
 }
 ```
 
 `PotentialValue<V>` contains the formula and is not intrinsically tied to
-`f64`. The same formula can later be evaluated with automatic-differentiation
-value types. Model parameters such as masses and couplings remain fixed; the
-fields are the differentiation variables. In a multifield extension this
-means derivatives with respect to each field `phi^I`.
+`f64`. The same formula is evaluated with the first-order forward-mode `Dual`
+type to obtain the gradient. Model parameters such as masses and couplings
+remain fixed; the field is the differentiation variable. In a multifield
+extension this means derivatives with respect to each field `phi^I`.
 
 The MVP implements a quadratic potential:
 
@@ -175,12 +177,11 @@ The MVP implements a quadratic potential:
 V(phi) = (1/2) m^2 phi^2
 ```
 
-For the MVP, the gradient is still written explicitly. This is transitional:
-automatic differentiation may later evaluate `PotentialValue<V>` with a value
-type that carries derivatives. The potential interface should not grow one
-method at a time for second, third, or fourth derivatives. Instead, the
-evaluation side selects an automatic-differentiation type capable of carrying
-the required derivative order.
+The gradient is not written separately from the potential formula. `Potential`
+has a default `gradient` implementation and is automatically implemented for
+types supporting both ordinary and dual-number evaluation. Higher derivatives
+can later use a value type capable of carrying the required derivative order,
+without adding one handwritten method per order to each potential.
 
 ## Scalar-field system
 

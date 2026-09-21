@@ -29,7 +29,7 @@ flowchart TD
 1. `use`による名前の読み込み
 2. `PotentialValue<V>`と`Potential` trait
 3. `QuadraticPotential` struct
-4. ポテンシャル値と勾配の実装
+4. ポテンシャル値と自動微分による勾配の実装
 5. テスト
 
 ## `crate`と`use`
@@ -37,7 +37,7 @@ flowchart TD
 ```rust
 use core::ops::Mul;
 
-use crate::{EnergyDensity, Field, Mass, PotentialGradient};
+use crate::{Dual, EnergyDensity, Field, Mass, PotentialGradient};
 ```
 
 `use`は、別の場所にある名前を現在のファイルで短く使えるようにする。
@@ -85,7 +85,7 @@ pub trait PotentialValue<V> {
 ```text
 V = f64             通常の浮動小数点数
 V = TestNumber      テスト用の数値型
-V = 将来のAD型      自動微分用の数値型
+V = Dual             自動微分用の数値型
 ```
 
 入力と出力で同じ`V`を使うため、次の関係になる。
@@ -93,6 +93,7 @@ V = 将来のAD型      自動微分用の数値型
 ```text
 Field<f64>        -> EnergyDensity<f64>
 Field<TestNumber> -> EnergyDensity<TestNumber>
+Field<Dual>       -> EnergyDensity<Dual>
 ```
 
 ## `&self`は自分自身を借りる
@@ -123,8 +124,12 @@ self       値そのものを渡す
 ## traitが別のtraitを要求する
 
 ```rust
-pub trait Potential: PotentialValue<f64> {
-    fn gradient(&self, phi: Field) -> PotentialGradient;
+pub trait Potential: PotentialValue<f64> + PotentialValue<Dual> {
+    fn gradient(&self, phi: Field) -> PotentialGradient {
+        let active = Field::new(Dual::variable(phi.into_value()));
+        let result = <Self as PotentialValue<Dual>>::value(self, active).into_value();
+        PotentialGradient::new(result.derivative)
+    }
 }
 ```
 
@@ -135,16 +140,21 @@ pub trait Potential: PotentialValue<f64> {
 flowchart TD
     P[Potential]
     V[PotentialValue&lt;f64&gt;を実装]
-    G[gradient関数を実装]
+    D[PotentialValue&lt;Dual&gt;を実装]
+    G[gradientの既定実装を利用]
 
     P --> V
+    P --> D
     P --> G
 ```
 
 したがって、現在の`Potential`に必要な能力は次の二つである。
 
 - `f64`でポテンシャル値を計算できる
-- 手書きの勾配を計算できる
+- `Dual`で同じポテンシャル式を計算できる
+
+この二つを満たす型にはblanket implementationによって`Potential`が自動的に
+実装される。勾配の式をポテンシャルごとに手書きする必要はない。
 
 ## `struct`はデータを持つ箱
 
@@ -332,7 +342,7 @@ Rustでは最初の演算へ`phi`を渡すと、所有権も移動する可能�
 
 ```rust
 fn value(&self, phi: Field<V>) -> EnergyDensity<V> {
-    self.mass * self.mass * phi.clone() * phi * 0.5
+    phi.clone() * phi * self.mass * self.mass * 0.5
 }
 ```
 
@@ -347,32 +357,29 @@ Rustでは、ブロックの最後の式にセミコロンを付けないと、�
 上の実装は\(V(\phi)=m^2\phi^2/2\)を計算する。型システムは結果の
 質量次元が\(M^4\)であることも確認する。
 
-## ジェネリクスのデフォルト値
+## 自動微分による勾配
 
-手書き勾配の実装では、`Field<V>`ではなく`Field`と書かれている。
-
-```rust
-impl Potential for QuadraticPotential {
-    fn gradient(&self, phi: Field) -> PotentialGradient {
-        self.mass * self.mass * phi
-    }
-}
-```
-
-`lib.rs`の定義は次のようになっている。
+`gradient`は場の数値を`Dual::variable`へ変換してから、同じ`value`を評価する。
 
 ```rust
-pub type Field<V = f64> = Quantity<M1, V>;
+let active = Field::new(Dual::variable(phi.into_value()));
+let result = <Self as PotentialValue<Dual>>::value(self, active).into_value();
+PotentialGradient::new(result.derivative)
 ```
 
-`V`を省略すると、デフォルトの`f64`が使われる。
+`Dual`は通常の値と、その入力場に関する一次微分を一緒に保持する。
 
 ```text
-Field    = Field<f64>
-Field<V> = 数値型Vを使うField
+Dual::variable(phi) = (値: phi, 微分: 1)
+定数                = (値: 定数値, 微分: 0)
 ```
 
-したがって現在の`gradient`は、MVP用の`f64`による手書き微分である。
+掛け算では積の微分則が適用されるため、二次ポテンシャルを評価すると
+`result.derivative`は自動的に$m^2\phi$になる。
+
+```text
+(u, u') * (v, v') = (uv, u'v + uv')
+```
 
 ## テスト用モジュール
 
@@ -487,9 +494,9 @@ TestNumber(3.0)
 
 と推論される。
 
-## 手書き勾配の有限差分テスト
+## 自動微分勾配の有限差分テスト
 
-解析的に実装した勾配
+自動微分で求めた勾配
 
 $$
 V_{,\phi}=m^2\phi
@@ -511,14 +518,15 @@ let analytic = potential.gradient(Field::new(phi)).into_value();
 assert!((numerical - analytic).abs() < 1.0e-18);
 ```
 
-これは自動微分のテストではない。MVPで手書きした`gradient`の式が間違って
-いないことを確認するテストである。
+これは、自動微分の結果を独立した数値微分と突き合わせるテストである。
+さらに三次式のテストにより、`gradient`が二次ポテンシャル専用の式を
+使っていないことも確認している。
 
 ## このファイルから読み取れる設計原則
 
 1. 物理次元と数値表現を`Quantity<Dimension, Value>`で分離する。
 2. モデルを特徴付ける固定パラメータと、時間変化する状態を分離する。
 3. ポテンシャルの式を一度だけ書き、数値型を交換可能にする。
-4. 手書き勾配はMVPの一時的な仕組みとする。
-5. 将来の自動微分では、微分階数ごとにメソッドを増やさず、必要な階数を
-   保持できる数値型で同じ式を評価する。
+4. 一次勾配は`Dual`で同じ式を評価して自動的に求める。
+5. 高階微分では、微分階数ごとにポテンシャルのメソッドを増やさず、必要な
+   階数を保持できる数値型へ差し替える。

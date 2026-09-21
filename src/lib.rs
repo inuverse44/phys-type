@@ -4,6 +4,7 @@
 //! dimensionally invalid expressions fail to compile. See `docs/mvp-design.md`
 //! for the design that this implements.
 
+pub mod autodiff;
 pub mod background;
 pub mod dimension;
 pub mod integrate;
@@ -12,6 +13,7 @@ pub mod quantity;
 pub mod scalar_field;
 pub mod state;
 
+pub use autodiff::Dual;
 pub use background::{BackgroundRun, Record, RunSettings, Termination};
 pub use dimension::{
     DimDiv, DimMul, DimSqrt, M0, M1, M2, M3, M3Over2, M4, M5Over2, MHalf, MMinus1, MMinus2,

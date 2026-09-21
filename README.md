@@ -49,10 +49,11 @@ checks are documented in
 
 | Module | Contents |
 | --- | --- |
+| `autodiff` | First-order forward-mode automatic differentiation with `Dual` |
 | `dimension` | `MassPower<E>` and the type-level `DimMul`, `DimDiv`, `DimSqrt` |
 | `quantity` | `Quantity<D, V>` and its arithmetic |
 | `state` | `State`, `StateDerivative`, `StateDelta` |
-| `potential` | The `Potential` trait and `QuadraticPotential` |
+| `potential` | Automatically differentiated potentials and `QuadraticPotential` |
 | `integrate` | The `System` trait and fixed-step `rk4_step` |
 | `scalar_field` | `ScalarFieldSystem`, including the Friedmann constraint |
 | `background` | The integration driver, termination conditions, and CSV export |

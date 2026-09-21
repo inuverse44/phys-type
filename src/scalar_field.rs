@@ -43,7 +43,7 @@ impl<P: Potential> ScalarFieldSystem<P> {
 
     /// The total energy density `(1/2) pi^2 + V(phi)`.
     pub fn energy_density(&self, state: &State) -> EnergyDensity {
-        state.pi * state.pi * 0.5 + self.potential.value(state.phi)
+        0.5 * state.pi * state.pi + self.potential.value(state.phi)
     }
 
     /// The Hubble rate on the expanding branch of the Friedmann equation.
@@ -180,15 +180,12 @@ mod tests {
             density: EnergyDensity,
         }
 
-        impl crate::PotentialValue<f64> for FlatPotential {
-            fn value(&self, _phi: Field) -> EnergyDensity {
-                self.density
-            }
-        }
-
-        impl Potential for FlatPotential {
-            fn gradient(&self, _phi: Field) -> crate::PotentialGradient {
-                crate::PotentialGradient::new(0.0)
+        impl<V> crate::PotentialValue<V> for FlatPotential
+        where
+            V: From<f64>,
+        {
+            fn value(&self, _phi: Field<V>) -> EnergyDensity<V> {
+                EnergyDensity::new(self.density.into_value().into())
             }
         }
 

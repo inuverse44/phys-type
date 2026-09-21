@@ -2,7 +2,7 @@
 
 use core::ops::Mul;
 
-use crate::{EnergyDensity, Field, Mass, PotentialGradient};
+use crate::{Dual, EnergyDensity, Field, Mass, PotentialGradient};
 
 /// A scalar field potential formula evaluated with numerical value type `V`.
 ///
@@ -13,16 +13,19 @@ pub trait PotentialValue<V> {
     fn value(&self, phi: Field<V>) -> EnergyDensity<V>;
 }
 
-/// The temporary, manually differentiated interface used by the background
-/// MVP.
-///
-/// Automatic differentiation will eventually replace the handwritten
-/// gradient. Requiring [`PotentialValue<f64>`] keeps the current background
-/// calculation available during that transition.
-pub trait Potential: PotentialValue<f64> {
-    /// The gradient `dV/dphi`.
-    fn gradient(&self, phi: Field) -> PotentialGradient;
+/// A scalar potential that can be evaluated normally and with automatic
+/// differentiation.
+pub trait Potential: PotentialValue<f64> + PotentialValue<Dual> {
+    /// Computes `dV/dphi` by evaluating the potential with an active field.
+    fn gradient(&self, phi: Field) -> PotentialGradient {
+        let active = Field::new(Dual::variable(phi.into_value()));
+        let result = <Self as PotentialValue<Dual>>::value(self, active).into_value();
+
+        PotentialGradient::new(result.derivative)
+    }
 }
+
+impl<T> Potential for T where T: PotentialValue<f64> + PotentialValue<Dual> {}
 
 /// The quadratic potential `V(phi) = (1/2) m^2 phi^2`.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -41,16 +44,9 @@ impl QuadraticPotential {
 impl<V> PotentialValue<V> for QuadraticPotential
 where
     V: Clone + Mul<V, Output = V> + Mul<f64, Output = V>,
-    f64: Mul<V, Output = V>,
 {
     fn value(&self, phi: Field<V>) -> EnergyDensity<V> {
-        self.mass * self.mass * phi.clone() * phi * 0.5
-    }
-}
-
-impl Potential for QuadraticPotential {
-    fn gradient(&self, phi: Field) -> PotentialGradient {
-        self.mass * self.mass * phi
+        phi.clone() * phi * self.mass * self.mass * 0.5
     }
 }
 
@@ -99,6 +95,28 @@ mod tests {
         let potential = QuadraticPotential::new(Mass::new(2.0));
 
         let gradient = potential.gradient(Field::new(3.0));
+
+        assert_eq!(gradient.into_value(), 12.0);
+    }
+
+    #[test]
+    fn gradient_comes_from_the_generic_potential_formula() {
+        struct CubicPotential;
+
+        impl<V> PotentialValue<V> for CubicPotential
+        where
+            V: Clone + Mul<V, Output = V>,
+        {
+            fn value(&self, phi: Field<V>) -> EnergyDensity<V> {
+                // The numerical formula is phi^3. This synthetic test focuses
+                // on differentiation; its declared output dimension matches
+                // the PotentialValue interface.
+                let value = phi.into_value();
+                EnergyDensity::new(value.clone() * value.clone() * value)
+            }
+        }
+
+        let gradient = CubicPotential.gradient(Field::new(2.0));
 
         assert_eq!(gradient.into_value(), 12.0);
     }
