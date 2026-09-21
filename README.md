@@ -8,6 +8,9 @@ target is inflationary background evolution; see
 [`docs/mvp-design.md`](docs/mvp-design.md). The next scientific target is a
 covariant two-field adiabatic/isocurvature spectrum, specified in
 [`docs/two-field-perturbation-design.md`](docs/two-field-perturbation-design.md).
+Higher-rank tensors, field-space Riemann curvature, and the extension boundary
+toward non-Gaussianity are specified in
+[`docs/field-space-curvature-design.md`](docs/field-space-curvature-design.md).
 
 ## Running it
 

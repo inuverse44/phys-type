@@ -343,11 +343,14 @@ Work proceeds in this order, one independently reviewable feature at a time:
 3. `feature/covariant-background` -- metric provider, connection, kinematic
    basis, continuous normal orientation, and turn rate.
 4. `feature/potential-hessian` -- second-order jets and covariant Hessian.
-5. `feature/two-field-perturbations` -- complex mode matrix, vacuum initial
+5. `feature/higher-rank-field-tensors` and `feature/field-space-curvature` --
+   rank-three/rank-four tensors and the Riemann geometry contract described in
+   [`field-space-curvature-design.md`](field-space-curvature-design.md).
+6. `feature/two-field-perturbations` -- complex mode matrix, vacuum initial
    state, Wronskian, and adaptive evolution.
-6. `feature/power-spectra` -- projections, pivot convention, CSV output, and
+7. `feature/power-spectra` -- projections, pivot convention, CSV output, and
    physical validation.
-7. `feature/two-field-spectrum-plots` -- the four-panel scientific figure and
+8. `feature/two-field-spectrum-plots` -- the four-panel scientific figure and
    reproducible generation command.
 
 Each branch starts from the updated default branch, contains one conceptual
