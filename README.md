@@ -154,7 +154,10 @@ Potentials that can be evaluated with `Jet<N>` automatically implement
 `TwiceDifferentiableMultifieldPotential<N>`. A single formula evaluation
 returns `V`, `V_,I`, and `V_,IJ`; the covariant system then constructs
 `V_;IJ = V_,IJ - Gamma^K_IJ V_,K` with lower tensor indices and dimension
-`M^2`.
+`M^2`. The shared `Transcendental` trait provides `exp`, `ln`, `cos`, and
+`tanh` for `f64`, `Dual`, and `Jet<N>`, so plateau, natural-inflation, and
+alpha-attractor formulas use the same automatic-differentiation path as
+polynomials.
 
 `TwoFieldPerturbationSystem` evolves the background together with two
 independent complex vacuum modes for one comoving `k`. Its mass matrix includes

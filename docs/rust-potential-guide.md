@@ -544,6 +544,32 @@ $$
 
 を構成する。
 
+### 超越関数を含むポテンシャル
+
+`Transcendental` traitは`f64`、`Dual`、`Jet<N>`に共通して`exp`、`ln`、
+`cos`、`tanh`を提供する。したがって、Starobinsky型の式も一度だけ書けばよい。
+
+```rust,ignore
+fn plateau<V>(phi: V, alpha: f64) -> V
+where
+    V: From<f64>
+        + Clone
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Mul<f64, Output = V>
+        + Transcendental,
+{
+    let exponential = (phi * -alpha).exp();
+    let shoulder = V::from(1.0) - exponential;
+    shoulder.clone() * shoulder
+}
+```
+
+`Dual`では`f'(x)`、`Jet<N>`では
+`f''(x) grad(x) grad(x)^T + f'(x) Hessian(x)`という連鎖律が適用される。
+定義域外での動作は`f64`と同じで、例えば非正の値の`ln`は有限な微分値を
+返すことを保証しない。
+
 ## このファイルから読み取れる設計原則
 
 1. 物理次元と数値表現を`Quantity<Dimension, Value>`で分離する。

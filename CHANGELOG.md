@@ -17,6 +17,8 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - An oriented two-field adiabatic/entropy basis and signed turn rate.
 - Second-order `Jet<N>` automatic differentiation for a potential's value,
   complete gradient, and Hessian in one evaluation.
+- A shared `Transcendental` interface for `exp`, `ln`, `cos`, and `tanh` on
+  `f64`, `Dual`, and `Jet<N>`, including second-order chain rules.
 - Covariant potential Hessians including the Christoffel correction.
 - Dense rank-three and rank-four field-space tensors with typed variance and
   physical dimension.

@@ -158,10 +158,34 @@ where
 
 #[cfg(test)]
 mod tests {
+    use core::ops::Sub;
+
     use super::*;
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     struct TestNumber(f64);
+
+    struct StarobinskyTestPotential {
+        scale: f64,
+        alpha: f64,
+    }
+
+    impl<V> MultifieldPotentialValue<V, 1> for StarobinskyTestPotential
+    where
+        V: From<f64>
+            + Clone
+            + Sub<V, Output = V>
+            + Mul<V, Output = V>
+            + Mul<f64, Output = V>
+            + crate::Transcendental,
+    {
+        fn value(&self, phi: [Field<V>; 1]) -> EnergyDensity<V> {
+            let exponential = (phi[0].clone().into_value() * -self.alpha).exp();
+            let plateau = V::from(1.0) - exponential;
+
+            EnergyDensity::new(plateau.clone() * plateau * self.scale)
+        }
+    }
 
     impl Mul for TestNumber {
         type Output = Self;
@@ -278,5 +302,27 @@ mod tests {
             [12.0, 36.0]
         );
         assert_eq!(hessian, [[4.0, 0.0], [0.0, 9.0]]);
+    }
+
+    #[test]
+    fn transcendental_potential_gets_gradient_and_hessian_from_one_formula() {
+        let potential = StarobinskyTestPotential {
+            scale: 2.0,
+            alpha: 0.7,
+        };
+        let phi = 1.3;
+        let exponential = (-potential.alpha * phi).exp();
+        let derivatives = potential.derivatives([Field::new(phi)]);
+        let expected_value = potential.scale * (1.0 - exponential).powi(2);
+        let expected_gradient =
+            2.0 * potential.scale * potential.alpha * exponential * (1.0 - exponential);
+        let expected_hessian = 2.0
+            * potential.scale
+            * potential.alpha.powi(2)
+            * (-exponential + 2.0 * exponential * exponential);
+
+        assert!((derivatives.value.into_value() - expected_value).abs() < 1.0e-15);
+        assert!((derivatives.gradient[0].into_value() - expected_gradient).abs() < 1.0e-15);
+        assert!((derivatives.hessian[0][0].into_value() - expected_hessian).abs() < 1.0e-15);
     }
 }

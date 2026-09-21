@@ -18,7 +18,7 @@ pub mod spectra;
 pub mod spectrum_run;
 pub mod state;
 
-pub use autodiff::{Dual, Jet};
+pub use autodiff::{Dual, Jet, Transcendental};
 pub use background::{
     AdaptiveRunSettings, AdaptiveStep, BackgroundRun, Record, RunSettings, Termination,
 };
