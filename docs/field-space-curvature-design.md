@@ -237,9 +237,11 @@ The revised implementation order is:
    geometries.
 4. `feature/two-field-perturbations` -- the complete linear mode equation and
    vacuum mode matrix.
-5. `feature/power-spectra` and `feature/two-field-spectrum-plots` -- physical
+5. `feature/complex-mode-values` -- dimensioned `Complex64` mode values and
+   conjugation-aware diagnostics.
+6. `feature/power-spectra` and `feature/two-field-spectrum-plots` -- physical
    spectra and figures already specified in the two-field design.
-6. `docs/non-gaussianity-architecture` -- choose and specify the cubic/in-in,
+7. `docs/non-gaussianity-architecture` -- choose and specify the cubic/in-in,
    transport, or deliberately hybrid observable pipeline before implementing
    it.
 

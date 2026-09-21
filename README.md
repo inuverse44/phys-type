@@ -134,6 +134,10 @@ the covariant potential Hessian, field-space Riemann term, and gravitational
 correction. Bunch-Davies initialization checks `k/(aH)` explicitly, and the
 canonical Wronskian is available as a numerical invariant.
 
+Mode values are specified as `Quantity<D, Complex64>` so complex conjugation
+and Hermitian products remain explicit without sacrificing compile-time
+physical dimensions. Real and imaginary parts are separated only for output.
+
 ## Compile-fail tests
 
 Rejecting invalid expressions is part of the contract, so it is tested. The

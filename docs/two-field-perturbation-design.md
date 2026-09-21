@@ -196,6 +196,19 @@ solver therefore evolves a complex `2 x 2` mode matrix `U^I_A`, where `A`
 labels the independent Bunch-Davies initial modes, together with its covariant
 time derivative.
 
+Complex values use `num_complex::Complex64` inside the existing dimensional
+wrapper:
+
+```rust,ignore
+type ModeAmplitude = Quantity<MMinusHalf, Complex64>;
+type ModeVelocity = Quantity<MHalf, Complex64>;
+```
+
+Physical dimension therefore remains a compile-time property of the outer
+`Quantity`; using a complex numerical representation does not erase it.
+Field-space variance likewise remains in `FieldVector` or tensor types and is
+independent of complex conjugation.
+
 Initial conditions are imposed in an orthonormal frame at
 `x_init = k/(aH)`, with a default `x_init = 100`:
 
@@ -212,11 +225,30 @@ Wronskian. Runs that cannot place every requested mode sufficiently inside
 the horizon return a typed error instead of silently using a poor vacuum
 approximation.
 
-The initial release evolves real and imaginary parts through the existing
-adaptive Dormand-Prince integrator. Background checkpoints are generated
-first. Monotone cubic Hermite interpolation supplies background quantities at
-mode-step times and locates each `x_init` crossing. This avoids reintegrating
-the background for every `k` while retaining continuous first derivatives.
+The first correctness-oriented release evolves `Complex64` mode components
+and the background together for each `k` through the existing integrator.
+Because all equation coefficients are real, the numerical result is
+equivalent to evolving real and imaginary parts separately, while the public
+API can express conjugation, Hermitian products, and phase operations
+directly. A later optimization may generate background checkpoints first and
+use monotone cubic Hermite interpolation, avoiding repeated background work
+without changing the mode API.
+
+Adaptive error control maps a dimensioned complex component to a real
+normalized error using its modulus:
+
+```math
+E(z)=\frac{|\delta z|}{a_{\rm tol}+r_{\rm tol}|z|}.
+```
+
+Absolute tolerances retain the component's physical dimension. Relative
+tolerances and the final combined norm are dimensionless. The integrator must
+not compare only real parts or apply separate acceptance decisions to real and
+imaginary components.
+
+Complex numbers are split into real and imaginary columns only at explicit
+interoperability boundaries such as CSV. Both columns are emitted, even when
+a particular observable is expected to be real.
 
 ## Spectra and normalization
 
@@ -227,6 +259,11 @@ For the mode matrix, define
 \qquad
 \mathcal P^{IJ}_Q(k)=\frac{k^3}{2\pi^2}\Sigma^{IJ}(k).
 ```
+
+`Sigma` is constructed with an explicit complex conjugate and checked for
+Hermiticity before projection. A physically real projected spectrum may
+discard an imaginary residual only after verifying that it is below a
+documented tolerance.
 
 Project this matrix with `e_sigma` and `e_s` at the requested output time:
 
@@ -348,9 +385,11 @@ Work proceeds in this order, one independently reviewable feature at a time:
    [`field-space-curvature-design.md`](field-space-curvature-design.md).
 6. `feature/two-field-perturbations` -- complex mode matrix, vacuum initial
    state, Wronskian, and adaptive evolution.
-7. `feature/power-spectra` -- projections, pivot convention, CSV output, and
+7. `docs/complex-mode-design` and `feature/complex-mode-values` -- use
+   `Quantity<D, Complex64>` directly and define modulus-based error handling.
+8. `feature/power-spectra` -- projections, pivot convention, CSV output, and
    physical validation.
-8. `feature/two-field-spectrum-plots` -- the four-panel scientific figure and
+9. `feature/two-field-spectrum-plots` -- the four-panel scientific figure and
    reproducible generation command.
 
 Each branch starts from the updated default branch, contains one conceptual
