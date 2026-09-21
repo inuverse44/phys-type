@@ -234,6 +234,13 @@ directly. A later optimization may generate background checkpoints first and
 use monotone cubic Hermite interpolation, avoiding repeated background work
 without changing the mode API.
 
+Step-size control is a property of the integrator rather than of any one
+system. A system implements `AdaptiveSystem` to reduce an embedded error
+estimate to a single dimensionless ratio, and the shared controller decides
+acceptance and the next step size from that ratio alone. The single-field
+background, both multifield backgrounds, and the two-field perturbation system
+use the same controller.
+
 Adaptive error control maps a dimensioned complex component to a real
 normalized error using its modulus:
 
@@ -387,10 +394,14 @@ Work proceeds in this order, one independently reviewable feature at a time:
    state, Wronskian, and adaptive evolution.
 7. `docs/complex-mode-design` and `feature/complex-mode-values` -- use
    `Quantity<D, Complex64>` directly and define modulus-based error handling.
-8. `feature/power-spectra` -- projections, pivot convention, CSV output, and
-   physical validation.
-9. `feature/two-field-spectrum-plots` -- the four-panel scientific figure and
-   reproducible generation command.
+8. `feature/power-spectra` -- mode covariance, projections, reality and range
+   validation of the projected spectra.
+9. `feature/adaptive-system` -- an `AdaptiveSystem` norm and a reusable
+   step-size controller shared by every system, including the complex modes.
+10. `feature/spectrum-run` -- pivot convention, the `k` grid driver, CSV
+    output, and physical validation against the analytic limits.
+11. `feature/two-field-spectrum-plots` -- the four-panel scientific figure and
+    reproducible generation command.
 
 Each branch starts from the updated default branch, contains one conceptual
 change, passes `cargo fmt --check`, `cargo clippy --all-targets`, and

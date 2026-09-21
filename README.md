@@ -70,7 +70,7 @@ checks are documented in
 | `potential` | Automatically differentiated potentials and `QuadraticPotential` |
 | `perturbation` | Covariant two-field mode matrices and Bunch-Davies evolution |
 | `spectra` | Mode covariance, Hermiticity checks, and adiabatic/entropy projections |
-| `integrate` | The `System` trait, fixed RK4, and embedded Dormand-Prince 5(4) |
+| `integrate` | The `System` and `AdaptiveSystem` traits, fixed RK4, embedded Dormand-Prince 5(4), and the shared step-size controller |
 | `scalar_field` | `ScalarFieldSystem`, including the Friedmann constraint |
 | `multifield` | Const-generic canonical multifield states and dynamics |
 | `background` | The integration driver, termination conditions, and CSV export |
@@ -90,6 +90,12 @@ let run = system.run_adaptive(initial, AdaptiveRunSettings::default());
 Each adaptive attempt records its step size, normalized local error, and
 acceptance decision in `run.adaptive_steps`. Fixed-step RK4 remains available
 through `system.run(initial, RunSettings::default())`.
+
+Step-size control lives in `integrate` rather than in any one system. A system
+implements `AdaptiveSystem` to reduce an embedded error estimate to a single
+dimensionless ratio; `adaptive_step` and `next_step_size` then handle
+acceptance and step growth for every system alike, from the single-field
+background to the complex two-field modes.
 
 Canonical multifield systems use fixed-size arrays and the same generic
 integrators. `QuadraticMultifieldPotential<N>` supplies one mass per field and

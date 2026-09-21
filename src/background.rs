@@ -7,7 +7,7 @@
 
 use std::io::{self, Write};
 
-use crate::integrate::{rk4_step, rk45_step};
+use crate::integrate::{ErrorTolerances, StepSizeLimits, adaptive_step, next_step_size, rk4_step};
 use crate::potential::Potential;
 use crate::scalar_field::ScalarFieldSystem;
 use crate::state::State;
@@ -248,6 +248,14 @@ impl<P: Potential> ScalarFieldSystem<P> {
         assert!(settings.relative_tolerance > 0.0);
         assert!(settings.sample_every > 0);
 
+        let tolerances = ErrorTolerances {
+            absolute: settings.absolute_tolerance,
+            relative: settings.relative_tolerance,
+        };
+        let limits = StepSizeLimits {
+            min: settings.min_dt,
+            max: settings.max_dt,
+        };
         let mut state = initial;
         let mut time = Time::new(0.0);
         let mut dt = settings.initial_dt;
@@ -269,24 +277,16 @@ impl<P: Potential> ScalarFieldSystem<P> {
                 }
             }
 
-            let attempt = rk45_step(self, time, &state, dt);
-            let error_ratio = state_error_ratio(
-                &state,
-                &attempt.state,
-                &attempt.error,
-                settings.absolute_tolerance,
-                settings.relative_tolerance,
-            );
-            let accepted = error_ratio <= 1.0;
+            let attempt = adaptive_step(self, time, &state, dt, tolerances);
 
             adaptive_steps.push(AdaptiveStep {
                 start_time: time,
                 dt,
-                error_ratio,
-                accepted,
+                error_ratio: attempt.error_ratio,
+                accepted: attempt.accepted,
             });
 
-            if accepted {
+            if attempt.accepted {
                 state = attempt.state;
                 time = time + dt;
                 accepted_steps += 1;
@@ -315,7 +315,7 @@ impl<P: Potential> ScalarFieldSystem<P> {
                 break;
             }
 
-            dt = next_step_size(dt, error_ratio, settings.min_dt, settings.max_dt);
+            dt = next_step_size(dt, attempt.error_ratio, &limits);
         }
 
         BackgroundRun {
@@ -327,53 +327,6 @@ impl<P: Potential> ScalarFieldSystem<P> {
             adaptive_steps,
         }
     }
-}
-
-fn state_error_ratio(
-    current: &State,
-    next: &State,
-    error: &crate::StateDelta,
-    absolute_tolerance: f64,
-    relative_tolerance: f64,
-) -> f64 {
-    fn component(error: f64, current: f64, next: f64, absolute: f64, relative: f64) -> f64 {
-        error.abs() / (absolute + relative * current.abs().max(next.abs()))
-    }
-
-    component(
-        error.phi.into_value(),
-        current.phi.into_value(),
-        next.phi.into_value(),
-        absolute_tolerance,
-        relative_tolerance,
-    )
-    .max(component(
-        error.pi.into_value(),
-        current.pi.into_value(),
-        next.pi.into_value(),
-        absolute_tolerance,
-        relative_tolerance,
-    ))
-    .max(component(
-        error.a.into_value(),
-        current.a.into_value(),
-        next.a.into_value(),
-        absolute_tolerance,
-        relative_tolerance,
-    ))
-}
-
-fn next_step_size(dt: Time, error_ratio: f64, min_dt: Time, max_dt: Time) -> Time {
-    let factor = if error_ratio == 0.0 {
-        5.0
-    } else if error_ratio.is_finite() {
-        (0.9 * error_ratio.powf(-0.2)).clamp(0.2, 5.0)
-    } else {
-        0.2
-    };
-    let proposed = dt.into_value() * factor;
-
-    Time::new(proposed.clamp(min_dt.into_value(), max_dt.into_value()))
 }
 
 #[cfg(test)]

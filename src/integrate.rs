@@ -133,6 +133,126 @@ pub fn rk45_step<S: System>(
     }
 }
 
+/// Tolerances that turn an embedded error estimate into a dimensionless
+/// ratio.
+///
+/// The absolute tolerance applies to raw Planck-unit component values, so a
+/// single pair of numbers covers every component of a state.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ErrorTolerances {
+    /// Absolute tolerance applied to raw Planck-unit component values.
+    pub absolute: f64,
+    /// Relative tolerance applied component by component.
+    pub relative: f64,
+}
+
+impl Default for ErrorTolerances {
+    fn default() -> Self {
+        Self {
+            absolute: 1.0e-12,
+            relative: 1.0e-8,
+        }
+    }
+}
+
+impl ErrorTolerances {
+    /// The normalized error `|e| / (a_tol + r_tol max(|y|, |y_next|))` of one
+    /// real component.
+    ///
+    /// Both endpoints of the step enter the scale so that a component passing
+    /// through zero is still bounded by the absolute tolerance.
+    pub fn component_ratio(&self, error: f64, current: f64, next: f64) -> f64 {
+        error.abs() / (self.absolute + self.relative * current.abs().max(next.abs()))
+    }
+}
+
+/// A system whose embedded step error can be normalized to a single ratio.
+///
+/// The integrator deliberately has no built-in norm, because only the system
+/// knows which components exist and what scale each one carries. An
+/// implementation reduces the whole state to the largest normalized component
+/// error, so one acceptance decision covers the entire step.
+pub trait AdaptiveSystem: System {
+    /// The largest normalized component error of one embedded step.
+    ///
+    /// A step is accepted when this does not exceed one.
+    fn error_ratio(
+        &self,
+        current: &Self::State,
+        next: &Self::State,
+        error: &Self::Delta,
+        tolerances: ErrorTolerances,
+    ) -> f64;
+}
+
+/// Bounds on the step size an adaptive controller may propose.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct StepSizeLimits<I> {
+    /// Smallest permitted step size.
+    pub min: I,
+    /// Largest permitted step size.
+    pub max: I,
+}
+
+/// One attempted adaptive step and its acceptance decision.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AdaptiveAttempt<State> {
+    /// The fifth-order solution estimate, whether or not it was accepted.
+    pub state: State,
+    /// The largest normalized component error of the attempt.
+    pub error_ratio: f64,
+    /// Whether the attempt met the requested tolerances.
+    pub accepted: bool,
+}
+
+/// Takes one embedded step and normalizes its error.
+///
+/// The caller decides what to do with a rejected attempt; this function only
+/// reports it.
+pub fn adaptive_step<S: AdaptiveSystem>(
+    system: &S,
+    independent: S::IndependentVariable,
+    state: &S::State,
+    step: S::IndependentVariable,
+    tolerances: ErrorTolerances,
+) -> AdaptiveAttempt<S::State> {
+    let attempt = rk45_step(system, independent, state, step);
+    let error_ratio = system.error_ratio(state, &attempt.state, &attempt.error, tolerances);
+
+    AdaptiveAttempt {
+        state: attempt.state,
+        error_ratio,
+        accepted: error_ratio <= 1.0,
+    }
+}
+
+/// The step size suggested by the standard fifth-order controller.
+///
+/// A zero error grows the step by the largest permitted factor, and a
+/// non-finite error shrinks it by the smallest one. The result is kept inside
+/// `limits`.
+pub fn next_step_size<I>(step: I, error_ratio: f64, limits: &StepSizeLimits<I>) -> I
+where
+    I: Copy + Mul<f64, Output = I> + PartialOrd,
+{
+    let factor = if error_ratio == 0.0 {
+        5.0
+    } else if error_ratio.is_finite() {
+        (0.9 * error_ratio.powf(-0.2)).clamp(0.2, 5.0)
+    } else {
+        0.2
+    };
+    let proposed = step * factor;
+
+    if proposed < limits.min {
+        limits.min
+    } else if proposed > limits.max {
+        limits.max
+    } else {
+        proposed
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -205,21 +325,91 @@ mod tests {
         assert_eq!(*result.0, 0.5);
     }
 
+    struct ExponentialSystem;
+
+    impl System for ExponentialSystem {
+        type IndependentVariable = Time;
+        type State = NonCopyState;
+        type Delta = NonCopyDelta;
+        type Derivative = NonCopyDerivative;
+
+        fn derivative(&self, _time: Time, state: &Self::State) -> Self::Derivative {
+            NonCopyDerivative(state.0.clone())
+        }
+    }
+
+    impl AdaptiveSystem for ExponentialSystem {
+        fn error_ratio(
+            &self,
+            current: &Self::State,
+            next: &Self::State,
+            error: &Self::Delta,
+            tolerances: ErrorTolerances,
+        ) -> f64 {
+            tolerances.component_ratio(*error.0, *current.0, *next.0)
+        }
+    }
+
+    #[test]
+    fn a_small_step_of_a_smooth_system_is_accepted() {
+        let attempt = adaptive_step(
+            &ExponentialSystem,
+            Time::new(0.0),
+            &NonCopyState(Box::new(1.0)),
+            Time::new(0.01),
+            ErrorTolerances::default(),
+        );
+
+        assert!(attempt.accepted);
+        assert!(attempt.error_ratio <= 1.0);
+        assert!((*attempt.state.0 - 0.01_f64.exp()).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn a_step_that_is_far_too_large_is_rejected() {
+        let attempt = adaptive_step(
+            &ExponentialSystem,
+            Time::new(0.0),
+            &NonCopyState(Box::new(1.0)),
+            Time::new(5.0),
+            ErrorTolerances::default(),
+        );
+
+        assert!(!attempt.accepted);
+        assert!(attempt.error_ratio > 1.0);
+    }
+
+    #[test]
+    fn the_controller_grows_shrinks_and_clamps_the_step() {
+        let limits = StepSizeLimits {
+            min: Time::new(0.5),
+            max: Time::new(4.0),
+        };
+        let step = Time::new(1.0);
+
+        // A vanishing error takes the largest growth factor, clamped by max.
+        assert_eq!(next_step_size(step, 0.0, &limits), Time::new(4.0));
+        // A large error shrinks the step, clamped by min.
+        assert_eq!(next_step_size(step, 1.0e6, &limits), Time::new(0.5));
+        // A non-finite error is treated as the worst case.
+        assert_eq!(next_step_size(step, f64::NAN, &limits), Time::new(0.5));
+        // An error just at tolerance barely changes the step.
+        assert!(next_step_size(step, 1.0, &limits) < step);
+    }
+
+    #[test]
+    fn a_component_passing_through_zero_is_bounded_by_the_absolute_tolerance() {
+        let tolerances = ErrorTolerances {
+            absolute: 1.0e-12,
+            relative: 1.0e-8,
+        };
+
+        assert!(tolerances.component_ratio(1.0e-13, 0.0, 0.0) < 1.0);
+        assert!(tolerances.component_ratio(1.0e-11, 0.0, 0.0) > 1.0);
+    }
+
     #[test]
     fn embedded_step_reports_a_small_error_for_a_smooth_solution() {
-        struct ExponentialSystem;
-
-        impl System for ExponentialSystem {
-            type IndependentVariable = Time;
-            type State = NonCopyState;
-            type Delta = NonCopyDelta;
-            type Derivative = NonCopyDerivative;
-
-            fn derivative(&self, _time: Time, state: &Self::State) -> Self::Derivative {
-                NonCopyDerivative(state.0.clone())
-            }
-        }
-
         let result = rk45_step(
             &ExponentialSystem,
             Time::new(0.0),

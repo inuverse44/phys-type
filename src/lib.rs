@@ -33,7 +33,10 @@ pub use field_space::{
     RiemannIdentity, RiemannTensor, Tensor3Components, Tensor4Components, Upper,
     validate_riemann_symmetries,
 };
-pub use integrate::{EmbeddedStep, System, rk4_step, rk45_step};
+pub use integrate::{
+    AdaptiveAttempt, AdaptiveSystem, EmbeddedStep, ErrorTolerances, StepSizeLimits, System,
+    adaptive_step, next_step_size, rk4_step, rk45_step,
+};
 pub use multifield::{
     CovariantMultifieldSystem, MultifieldState, MultifieldStateDelta, MultifieldStateDerivative,
     MultifieldSystem, TwoFieldKinematics,

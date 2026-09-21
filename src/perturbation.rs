@@ -4,7 +4,7 @@ use core::ops::{Add, Mul};
 
 use num_complex::Complex64;
 
-use crate::integrate::System;
+use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
 use crate::{
     CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, KinematicBasisError, M1,
     M3Over2, MHalf, MMinusHalf, Mass, MultifieldState, MultifieldStateDelta,
@@ -338,11 +338,59 @@ where
     }
 }
 
+impl<P, G> AdaptiveSystem for TwoFieldPerturbationSystem<P, G>
+where
+    P: TwiceDifferentiableMultifieldPotential<2>,
+    G: CurvedFieldSpaceGeometry<2>,
+{
+    /// Combines the background norm with the complex mode norms.
+    ///
+    /// Each mode component contributes the modulus of its whole complex
+    /// error, so the real and imaginary parts are never accepted separately.
+    fn error_ratio(
+        &self,
+        current: &Self::State,
+        next: &Self::State,
+        error: &Self::Delta,
+        tolerances: ErrorTolerances,
+    ) -> f64 {
+        let background = self.background.error_ratio(
+            &current.background,
+            &next.background,
+            &error.background,
+            tolerances,
+        );
+
+        (0..2)
+            .flat_map(|field| (0..2).map(move |mode| (field, mode)))
+            .map(|(field, mode)| {
+                let amplitude = normalized_mode_error(
+                    error.amplitude[field][mode],
+                    current.modes.amplitude[field][mode],
+                    next.modes.amplitude[field][mode],
+                    ModeAmplitude::<f64>::new(tolerances.absolute),
+                    tolerances.relative,
+                );
+                let velocity = normalized_mode_error(
+                    error.velocity[field][mode],
+                    current.modes.velocity[field][mode],
+                    next.modes.velocity[field][mode],
+                    ModeVelocity::<f64>::new(tolerances.absolute),
+                    tolerances.relative,
+                );
+
+                amplitude.max(velocity)
+            })
+            .fold(background, f64::max)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        Field, FieldVelocity, FlatFieldSpace, QuadraticMultifieldPotential, ScaleFactor, rk4_step,
+        ErrorTolerances, Field, FieldVelocity, FlatFieldSpace, QuadraticMultifieldPotential,
+        ScaleFactor, adaptive_step, rk4_step,
     };
 
     fn system() -> TwoFieldPerturbationSystem<QuadraticMultifieldPotential<2>, FlatFieldSpace> {
@@ -404,6 +452,55 @@ mod tests {
         let ratio = normalized_mode_error(error, zero, zero, absolute, 1.0e-9);
 
         assert!(ratio < 1.0);
+    }
+
+    fn zero_delta() -> TwoFieldPerturbationDelta {
+        TwoFieldPerturbationDelta {
+            background: MultifieldStateDelta {
+                phi: [Field::new(0.0); 2],
+                pi: [FieldVelocity::new(0.0); 2],
+                a: ScaleFactor::new(0.0),
+            },
+            amplitude: [[ModeAmplitude::new(Complex64::new(0.0, 0.0)); 2]; 2],
+            velocity: [[ModeVelocity::new(Complex64::new(0.0, 0.0)); 2]; 2],
+        }
+    }
+
+    #[test]
+    fn a_purely_imaginary_mode_error_still_drives_the_step_decision() {
+        let system = system();
+        let state = system.bunch_davies_state(background(), 100.0).unwrap();
+        let tolerances = ErrorTolerances::default();
+
+        assert_eq!(
+            system.error_ratio(&state, &state, &zero_delta(), tolerances),
+            0.0
+        );
+
+        let mut imaginary = zero_delta();
+        imaginary.amplitude[0][0] = ModeAmplitude::new(Complex64::new(0.0, 1.0));
+
+        assert!(system.error_ratio(&state, &state, &imaginary, tolerances) > 1.0);
+    }
+
+    #[test]
+    fn an_adaptive_step_accepts_a_small_step_and_rejects_a_huge_one() {
+        let system = system();
+        let state = system.bunch_davies_state(background(), 100.0).unwrap();
+        let tolerances = ErrorTolerances::default();
+
+        let small = adaptive_step(&system, Time::new(0.0), &state, Time::new(1.0), tolerances);
+        let huge = adaptive_step(
+            &system,
+            Time::new(0.0),
+            &state,
+            Time::new(1.0e6),
+            tolerances,
+        );
+
+        assert!(small.accepted);
+        assert!(!huge.accepted);
+        assert!(huge.error_ratio > small.error_ratio);
     }
 
     #[test]

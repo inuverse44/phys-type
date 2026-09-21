@@ -9,7 +9,7 @@ use crate::dimension::{DimDiv, DimMul, DimSqrt};
 ///
 /// `D` describes the physical dimension and `V` stores the numerical value.
 /// The dimension marker occupies no space at runtime.
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default)]
 #[repr(transparent)]
 pub struct Quantity<D, V> {
     value: V,
@@ -33,6 +33,22 @@ impl<D, V> Quantity<D, V> {
     /// Removes the dimension marker and returns the stored numerical value.
     pub fn into_value(self) -> V {
         self.value
+    }
+}
+
+// Comparison is written out rather than derived. A derived implementation
+// would demand that the dimension marker itself be comparable, even though it
+// is zero-sized and two quantities can only be compared when their dimensions
+// are already the same type.
+impl<D, V: PartialEq> PartialEq for Quantity<D, V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl<D, V: PartialOrd> PartialOrd for Quantity<D, V> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.value.partial_cmp(&other.value)
     }
 }
 
@@ -189,6 +205,16 @@ mod tests {
         let gradient: Quantity<M3, f64> = Quantity::new(2.5);
 
         assert_eq!((-gradient).into_value(), -2.5);
+    }
+
+    #[test]
+    fn quantities_of_the_same_dimension_are_ordered_by_their_values() {
+        let shorter = Time::new(1.0);
+        let longer = Time::new(2.0);
+
+        assert!(shorter < longer);
+        assert!(longer > shorter);
+        assert_eq!(shorter, Time::new(1.0));
     }
 
     #[test]

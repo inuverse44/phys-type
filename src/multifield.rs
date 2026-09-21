@@ -2,7 +2,7 @@
 
 use core::ops::{Add, Mul};
 
-use crate::integrate::System;
+use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
 use crate::potential::MultifieldPotential;
 use crate::{
     ContravariantField, CovariantPotentialHessian, CurvedFieldSpaceGeometry, EnergyDensity, Field,
@@ -323,6 +323,38 @@ where
     }
 }
 
+/// The largest normalized component error of a multifield background step.
+///
+/// Both background systems evolve the same state, so they share this norm.
+fn multifield_error_ratio<const N: usize>(
+    current: &MultifieldState<N>,
+    next: &MultifieldState<N>,
+    error: &MultifieldStateDelta<N>,
+    tolerances: ErrorTolerances,
+) -> f64 {
+    let fields = (0..N).map(|index| {
+        tolerances.component_ratio(
+            error.phi[index].into_value(),
+            current.phi[index].into_value(),
+            next.phi[index].into_value(),
+        )
+    });
+    let velocities = (0..N).map(|index| {
+        tolerances.component_ratio(
+            error.pi[index].into_value(),
+            current.pi[index].into_value(),
+            next.pi[index].into_value(),
+        )
+    });
+    let scale_factor = tolerances.component_ratio(
+        error.a.into_value(),
+        current.a.into_value(),
+        next.a.into_value(),
+    );
+
+    fields.chain(velocities).fold(scale_factor, f64::max)
+}
+
 impl<P, G, const N: usize> System for CovariantMultifieldSystem<P, G, N>
 where
     P: MultifieldPotential<N>,
@@ -355,6 +387,22 @@ where
             }),
             da_dt: state.a * hubble,
         }
+    }
+}
+
+impl<P, G, const N: usize> AdaptiveSystem for CovariantMultifieldSystem<P, G, N>
+where
+    P: MultifieldPotential<N>,
+    G: FieldSpaceGeometry<N>,
+{
+    fn error_ratio(
+        &self,
+        current: &Self::State,
+        next: &Self::State,
+        error: &Self::Delta,
+        tolerances: ErrorTolerances,
+    ) -> f64 {
+        multifield_error_ratio(current, next, error, tolerances)
     }
 }
 
@@ -432,6 +480,21 @@ where
             }),
             da_dt: state.a * hubble,
         }
+    }
+}
+
+impl<P, const N: usize> AdaptiveSystem for MultifieldSystem<P, N>
+where
+    P: MultifieldPotential<N>,
+{
+    fn error_ratio(
+        &self,
+        current: &Self::State,
+        next: &Self::State,
+        error: &Self::Delta,
+        tolerances: ErrorTolerances,
+    ) -> f64 {
+        multifield_error_ratio(current, next, error, tolerances)
     }
 }
 

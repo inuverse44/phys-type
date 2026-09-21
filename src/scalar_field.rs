@@ -15,7 +15,7 @@
 //! H = +sqrt(((1/2) pi^2 + V(phi)) / (3 M_pl^2))
 //! ```
 
-use crate::integrate::System;
+use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
 use crate::potential::Potential;
 use crate::state::{State, StateDelta, StateDerivative};
 use crate::{EnergyDensity, Hubble, Mass};
@@ -95,6 +95,33 @@ impl<P: Potential> System for ScalarFieldSystem<P> {
             dpi_dt: state.pi * hubble * (-3.0) - self.potential.gradient(state.phi),
             da_dt: state.a * hubble,
         }
+    }
+}
+
+impl<P: Potential> AdaptiveSystem for ScalarFieldSystem<P> {
+    fn error_ratio(
+        &self,
+        current: &State,
+        next: &State,
+        error: &StateDelta,
+        tolerances: ErrorTolerances,
+    ) -> f64 {
+        tolerances
+            .component_ratio(
+                error.phi.into_value(),
+                current.phi.into_value(),
+                next.phi.into_value(),
+            )
+            .max(tolerances.component_ratio(
+                error.pi.into_value(),
+                current.pi.into_value(),
+                next.pi.into_value(),
+            ))
+            .max(tolerances.component_ratio(
+                error.a.into_value(),
+                current.a.into_value(),
+                next.a.into_value(),
+            ))
     }
 }
 

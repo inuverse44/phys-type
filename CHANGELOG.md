@@ -35,6 +35,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   adiabatic/entropy projections yielding `P_R`, `P_S`, signed `C_RS`, and a
   correlation coefficient, each guarded by explicit reality and range
   tolerances.
+- An `AdaptiveSystem` error norm and a reusable Dormand-Prince step-size
+  controller, implemented by the single-field background, both multifield
+  backgrounds, and the two-field perturbation system.
 
 ## [0.1.0] - 2026-09-21
 
