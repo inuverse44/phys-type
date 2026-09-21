@@ -5,7 +5,8 @@ use core::ops::{Add, Mul};
 use crate::integrate::System;
 use crate::potential::MultifieldPotential;
 use crate::{
-    EnergyDensity, Field, FieldVelocity, Hubble, M1, M2, M3, Mass, PotentialGradient, Quantity,
+    ContravariantField, EnergyDensity, Field, FieldSpaceGeometry, FieldVelocity, Hubble,
+    KinematicBasis2, KinematicBasisError, M0, M1, M2, M3, Mass, PotentialGradient, Quantity,
     ScaleFactor, Time,
 };
 
@@ -111,6 +112,157 @@ pub struct MultifieldSystem<P, const N: usize> {
     pub m_pl: Mass,
 }
 
+/// `N` scalar fields evolving in an explicitly supplied field-space geometry.
+///
+/// This is separate from [`MultifieldSystem`] while the original canonical API
+/// remains stable. `FlatFieldSpace` reproduces that system's dynamics.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CovariantMultifieldSystem<P, G, const N: usize> {
+    /// The scalar potential.
+    pub potential: P,
+    /// Metric, inverse metric, and connection provider.
+    pub geometry: G,
+    /// The reduced Planck mass.
+    pub m_pl: Mass,
+}
+
+impl<P, G, const N: usize> CovariantMultifieldSystem<P, G, N>
+where
+    P: MultifieldPotential<N>,
+    G: FieldSpaceGeometry<N>,
+{
+    /// Builds a covariant multifield system.
+    pub const fn new(potential: P, geometry: G, m_pl: Mass) -> Self {
+        Self {
+            potential,
+            geometry,
+            m_pl,
+        }
+    }
+
+    /// Builds a covariant system in reduced Planck units.
+    pub const fn in_planck_units(potential: P, geometry: G) -> Self {
+        Self::new(potential, geometry, Mass::new(1.0))
+    }
+
+    /// Total covariant kinetic plus potential energy density.
+    pub fn energy_density(&self, state: &MultifieldState<N>) -> EnergyDensity {
+        let velocity = ContravariantField::new(state.pi);
+        let metric = self.geometry.metric(&state.phi);
+        let kinetic = metric.lower(&velocity).contract(&velocity) * 0.5;
+
+        kinetic + self.potential.value(state.phi)
+    }
+
+    /// The expanding-branch Hubble rate.
+    pub fn hubble(&self, state: &MultifieldState<N>) -> Hubble {
+        (self.energy_density(state) / (self.m_pl * self.m_pl * 3.0)).sqrt()
+    }
+
+    /// `epsilon_H = G_IJ pi^I pi^J / (2 M_pl^2 H^2)`.
+    pub fn epsilon_h(&self, state: &MultifieldState<N>) -> f64 {
+        let velocity = ContravariantField::new(state.pi);
+        let kinetic_twice = self
+            .geometry
+            .metric(&state.phi)
+            .lower(&velocity)
+            .contract(&velocity);
+        let hubble = self.hubble(state);
+        let denominator = self.m_pl * self.m_pl * hubble * hubble * 2.0;
+
+        (kinetic_twice / denominator).into_value()
+    }
+
+    /// Slow-roll velocity `pi^I ~= -G^IJ V_;J / (3H)`.
+    pub fn slow_roll_velocity(&self, state: &MultifieldState<N>) -> [FieldVelocity; N] {
+        let gradient = crate::CovariantField::new(self.potential.gradient(state.phi));
+        let raised = self.geometry.inverse_metric(&state.phi).raise(&gradient);
+        let hubble = self.hubble(state);
+
+        raised
+            .into_components()
+            .map(|component| -(component / (hubble * 3.0)))
+    }
+}
+
+/// Two-field kinematics attached to a background state.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TwoFieldKinematics {
+    /// Instantaneous adiabatic and entropy basis.
+    pub basis: KinematicBasis2,
+    /// Signed angular velocity `e_sI D_t e_sigma^I`.
+    pub turn_rate: Hubble,
+    /// Dimensionless signed turn rate `turn_rate / H`.
+    pub eta_perp: Quantity<M0, f64>,
+}
+
+impl<P, G> CovariantMultifieldSystem<P, G, 2>
+where
+    P: MultifieldPotential<2>,
+    G: FieldSpaceGeometry<2>,
+{
+    /// Computes the oriented adiabatic/entropy basis and signed turn rate.
+    pub fn kinematics(
+        &self,
+        state: &MultifieldState<2>,
+        previous_normal: Option<&ContravariantField<M0, f64, 2>>,
+    ) -> Result<TwoFieldKinematics, KinematicBasisError> {
+        let metric = self.geometry.metric(&state.phi);
+        let inverse = self.geometry.inverse_metric(&state.phi);
+        let velocity = ContravariantField::new(state.pi);
+        let basis = KinematicBasis2::from_velocity(&metric, &velocity, previous_normal)?;
+        let gradient = crate::CovariantField::new(self.potential.gradient(state.phi));
+        let raised_gradient = inverse.raise(&gradient).into_components();
+        let hubble = self.hubble(state);
+        let covariant_acceleration = ContravariantField::new(core::array::from_fn(|index| {
+            state.pi[index] * hubble * -3.0 - raised_gradient[index]
+        }));
+        let normal_lower = metric.lower(&basis.normal);
+        let turn_rate = normal_lower.contract(&covariant_acceleration) / basis.speed;
+
+        Ok(TwoFieldKinematics {
+            basis,
+            turn_rate,
+            eta_perp: turn_rate / hubble,
+        })
+    }
+}
+
+impl<P, G, const N: usize> System for CovariantMultifieldSystem<P, G, N>
+where
+    P: MultifieldPotential<N>,
+    G: FieldSpaceGeometry<N>,
+{
+    type IndependentVariable = Time;
+    type State = MultifieldState<N>;
+    type Delta = MultifieldStateDelta<N>;
+    type Derivative = MultifieldStateDerivative<N>;
+
+    fn derivative(&self, _time: Time, state: &Self::State) -> Self::Derivative {
+        let hubble = self.hubble(state);
+        let gradient = crate::CovariantField::new(self.potential.gradient(state.phi));
+        let raised_gradient = self
+            .geometry
+            .inverse_metric(&state.phi)
+            .raise(&gradient)
+            .into_components();
+        let velocity = ContravariantField::new(state.pi);
+        let connection = self
+            .geometry
+            .christoffel(&state.phi)
+            .quadratic_velocity(&velocity)
+            .into_components();
+
+        MultifieldStateDerivative {
+            dphi_dt: state.pi,
+            dpi_dt: core::array::from_fn(|index| {
+                state.pi[index] * hubble * -3.0 - raised_gradient[index] - connection[index]
+            }),
+            da_dt: state.a * hubble,
+        }
+    }
+}
+
 impl<P, const N: usize> MultifieldSystem<P, N>
 where
     P: MultifieldPotential<N>,
@@ -191,7 +343,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{QuadraticMultifieldPotential, rk4_step, rk45_step};
+    use crate::{
+        ChristoffelSymbols, FieldMetric, FlatFieldSpace, InverseFieldMetric, MMinus1,
+        QuadraticMultifieldPotential, rk4_step, rk45_step,
+    };
 
     fn two_field_system() -> MultifieldSystem<QuadraticMultifieldPotential<2>, 2> {
         MultifieldSystem::in_planck_units(QuadraticMultifieldPotential::new([
@@ -235,5 +390,86 @@ mod tests {
         assert!(rk4.phi[0].into_value() < initial.phi[0].into_value());
         assert!(rk4.phi[1].into_value() < initial.phi[1].into_value());
         assert!((rk4.phi[0].into_value() - rk45.phi[0].into_value()).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn flat_covariant_system_reproduces_the_canonical_system() {
+        let canonical = two_field_system();
+        let covariant =
+            CovariantMultifieldSystem::in_planck_units(canonical.potential, FlatFieldSpace);
+        let state = MultifieldState::new(
+            [Field::new(12.0), Field::new(8.0)],
+            [FieldVelocity::new(-1.0e-6), FieldVelocity::new(-2.0e-6)],
+            ScaleFactor::new(1.0),
+        );
+
+        assert_eq!(
+            covariant.energy_density(&state),
+            canonical.energy_density(&state)
+        );
+        assert_eq!(covariant.hubble(&state), canonical.hubble(&state));
+        assert_eq!(
+            covariant.derivative(Time::new(0.0), &state),
+            canonical.derivative(Time::new(0.0), &state)
+        );
+        assert!((covariant.epsilon_h(&state) - canonical.epsilon_h(&state)).abs() < 1.0e-15);
+    }
+
+    #[derive(Clone, Copy)]
+    struct ConnectedFlatSpace;
+
+    impl FieldSpaceGeometry<2> for ConnectedFlatSpace {
+        fn metric(&self, _position: &[Field; 2]) -> FieldMetric<2> {
+            FieldMetric::euclidean()
+        }
+
+        fn inverse_metric(&self, _position: &[Field; 2]) -> InverseFieldMetric<2> {
+            InverseFieldMetric::euclidean()
+        }
+
+        fn christoffel(&self, _position: &[Field; 2]) -> ChristoffelSymbols<2> {
+            let mut components = [[[Quantity::<MMinus1, f64>::new(0.0); 2]; 2]; 2];
+            components[0][1][1] = Quantity::new(2.0);
+            ChristoffelSymbols::new(components)
+        }
+    }
+
+    #[test]
+    fn covariant_equation_includes_the_connection_force() {
+        let potential = QuadraticMultifieldPotential::new([Mass::new(0.0), Mass::new(0.0)]);
+        let system = CovariantMultifieldSystem::in_planck_units(potential, ConnectedFlatSpace);
+        let state = MultifieldState::new(
+            [Field::new(0.0), Field::new(0.0)],
+            [FieldVelocity::new(0.0), FieldVelocity::new(1.0)],
+            ScaleFactor::new(1.0),
+        );
+
+        let derivative = system.derivative(Time::new(0.0), &state);
+
+        assert_eq!(derivative.dpi_dt[0].into_value(), -2.0);
+    }
+
+    #[test]
+    fn two_field_kinematics_reports_an_orthogonal_signed_turn() {
+        let system = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0e-6), Mass::new(2.0e-6)]),
+            FlatFieldSpace,
+        );
+        let state = MultifieldState::new(
+            [Field::new(12.0), Field::new(8.0)],
+            [FieldVelocity::new(-3.0e-6), FieldVelocity::new(-4.0e-6)],
+            ScaleFactor::new(1.0),
+        );
+
+        let kinematics = system.kinematics(&state, None).unwrap();
+        let metric = FieldMetric::<2>::euclidean();
+        let overlap = metric
+            .lower(&kinematics.basis.tangent)
+            .contract(&kinematics.basis.normal)
+            .into_value();
+
+        assert!(overlap.abs() < 1.0e-15);
+        assert!(kinematics.turn_rate.into_value().is_finite());
+        assert!(kinematics.eta_perp.into_value().is_finite());
     }
 }

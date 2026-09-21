@@ -61,7 +61,7 @@ checks are documented in
 | --- | --- |
 | `autodiff` | First-order forward-mode automatic differentiation with `Dual` |
 | `dimension` | `MassPower<E>` and the type-level `DimMul`, `DimDiv`, `DimSqrt` |
-| `field_space` | Fixed-size vectors/tensors with typed upper and lower indices |
+| `field_space` | Typed tensor variance, metrics, connections, and kinematic bases |
 | `quantity` | `Quantity<D, V>` and its arithmetic |
 | `state` | `State`, `StateDerivative`, `StateDelta` |
 | `potential` | Automatically differentiated potentials and `QuadraticPotential` |
@@ -100,6 +100,12 @@ dimension. `FieldMetric<N>::lower` maps an upper-index vector to a lower-index
 vector, `InverseFieldMetric<N>::raise` performs the inverse operation, and
 only opposite-variance vectors expose contraction. Invalid index operations
 are covered by compile-fail tests.
+
+`CovariantMultifieldSystem<P, G, N>` accepts a `FieldSpaceGeometry<N>` that
+supplies `G_IJ`, `G^IJ`, and `Gamma^I_JK`. `FlatFieldSpace` exactly reproduces
+the canonical solver. For two fields, `kinematics` returns the normalized
+adiabatic tangent, continuously oriented entropy normal, `dot_sigma`, and the
+signed dimensionless turn rate.
 
 ## Compile-fail tests
 

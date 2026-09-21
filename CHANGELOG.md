@@ -12,6 +12,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and lower indices.
 - Explicit metric raise/lower operations and opposite-variance contraction.
 - Compile-fail coverage for invalid field-space index operations.
+- Covariant multifield background equations with pluggable metric, inverse
+  metric, and Christoffel symbols.
+- An oriented two-field adiabatic/entropy basis and signed turn rate.
 
 ## [0.1.0] - 2026-09-21
 

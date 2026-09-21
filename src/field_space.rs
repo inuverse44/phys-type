@@ -8,7 +8,7 @@ use core::marker::PhantomData;
 use core::ops::{Add, Mul, Neg, Sub};
 
 use crate::dimension::DimMul;
-use crate::{M0, Quantity};
+use crate::{Field, FieldVelocity, M0, M2, M3, MMinus1, Quantity};
 
 /// Marker for a contravariant (upper) field-space index.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -155,6 +155,163 @@ pub type FieldMetric<const N: usize> = FieldTensor2<Lower, Lower, M0, f64, N>;
 /// An inverse metric `G^IJ` with two upper, dimensionless field-space indices.
 pub type InverseFieldMetric<const N: usize> = FieldTensor2<Upper, Upper, M0, f64, N>;
 
+/// Christoffel symbols `Gamma^I_JK` for scalar fields of mass dimension one.
+///
+/// A derivative with respect to a field contributes dimension `M^-1`, so the
+/// connection components carry that dimension.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ChristoffelSymbols<const N: usize> {
+    components: [[[Quantity<MMinus1, f64>; N]; N]; N],
+}
+
+impl<const N: usize> ChristoffelSymbols<N> {
+    /// Builds connection coefficients in `upper, lower, lower` index order.
+    pub const fn new(components: [[[Quantity<MMinus1, f64>; N]; N]; N]) -> Self {
+        Self { components }
+    }
+
+    /// Returns a vanishing connection.
+    pub fn zero() -> Self {
+        Self::new([[[Quantity::new(0.0); N]; N]; N])
+    }
+
+    /// Borrows the connection coefficients.
+    pub const fn components(&self) -> &[[[Quantity<MMinus1, f64>; N]; N]; N] {
+        &self.components
+    }
+
+    /// Computes `Gamma^I_JK velocity^J velocity^K`.
+    pub fn quadratic_velocity(
+        &self,
+        velocity: &ContravariantField<M2, f64, N>,
+    ) -> ContravariantField<M3, f64, N> {
+        ContravariantField::new(core::array::from_fn(|upper| {
+            Quantity::new(
+                (0..N)
+                    .flat_map(|first| (0..N).map(move |second| (first, second)))
+                    .map(|(first, second)| {
+                        self.components[upper][first][second].value()
+                            * velocity.components[first].value()
+                            * velocity.components[second].value()
+                    })
+                    .sum(),
+            )
+        }))
+    }
+}
+
+/// Supplies field-space geometry at a background position.
+pub trait FieldSpaceGeometry<const N: usize> {
+    /// The covariant metric `G_IJ`.
+    fn metric(&self, position: &[Field; N]) -> FieldMetric<N>;
+
+    /// The inverse metric `G^IJ`.
+    fn inverse_metric(&self, position: &[Field; N]) -> InverseFieldMetric<N>;
+
+    /// The Levi-Civita connection `Gamma^I_JK`.
+    fn christoffel(&self, position: &[Field; N]) -> ChristoffelSymbols<N>;
+}
+
+/// Euclidean field space in Cartesian coordinates.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FlatFieldSpace;
+
+impl<const N: usize> FieldSpaceGeometry<N> for FlatFieldSpace {
+    fn metric(&self, _position: &[Field; N]) -> FieldMetric<N> {
+        FieldMetric::euclidean()
+    }
+
+    fn inverse_metric(&self, _position: &[Field; N]) -> InverseFieldMetric<N> {
+        InverseFieldMetric::euclidean()
+    }
+
+    fn christoffel(&self, _position: &[Field; N]) -> ChristoffelSymbols<N> {
+        ChristoffelSymbols::zero()
+    }
+}
+
+/// Why an orthonormal two-field kinematic basis could not be constructed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KinematicBasisError {
+    /// The background is instantaneously stationary, so its tangent is
+    /// undefined.
+    ZeroSpeed,
+    /// The supplied metric is not symmetric to floating-point tolerance.
+    NonSymmetricMetric,
+    /// The supplied two-dimensional metric is not positive definite.
+    NonPositiveMetric,
+}
+
+/// Instantaneous tangent and normal directions for a two-field trajectory.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct KinematicBasis2 {
+    /// Unit vector tangent to the background velocity.
+    pub tangent: ContravariantField<M0, f64, 2>,
+    /// Unit vector normal to the background velocity.
+    pub normal: ContravariantField<M0, f64, 2>,
+    /// Covariant magnitude `dot sigma` of the background velocity.
+    pub speed: FieldVelocity,
+}
+
+impl KinematicBasis2 {
+    /// Constructs an oriented orthonormal basis.
+    ///
+    /// If `previous_normal` is supplied, the sign is selected to give a
+    /// positive overlap with it. Otherwise the positive coordinate
+    /// orientation is used.
+    pub fn from_velocity(
+        metric: &FieldMetric<2>,
+        velocity: &ContravariantField<M2, f64, 2>,
+        previous_normal: Option<&ContravariantField<M0, f64, 2>>,
+    ) -> Result<Self, KinematicBasisError> {
+        let components = metric.components();
+        let g00 = *components[0][0].value();
+        let g01 = *components[0][1].value();
+        let g10 = *components[1][0].value();
+        let g11 = *components[1][1].value();
+        let scale = g01.abs().max(g10.abs()).max(1.0);
+
+        if (g01 - g10).abs() > 1.0e-12 * scale {
+            return Err(KinematicBasisError::NonSymmetricMetric);
+        }
+
+        let determinant = g00 * g11 - g01 * g10;
+        if g00 <= 0.0 || determinant <= 0.0 {
+            return Err(KinematicBasisError::NonPositiveMetric);
+        }
+
+        let lowered_velocity = metric.lower(velocity);
+        let speed_squared = lowered_velocity.contract(velocity).into_value();
+        if speed_squared <= 0.0 || !speed_squared.is_finite() {
+            return Err(KinematicBasisError::ZeroSpeed);
+        }
+
+        let speed = speed_squared.sqrt();
+        let tangent = ContravariantField::new([
+            Quantity::new(velocity.components[0].value() / speed),
+            Quantity::new(velocity.components[1].value() / speed),
+        ]);
+        let tangent_lower = metric.lower(&tangent);
+        let root_determinant = determinant.sqrt();
+        let mut normal = ContravariantField::new([
+            Quantity::new(-tangent_lower.components[1].value() / root_determinant),
+            Quantity::new(tangent_lower.components[0].value() / root_determinant),
+        ]);
+
+        if let Some(previous) = previous_normal
+            && metric.lower(&normal).contract(previous).into_value() < 0.0
+        {
+            normal = normal * -1.0;
+        }
+
+        Ok(Self {
+            tangent,
+            normal,
+            speed: FieldVelocity::new(speed),
+        })
+    }
+}
+
 impl<const N: usize> FieldTensor2<Lower, Lower, M0, f64, N> {
     /// Returns the Euclidean metric in `N` Cartesian field coordinates.
     pub fn euclidean() -> Self {
@@ -270,5 +427,55 @@ mod tests {
             result.into_components().map(Quantity::into_value),
             [2.0, 3.0]
         );
+    }
+
+    #[test]
+    fn christoffel_symbols_contract_both_lower_indices() {
+        let mut components = [[[Quantity::new(0.0); 2]; 2]; 2];
+        components[0][0][0] = Quantity::new(0.5);
+        let connection = ChristoffelSymbols::new(components);
+        let velocity =
+            ContravariantField::<M2, f64, 2>::new([Quantity::new(2.0), Quantity::new(3.0)]);
+
+        let result = connection
+            .quadratic_velocity(&velocity)
+            .into_components()
+            .map(Quantity::into_value);
+
+        assert_eq!(result, [2.0, 0.0]);
+    }
+
+    #[test]
+    fn two_field_basis_is_oriented_and_orthonormal() {
+        let metric = FieldMetric::<2>::euclidean();
+        let velocity =
+            ContravariantField::<M2, f64, 2>::new([Quantity::new(3.0), Quantity::new(4.0)]);
+
+        let basis = KinematicBasis2::from_velocity(&metric, &velocity, None).unwrap();
+        let tangent_norm = metric.lower(&basis.tangent).contract(&basis.tangent);
+        let normal_norm = metric.lower(&basis.normal).contract(&basis.normal);
+        let overlap = metric.lower(&basis.tangent).contract(&basis.normal);
+
+        assert_eq!(basis.speed.into_value(), 5.0);
+        assert!((tangent_norm.into_value() - 1.0).abs() < 1.0e-15);
+        assert!((normal_norm.into_value() - 1.0).abs() < 1.0e-15);
+        assert!(overlap.into_value().abs() < 1.0e-15);
+        assert_eq!(
+            basis.normal.into_components().map(Quantity::into_value),
+            [-0.8, 0.6]
+        );
+    }
+
+    #[test]
+    fn previous_normal_prevents_an_orientation_flip() {
+        let metric = FieldMetric::<2>::euclidean();
+        let velocity =
+            ContravariantField::<M2, f64, 2>::new([Quantity::new(3.0), Quantity::new(4.0)]);
+        let previous =
+            ContravariantField::<M0, f64, 2>::new([Quantity::new(0.8), Quantity::new(-0.6)]);
+
+        let basis = KinematicBasis2::from_velocity(&metric, &velocity, Some(&previous)).unwrap();
+
+        assert_eq!(basis.normal, previous);
     }
 }

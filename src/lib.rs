@@ -24,12 +24,14 @@ pub use dimension::{
     MassPower,
 };
 pub use field_space::{
-    ContravariantField, CovariantField, FieldMetric, FieldTensor2, FieldVector, InverseFieldMetric,
-    Lower, Upper,
+    ChristoffelSymbols, ContravariantField, CovariantField, FieldMetric, FieldSpaceGeometry,
+    FieldTensor2, FieldVector, FlatFieldSpace, InverseFieldMetric, KinematicBasis2,
+    KinematicBasisError, Lower, Upper,
 };
 pub use integrate::{EmbeddedStep, System, rk4_step, rk45_step};
 pub use multifield::{
-    MultifieldState, MultifieldStateDelta, MultifieldStateDerivative, MultifieldSystem,
+    CovariantMultifieldSystem, MultifieldState, MultifieldStateDelta, MultifieldStateDerivative,
+    MultifieldSystem, TwoFieldKinematics,
 };
 pub use potential::{
     MultifieldPotential, MultifieldPotentialValue, Potential, PotentialValue,
