@@ -267,8 +267,10 @@ matter-likeなスケール因子の発展を一度に確認する。
 
 ```text
 plots/
+├── generate_all.py          CSVと全図の一括生成・検証
 ├── background.py           背景解の四パネル
 ├── attractor.py            インフレーション中の位相空間
+├── convergence.py          RK4誤差と収束次数
 └── oscillation.py          振動期の四パネル
 
 diagnostics/
@@ -278,6 +280,9 @@ diagnostics/
 ├── attractor.csv           複数の初速度による軌道
 ├── attractor.png
 ├── attractor.pdf
+├── convergence.csv         刻み幅ごとのRK4誤差と収束次数
+├── convergence.png
+├── convergence.pdf
 ├── oscillation.csv         振動期の時系列
 ├── oscillation.png
 └── oscillation.pdf
@@ -287,17 +292,19 @@ diagnostics/
 
 ## 実行方法
 
-背景解を計算する。
+CSVと全4種類のPNG/PDFを一括生成し、8個の図ファイルが存在して空でない
+ことまで検証する。
 
 ```sh
-cargo run --release --example diagnostics
+uv run plots/generate_all.py
 ```
 
-生成されたCSVを可視化する。
+個別に再生成する場合は次を使う。
 
 ```sh
 uv run plots/background.py diagnostics/trajectory.csv
 uv run plots/attractor.py diagnostics/attractor.csv
+uv run plots/convergence.py diagnostics/convergence.csv
 uv run plots/oscillation.py diagnostics/oscillation.csv
 ```
 
@@ -327,8 +334,9 @@ uv run plots/oscillation.py diagnostics/oscillation.csv
 - データ行がない。
 - 出力先へ書き込めない。
 
-NaNや無限大が含まれる場合の詳細な診断表示は、背景積分側の異常終了設計
-と合わせて後から追加する。
+通常の時系列図ではNaNや無限大をエラーにする。収束図だけは、意図的に
+粗い刻みが発散し得るため、非有限または非正の誤差行を件数付きで除外する。
+ただし有効な収束データが3行未満なら図を生成せずエラーにする。
 
 ## 可視化MVPの完了条件
 
@@ -344,6 +352,8 @@ NaNや無限大が含まれる場合の詳細な診断表示は、背景積分�
 7. インフレーション終了後に10周期の振動を追跡できる。
 8. `phi`--`dphi`位相空間、`w`とその平均、`a(t)`とmatter予測を描ける。
 9. 物理スケールによる刻みと、その半分の刻みで結果の収束を確認できる。
+10. RK4の誤差と経験的収束次数をlog–log図で確認できる。
+11. 一つのコマンドで全CSVと全図を生成し、成果物を検証できる。
 
 ## 実装結果
 
@@ -364,12 +374,12 @@ NaNや無限大が含まれる場合の詳細な診断表示は、背景積分�
 ```text
 background   インフレーション背景の四パネル
 attractor    異なる初速度からの位相軌道
+convergence  RK4の大域誤差と経験的収束次数
 oscillation  振動、wの平均、matter-likeな膨張
 ```
 
 ## MVP後の候補
 
-- RK4の収束次数を確認するlog-log図
 - Plotlyによる対話的な探索
 - 論文向けの共通スタイル設定
 - 一般のポテンシャルに対する`omega_eff`ベースの刻み自動化

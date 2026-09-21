@@ -32,11 +32,19 @@ post-inflation oscillations, run:
 cargo run --release --example diagnostics
 ```
 
-Generate publication-quality PNG and PDF figures with Python and Matplotlib:
+Generate every diagnostic CSV and publication-quality PNG/PDF figure with one
+command:
+
+```sh
+uv run plots/generate_all.py
+```
+
+Individual plots can also be regenerated from existing CSV files:
 
 ```sh
 uv run plots/background.py diagnostics/trajectory.csv
 uv run plots/attractor.py diagnostics/attractor.csv
+uv run plots/convergence.py diagnostics/convergence.csv
 uv run plots/oscillation.py diagnostics/oscillation.csv
 ```
 
