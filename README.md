@@ -53,6 +53,13 @@ and selected modes through horizon exit:
 uv run plots/two_field_spectra.py diagnostics
 ```
 
+The focused final spectrum figure puts `P_R(k)` and `P_S(k)` on one log-log
+axis at the end of inflation:
+
+```sh
+uv run plots/final_spectra.py diagnostics/two_field_spectra.csv
+```
+
 Generate every diagnostic CSV and publication-quality PNG/PDF figure with one
 command:
 
@@ -68,6 +75,7 @@ uv run plots/attractor.py diagnostics/attractor.csv
 uv run plots/convergence.py diagnostics/convergence.csv
 uv run plots/oscillation.py diagnostics/oscillation.csv
 uv run plots/two_field_spectra.py diagnostics
+uv run plots/final_spectra.py diagnostics/two_field_spectra.csv
 ```
 
 The plotting scripts declare their own Python dependencies, so `uv` creates an

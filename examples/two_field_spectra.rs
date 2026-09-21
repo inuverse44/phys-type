@@ -57,10 +57,21 @@ fn revision() -> Option<String> {
         .output()
         .ok()?;
 
-    output
+    let revision = output
         .status
         .success()
-        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
+        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())?;
+    let status = Command::new("git")
+        .args(["status", "--porcelain", "--untracked-files=no"])
+        .output()
+        .ok()?;
+    let dirty = status.status.success() && !status.stdout.is_empty();
+
+    Some(if dirty {
+        format!("{revision}-dirty")
+    } else {
+        revision
+    })
 }
 
 fn write_file(
@@ -88,7 +99,13 @@ fn main() -> io::Result<()> {
     fs::create_dir_all(directory)?;
 
     let system = model();
-    let settings = SpectrumRunSettings::default();
+    // The example reports the final inflationary spectra, after the entropy
+    // mode has had the full inflationary interval in which to source the
+    // curvature mode.
+    let settings = SpectrumRunSettings {
+        output_e_folds_before_end: 0.0,
+        ..SpectrumRunSettings::default()
+    };
     let run = match system.run_two_field_spectra(initial_state(&system), &settings) {
         Ok(run) => run,
         Err(error) => {

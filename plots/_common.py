@@ -68,8 +68,14 @@ def require_finite(data: np.ndarray, columns: set[str]) -> None:
             raise SystemExit(f"column contains NaN or infinity: {column}")
 
 
-def save_figure(figure: plt.Figure, input_path: Path, stem: str) -> None:
-    output_dir = input_path.parent
+def save_figure(
+    figure: plt.Figure,
+    input_path: Path,
+    stem: str,
+    output_dir: Path | None = None,
+) -> None:
+    output_dir = input_path.parent if output_dir is None else output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
     png = output_dir / f"{stem}.png"
     pdf = output_dir / f"{stem}.pdf"
 

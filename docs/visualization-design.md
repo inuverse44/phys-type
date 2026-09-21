@@ -403,6 +403,24 @@ revisionとx_init、pivot位置を図のキャプションに出す。図だけ�
 `load_csv`はこのブロックの行数を数えて読み飛ばす。numpyの`names=True`は
 コメント処理に任せると先頭のコメント行を列名として読んでしまう。
 
+## 最終曲率・等曲率スペクトル図
+
+四パネル図とは別に、インフレーション終了時の主要な結果だけを読むための
+図を生成する。
+
+```text
+diagnostics/two_field_final_spectra.png
+diagnostics/two_field_final_spectra.pdf
+```
+
+横軸は`k/k_pivot`、縦軸は無次元の`P_R`と`P_S`で、両方とも対数軸とする。
+二つの系列を単純に足したものを曲率スペクトルとは呼ばない。図中の`P_R`は、
+等曲率modeからのsourceを含めて終了時まで発展させた曲率modeから直接構成する。
+相関はpivotでの`r_C`を注記し、完全な`C_RS(k)`は四パネル図とCSVに残す。
+
+exampleは`output_e_folds_before_end = 0`を指定する。タイトルには出力時刻とGit
+revisionを表示し、未コミット変更を含む実行ではrevisionに`-dirty`を付ける。
+
 ## MVP後の候補
 
 - Plotlyによる対話的な探索

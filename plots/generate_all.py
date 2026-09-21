@@ -23,6 +23,7 @@ PLOTS = (
 # The two-field figure reads three CSV files, so it takes the directory
 # rather than one input file.
 TWO_FIELD_PLOT = ("two_field_spectra.py", "two_field_spectra")
+FINAL_SPECTRUM_PLOT = ("final_spectra.py", "two_field_final_spectra")
 
 
 def run(command: list[str], cwd: Path) -> None:
@@ -68,7 +69,14 @@ def main() -> None:
     run([sys.executable, str(scripts / script), str(output)], repository)
     verify(output, stem)
 
-    print(f"verified {(len(PLOTS) + 1) * 2} plot files in {output}")
+    script, stem = FINAL_SPECTRUM_PLOT
+    run(
+        [sys.executable, str(scripts / script), str(output / "two_field_spectra.csv")],
+        repository,
+    )
+    verify(output, stem)
+
+    print(f"verified {(len(PLOTS) + 2) * 2} plot files in {output}")
 
 
 if __name__ == "__main__":
