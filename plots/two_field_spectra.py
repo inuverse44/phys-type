@@ -196,7 +196,10 @@ def provenance(metadata: dict[str, str]) -> str:
     parts = []
     if "revision" in metadata:
         parts.append(f"revision {metadata['revision']}")
-    if "x_init" in metadata:
+    if "e_folds_before_exit" in metadata:
+        start = float(metadata["e_folds_before_exit"])
+        parts.append(rf"start ${start:.1f}$ e-folds before exit")
+    elif "x_init" in metadata:
         parts.append(rf"$x_{{\mathrm{{init}}}}={metadata['x_init']}$")
     if "e_folds_at_pivot" in metadata and "e_folds_at_end" in metadata:
         pivot = float(metadata["e_folds_at_pivot"])

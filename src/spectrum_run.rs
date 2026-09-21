@@ -49,8 +49,14 @@ pub struct SpectrumRunSettings {
     pub max_steps: usize,
     /// Give up on inflation ending after this many e-folds.
     pub max_e_folds: f64,
-    /// `k/(aH)` at which each mode is initialized.
-    pub x_init: f64,
+    /// How many e-folds before its own horizon exit each mode is initialized.
+    ///
+    /// This is the readable form of the depth `x_init = k/(aH)`, which is its
+    /// exponential. The trade-off is steep and regular: one more e-fold costs
+    /// about `e` times as much work, because that many more sub-horizon
+    /// oscillations must be resolved, and buys about `e^2` in accuracy,
+    /// because the Bunch-Davies form is approached as `1/x_init^2`.
+    pub e_folds_before_exit: f64,
     /// The pivot exits the horizon this many e-folds before inflation ends.
     pub pivot_e_folds_before_end: f64,
     /// Spectra are reported this many e-folds before inflation ends.
@@ -81,7 +87,7 @@ impl Default for SpectrumRunSettings {
             },
             max_steps: 1_000_000,
             max_e_folds: 120.0,
-            x_init: 100.0,
+            e_folds_before_exit: 5.0,
             pivot_e_folds_before_end: 55.0,
             output_e_folds_before_end: 5.0,
             k_min_over_pivot: 0.1,
@@ -359,7 +365,12 @@ pub fn write_metadata<W: Write>(
     if let Some(revision) = revision {
         writeln!(writer, "# revision: {revision}")?;
     }
-    writeln!(writer, "# x_init: {:e}", settings.x_init)?;
+    writeln!(
+        writer,
+        "# e_folds_before_exit: {:e}",
+        settings.e_folds_before_exit
+    )?;
+    writeln!(writer, "# x_init: {:e}", start_depth(settings))?;
     writeln!(
         writer,
         "# absolute_tolerance: {:e}",
@@ -666,12 +677,12 @@ where
             initial,
             Time::new(0.0),
             settings,
-            |state| (k / (state.a * self.hubble(state))).into_value() - settings.x_init,
+            |state| (k / (state.a * self.hubble(state))).into_value() - start_depth(settings),
             |_, _| {},
         )?;
 
         let mode_state = system
-            .bunch_davies_state(start, settings.x_init)
+            .bunch_davies_state(start, start_depth(settings))
             .map_err(|source| SpectrumRunError::ModeInitialization {
                 k: k.into_value(),
                 source,
@@ -818,6 +829,11 @@ fn component_pair(vector: &ContravariantField<M0, f64, 2>) -> [f64; 2] {
     [components[0].into_value(), components[1].into_value()]
 }
 
+/// The depth `x_init = k/(aH)` at which modes are initialized.
+fn start_depth(settings: &SpectrumRunSettings) -> f64 {
+    settings.e_folds_before_exit.exp()
+}
+
 /// The logarithmically spaced grid point at `index`.
 fn grid_point(settings: &SpectrumRunSettings, index: usize) -> f64 {
     if settings.k_count == 1 {
@@ -848,9 +864,9 @@ fn validate(settings: &SpectrumRunSettings) -> Result<(), SpectrumRunError> {
     }
     // Written without a negated comparison so that a NaN is rejected
     // explicitly rather than by falling through a flipped inequality.
-    if settings.x_init.is_nan() || settings.x_init <= 1.0 {
+    if settings.e_folds_before_exit.is_nan() || settings.e_folds_before_exit <= 0.0 {
         return Err(SpectrumRunError::InvalidSettings(
-            "x_init must place modes inside the horizon",
+            "modes must start before their horizon exit",
         ));
     }
     if settings.min_dt.into_value() <= 0.0 || settings.max_dt < settings.min_dt {
@@ -902,7 +918,7 @@ mod tests {
     /// A short run that still exercises every stage.
     fn quick_settings() -> SpectrumRunSettings {
         SpectrumRunSettings {
-            x_init: 8.0,
+            e_folds_before_exit: 2.0,
             pivot_e_folds_before_end: 6.0,
             output_e_folds_before_end: 2.0,
             k_min_over_pivot: 1.0,
@@ -1096,7 +1112,7 @@ mod tests {
             .run_two_field_spectra(
                 initial,
                 &SpectrumRunSettings {
-                    x_init: 50.0,
+                    e_folds_before_exit: 4.0,
                     ..quick_settings()
                 },
             )
@@ -1105,7 +1121,7 @@ mod tests {
             .run_two_field_spectra(
                 initial,
                 &SpectrumRunSettings {
-                    x_init: 100.0,
+                    e_folds_before_exit: 5.0,
                     ..quick_settings()
                 },
             )
@@ -1126,12 +1142,12 @@ mod tests {
         // produces.
         let system = system([1.0e-6, 1.5e-6]);
         let initial = slow_roll_start(&system, [12.0, 8.0]);
-        let spectrum = |x_init| {
+        let spectrum = |e_folds_before_exit| {
             system
                 .run_two_field_spectra(
                     initial,
                     &SpectrumRunSettings {
-                        x_init,
+                        e_folds_before_exit,
                         ..quick_settings()
                     },
                 )
@@ -1140,10 +1156,10 @@ mod tests {
                 .p_r
         };
 
-        let coarse = spectrum(25.0);
-        let medium = spectrum(50.0);
-        let fine = spectrum(100.0);
-        let finest = spectrum(200.0);
+        let coarse = spectrum(4.0);
+        let medium = spectrum(5.0);
+        let fine = spectrum(6.0);
+        let finest = spectrum(7.0);
 
         let first = (medium - coarse).abs() / medium;
         let second = (fine - medium).abs() / fine;
@@ -1230,7 +1246,7 @@ mod tests {
         let text = String::from_utf8(buffer).unwrap();
 
         assert!(text.contains("# revision: abc123"));
-        assert!(text.contains("# x_init: 8e0"));
+        assert!(text.contains("# e_folds_before_exit: 2e0"));
         assert!(text.contains("# k_pivot_over_m_pl: 1.5e-5"));
         assert!(text.lines().all(|line| line.starts_with('#')));
     }

@@ -179,8 +179,9 @@ being silently discarded.
 
 `run_two_field_spectra` puts those pieces together. It surveys the background
 to the end of inflation, fixes `k_pivot = a_* H_*` a chosen number of e-folds
-earlier, carries every wavenumber to its own `x_init = k/(aH)` crossing before
-initializing the vacuum there, and reports spectra at one output time. A mode
+earlier, carries every wavenumber to a fixed number of e-folds before its own horizon
+exit before initializing the vacuum there, and reports spectra at one output
+time. A mode
 that cannot be placed deep enough inside the horizon is a typed error, not a
 silently poor approximation. Note that the single absolute error tolerance
 applies to raw Planck-unit values across a run spanning some fifty orders of

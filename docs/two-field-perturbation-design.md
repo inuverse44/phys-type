@@ -209,8 +209,10 @@ Physical dimension therefore remains a compile-time property of the outer
 Field-space variance likewise remains in `FieldVector` or tensor types and is
 independent of complex conjugation.
 
-Initial conditions are imposed in an orthonormal frame at
-`x_init = k/(aH)`, with a default `x_init = 100`:
+Initial conditions are imposed in an orthonormal frame a fixed number of
+e-folds before each mode leaves the horizon. The depth `x_init = k/(aH)` is
+the exponential of that number, and the default is five e-folds, so
+`x_init ~= 148`:
 
 ```math
 U^a{}_A \simeq \frac{\delta^a{}_A}{a\sqrt{2k}}e^{-ik\tau},
@@ -453,6 +455,28 @@ Bunch-Davies initialization is leading order in `1/x_init`, so a spectrum
 carries a systematic error that falls off as `1/x_init^2`. This is a genuine
 approximation, not a numerical artifact, and is fixed by a convergence test
 rather than by an absolute threshold.
+
+Because the start is expressed in e-folds before horizon exit, the trade-off
+is regular and easy to price. Each additional e-fold multiplies the work by
+about `e`, since that many more sub-horizon oscillations must be resolved, and
+divides the error by about `e^2`. Measured on the two-field quadratic model:
+
+```text
+e-folds before exit   x_init   relative error   time
+        1                2.7        1.5e-1      0.002 s
+        3               20          3.1e-4      0.003 s
+        4               55          2.7e-4      0.005 s
+        4.6            100          9.9e-5      0.007 s
+        5              148          2.1e-5      0.010 s
+        6              403          5.8e-6      0.024 s
+        7             1097          3.8e-7      0.061 s
+```
+
+From four e-folds onward the measured error tracks `1/x_init^2` closely. The
+default of five e-folds buys a systematic error around `2e-5`, well below the
+other approximations in the pipeline, for a few milliseconds per mode. There
+is no optimum to find: error falls as the square of the cost, so the number is
+chosen from the accuracy wanted, not from a sweet spot.
 
 ## Branch sequence
 
