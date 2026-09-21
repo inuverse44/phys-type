@@ -539,6 +539,13 @@ The first row is not an integration failure. The exact de Sitter mode has
 term, so at `x = 2.7` the discarded correction is `13.5%` against a measured
 `14.8%`. One e-fold before exit is simply not yet Bunch-Davies.
 
+The crossing that starts a mode, and the one the spectra are read from, are
+refined by bisection inside the last accepted step using the same fifth-order
+method the step was accepted on. Refining with a fourth-order sub-step instead
+moved the reported spectra by `2e-5` to `5e-5`, which is the same size as the
+systematic the table below is used to control, so the cheaper choice was not
+worth the accuracy.
+
 From four e-folds onward the measured error tracks `1/x_init^2` closely. The
 default of five e-folds buys a systematic error around `2e-5`, well below the
 other approximations in the pipeline, for a few milliseconds per mode. There

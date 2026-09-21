@@ -62,6 +62,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `project_modes` reports the curvature and entropy amplitude of each
   independent mode, which the super-horizon transfer matrix needs.
 
+- Event crossings are refined with the fifth-order Dormand-Prince state rather
+  than a fourth-order sub-step, which was moving the reported spectra by `2e-5`
+  to `5e-5`.
 - `component_error_ratio` carries the component's dimension on every argument,
   so a background tolerance meant for one quantity cannot bound another. This
   was already true of the complex mode path; the real path had only the

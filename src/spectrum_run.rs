@@ -14,7 +14,7 @@
 use std::io::{self, Write};
 
 use crate::integrate::{
-    AdaptiveSystem, ErrorTolerances, StepSizeLimits, adaptive_step, next_step_size, rk4_step,
+    AdaptiveSystem, ErrorTolerances, StepSizeLimits, adaptive_step, next_step_size, rk45_step,
 };
 use crate::spectra::{
     ProjectedSpectra, SpectrumError, SpectrumTolerances, field_power_spectrum, mode_covariance,
@@ -494,6 +494,12 @@ where
 ///
 /// Taking the positive side means a state handed to Bunch-Davies
 /// initialization is never a hair shallower than the requested depth.
+///
+/// The sub-steps are taken with the same fifth-order method the step was
+/// accepted on. A fourth-order sub-step would be cheaper, but the state it
+/// returns is the one that starts a mode and the one the spectra are read
+/// from, and its extra error is comparable to the systematic the
+/// initialization depth is chosen to control.
 fn refine_crossing<S, Event>(
     system: &S,
     time: Time,
@@ -513,7 +519,7 @@ where
 
     for _ in 0..60 {
         let middle = 0.5 * (low + high);
-        let trial = rk4_step(system, time, state, dt * middle);
+        let trial = rk45_step(system, time, state, dt * middle).state;
 
         if event(&trial) > 0.0 {
             low = middle;
