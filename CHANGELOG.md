@@ -62,6 +62,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `project_modes` reports the curvature and entropy amplitude of each
   independent mode, which the super-horizon transfer matrix needs.
 
+- `HyperbolicFieldSpace`, a constant-negative-curvature two-field geometry,
+  so that the covariant machinery is exercised with a non-vanishing connection
+  and Riemann tensor rather than only through `FlatFieldSpace`.
+
 ### Fixed
 
 - A spectrum run refuses a wavenumber that has not left the horizon by the

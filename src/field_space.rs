@@ -571,6 +571,104 @@ impl<const N: usize> CurvedFieldSpaceGeometry<N> for FlatFieldSpace {
     }
 }
 
+/// A maximally symmetric field space of constant negative curvature.
+///
+/// In coordinates `(phi^1, phi^2)` the line element is
+///
+/// ```text
+/// ds^2 = (dphi^1)^2 + sinh^2(phi^1 / L) (dphi^2)^2,
+/// ```
+///
+/// whose Gaussian curvature is `-1/L^2`. This is the two-field geometry that
+/// appears in alpha-attractor and hyperbolic-inflation models, and it is the
+/// smallest example that exercises a non-vanishing connection and a
+/// non-vanishing Riemann tensor at once.
+///
+/// The coordinate `phi^1` is a geodesic radius, so the metric degenerates at
+/// `phi^1 = 0` where `G_22` vanishes and the inverse metric diverges. Keep
+/// trajectories away from the origin.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HyperbolicFieldSpace {
+    /// The curvature radius `L`; the Gaussian curvature is `-1/L^2`.
+    pub curvature_radius: Field,
+}
+
+impl HyperbolicFieldSpace {
+    /// Builds a field space of curvature radius `L`.
+    pub const fn new(curvature_radius: Field) -> Self {
+        Self { curvature_radius }
+    }
+
+    /// `sinh(phi^1 / L)` and `cosh(phi^1 / L)` at a position.
+    fn hyperbolics(&self, position: &[Field; 2]) -> (f64, f64) {
+        let scaled = (position[0] / self.curvature_radius).into_value();
+
+        (scaled.sinh(), scaled.cosh())
+    }
+}
+
+impl FieldSpaceGeometry<2> for HyperbolicFieldSpace {
+    fn metric(&self, position: &[Field; 2]) -> FieldMetric<2> {
+        let (sinh, _) = self.hyperbolics(position);
+
+        FieldMetric::new([
+            [Quantity::new(1.0), Quantity::new(0.0)],
+            [Quantity::new(0.0), Quantity::new(sinh * sinh)],
+        ])
+    }
+
+    fn inverse_metric(&self, position: &[Field; 2]) -> InverseFieldMetric<2> {
+        let (sinh, _) = self.hyperbolics(position);
+
+        InverseFieldMetric::new([
+            [Quantity::new(1.0), Quantity::new(0.0)],
+            [Quantity::new(0.0), Quantity::new(1.0 / (sinh * sinh))],
+        ])
+    }
+
+    fn christoffel(&self, position: &[Field; 2]) -> ChristoffelSymbols<2> {
+        let (sinh, cosh) = self.hyperbolics(position);
+        let radius = self.curvature_radius.into_value();
+        let mut components = [[[Quantity::<MMinus1, f64>::new(0.0); 2]; 2]; 2];
+
+        // Gamma^1_22 = -sinh cosh / L
+        components[0][1][1] = Quantity::new(-sinh * cosh / radius);
+        // Gamma^2_12 = Gamma^2_21 = coth / L
+        let connection = Quantity::new(cosh / (sinh * radius));
+        components[1][0][1] = connection;
+        components[1][1][0] = connection;
+
+        ChristoffelSymbols::new(components)
+    }
+}
+
+impl CurvedFieldSpaceGeometry<2> for HyperbolicFieldSpace {
+    /// `R^I_JKL = K (delta^I_K G_JL - delta^I_L G_JK)` with `K = -1/L^2`,
+    /// which is the maximally symmetric form in the crate convention
+    /// `[nabla_K, nabla_L] A^I = R^I_JKL A^J`.
+    fn riemann(&self, position: &[Field; 2]) -> RiemannTensor<2> {
+        let metric = self.metric(position);
+        let radius = self.curvature_radius.into_value();
+        let curvature = -1.0 / (radius * radius);
+        let components = metric.components();
+
+        RiemannTensor::new(core::array::from_fn(|upper| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|third| {
+                    core::array::from_fn(|fourth| {
+                        let first =
+                            f64::from(upper == third) * components[second][fourth].into_value();
+                        let second_term =
+                            f64::from(upper == fourth) * components[second][third].into_value();
+
+                        Quantity::new(curvature * (first - second_term))
+                    })
+                })
+            })
+        }))
+    }
+}
+
 /// Riemann identity checked by [`validate_riemann_symmetries`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RiemannIdentity {
@@ -1015,5 +1113,107 @@ mod tests {
                 .flatten()
                 .all(|component| component.into_value() == 0.0)
         );
+    }
+
+    #[test]
+    fn the_hyperbolic_geometry_satisfies_the_riemann_identities() {
+        let geometry = HyperbolicFieldSpace::new(Field::new(7.0));
+        let position = [Field::new(3.0), Field::new(1.0)];
+        let lowered = geometry
+            .metric(&position)
+            .lower_first(&geometry.riemann(&position));
+
+        validate_riemann_symmetries(&lowered, 1.0e-12).unwrap();
+    }
+
+    #[test]
+    fn the_hyperbolic_metric_and_its_inverse_are_reciprocal() {
+        let geometry = HyperbolicFieldSpace::new(Field::new(7.0));
+        let position = [Field::new(3.0), Field::new(1.0)];
+        let metric = geometry.metric(&position);
+        let inverse = geometry.inverse_metric(&position);
+
+        for row in 0..2 {
+            for column in 0..2 {
+                let product: f64 = (0..2)
+                    .map(|index| {
+                        metric.components()[row][index].into_value()
+                            * inverse.components()[index][column].into_value()
+                    })
+                    .sum();
+
+                assert!((product - f64::from(row == column)).abs() < 1.0e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn the_hyperbolic_curvature_scalar_is_minus_two_over_the_radius_squared() {
+        // In two dimensions R = 2K, and K = -1/L^2 for this geometry.
+        let radius = 7.0;
+        let geometry = HyperbolicFieldSpace::new(Field::new(radius));
+        let position = [Field::new(3.0), Field::new(1.0)];
+        let riemann = geometry.riemann(&position);
+        let inverse = geometry.inverse_metric(&position);
+
+        // R = G^JL R^I_JIL
+        let scalar: f64 = (0..2)
+            .flat_map(|second| (0..2).map(move |fourth| (second, fourth)))
+            .map(|(second, fourth)| {
+                let trace: f64 = (0..2)
+                    .map(|index| riemann.components()[index][second][index][fourth].into_value())
+                    .sum();
+
+                inverse.components()[second][fourth].into_value() * trace
+            })
+            .sum();
+
+        assert!(
+            (scalar + 2.0 / (radius * radius)).abs() < 1.0e-12,
+            "R = {scalar}"
+        );
+    }
+
+    #[test]
+    fn the_hyperbolic_connection_is_metric_compatible() {
+        // nabla_K G_IJ = 0, checked against a finite-difference derivative of
+        // the metric.
+        let geometry = HyperbolicFieldSpace::new(Field::new(7.0));
+        let position = [Field::new(3.0), Field::new(1.0)];
+        let step = 1.0e-6;
+        let connection = geometry.christoffel(&position);
+
+        for lower in 0..2 {
+            let mut ahead = position;
+            let mut behind = position;
+            ahead[lower] = Field::new(position[lower].into_value() + step);
+            behind[lower] = Field::new(position[lower].into_value() - step);
+            let forward = geometry.metric(&ahead);
+            let backward = geometry.metric(&behind);
+
+            for first in 0..2 {
+                for second in 0..2 {
+                    let derivative = (forward.components()[first][second].into_value()
+                        - backward.components()[first][second].into_value())
+                        / (2.0 * step);
+                    let corrections: f64 = (0..2)
+                        .map(|index| {
+                            connection.components()[index][lower][first].into_value()
+                                * geometry.metric(&position).components()[index][second]
+                                    .into_value()
+                                + connection.components()[index][lower][second].into_value()
+                                    * geometry.metric(&position).components()[first][index]
+                                        .into_value()
+                        })
+                        .sum();
+
+                    assert!(
+                        (derivative - corrections).abs() < 1.0e-6,
+                        "nabla_{lower} G_{first}{second} = {}",
+                        derivative - corrections
+                    );
+                }
+            }
+        }
     }
 }

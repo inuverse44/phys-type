@@ -143,7 +143,10 @@ symmetries and the first Bianchi identity with structured validation errors.
 
 `CovariantMultifieldSystem<P, G, N>` accepts a `FieldSpaceGeometry<N>` that
 supplies `G_IJ`, `G^IJ`, and `Gamma^I_JK`. `FlatFieldSpace` exactly reproduces
-the canonical solver. For two fields, `kinematics` returns the normalized
+the canonical solver, and `HyperbolicFieldSpace` supplies the constant
+negative curvature of alpha-attractor and hyperbolic-inflation models, which
+is the smallest geometry that exercises a non-vanishing connection and Riemann
+tensor at once. For two fields, `kinematics` returns the normalized
 adiabatic tangent, continuously oriented entropy normal, `dot_sigma`, and the
 signed dimensionless turn rate.
 

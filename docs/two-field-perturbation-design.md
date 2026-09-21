@@ -361,6 +361,17 @@ The plotting code must never take `abs(C_RS)` without also retaining its sign.
 Every implementation stage adds tests appropriate to its layer:
 
 - Metric raise/lower round trips and orthonormal-basis identities.
+- A concrete curved geometry, so that the covariant machinery is exercised
+  with a non-vanishing connection and Riemann tensor rather than only through
+  `FlatFieldSpace`, where every curvature contribution is identically zero.
+  `HyperbolicFieldSpace` is checked against the Riemann symmetries and the
+  first Bianchi identity, against `R = -2/L^2`, and for metric compatibility
+  by finite differences. Its curvature is then shown to reach the perturbation
+  mass matrix and the spectra by holding the metric and connection fixed and
+  zeroing only the Riemann tensor: the mass matrix moves by `0.4%` and `P_R`
+  by `6e-3`. Comparing against `FlatFieldSpace` at equal coordinates would not
+  be a controlled comparison, because this metric approaches flat space in
+  polar rather than Cartesian coordinates as `L` grows.
 - Compile-fail tests for illegal contractions and variance mismatches.
 - Potential Hessians checked against analytic quadratic models and finite
   differences.

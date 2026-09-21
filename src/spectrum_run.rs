@@ -773,7 +773,9 @@ where
         // refuses rather than returning a number that looks physical.
         let depth =
             (k / (final_state.background.a * self.hubble(&final_state.background))).into_value();
-        if !(depth < 1.0) {
+        // Written without a negated comparison so a NaN depth is refused
+        // explicitly rather than by falling through a flipped inequality.
+        if depth.is_nan() || depth >= 1.0 {
             return Err(SpectrumRunError::OutputBeforeHorizonExit {
                 k: k.into_value(),
                 k_over_ah: depth,
@@ -946,8 +948,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        Field, FieldVelocity, FlatFieldSpace, QuadraticMultifieldPotential, ScaleFactor,
-        multifield::MultifieldState,
+        Field, FieldVelocity, FlatFieldSpace, HyperbolicFieldSpace, QuadraticMultifieldPotential,
+        ScaleFactor, multifield::MultifieldState,
     };
 
     type TestSystem = CovariantMultifieldSystem<QuadraticMultifieldPotential<2>, FlatFieldSpace, 2>;
@@ -957,6 +959,25 @@ mod tests {
             QuadraticMultifieldPotential::new([Mass::new(masses[0]), Mass::new(masses[1])]),
             FlatFieldSpace,
         )
+    }
+
+    fn slow_roll_start_curved<G>(
+        system: &CovariantMultifieldSystem<QuadraticMultifieldPotential<2>, G, 2>,
+        phi: [f64; 2],
+    ) -> MultifieldState<2>
+    where
+        G: crate::FieldSpaceGeometry<2>,
+    {
+        let resting = MultifieldState::new(
+            [Field::new(phi[0]), Field::new(phi[1])],
+            [FieldVelocity::new(0.0); 2],
+            ScaleFactor::new(1.0),
+        );
+
+        MultifieldState {
+            pi: system.slow_roll_velocity(&resting),
+            ..resting
+        }
     }
 
     fn slow_roll_start(system: &TestSystem, phi: [f64; 2]) -> MultifieldState<2> {
@@ -1579,6 +1600,144 @@ mod tests {
                 other => panic!("expected a refusal at output {output}, got {other:?}"),
             }
         }
+    }
+
+    /// A curvature radius and start that leave inflation ending within the
+    /// e-fold budget while making the Riemann term large enough to measure.
+    /// Stronger curvature with a larger second field sustains inflation past
+    /// the budget, which is hyperinflation rather than a failure.
+    const CURVATURE_RADIUS: f64 = 5.0;
+    const CURVED_START: [f64; 2] = [12.0, 8.0];
+
+    fn curved_system(
+        radius: f64,
+    ) -> CovariantMultifieldSystem<QuadraticMultifieldPotential<2>, HyperbolicFieldSpace, 2> {
+        CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0e-6), Mass::new(1.5e-6)]),
+            HyperbolicFieldSpace::new(Field::new(radius)),
+        )
+    }
+
+    /// The hyperbolic geometry with its Riemann tensor forced to zero.
+    ///
+    /// This is deliberately not a consistent geometry: the metric it reports
+    /// does have curvature. It exists so that a test can hold the metric, the
+    /// inverse metric and the connection fixed and vary only the curvature
+    /// contribution, which is otherwise entangled with the Christoffel
+    /// correction to the potential Hessian.
+    #[derive(Clone, Copy)]
+    struct RiemannFree(HyperbolicFieldSpace);
+
+    impl crate::FieldSpaceGeometry<2> for RiemannFree {
+        fn metric(&self, position: &[Field; 2]) -> crate::FieldMetric<2> {
+            self.0.metric(position)
+        }
+
+        fn inverse_metric(&self, position: &[Field; 2]) -> crate::InverseFieldMetric<2> {
+            self.0.inverse_metric(position)
+        }
+
+        fn christoffel(&self, position: &[Field; 2]) -> crate::ChristoffelSymbols<2> {
+            self.0.christoffel(position)
+        }
+    }
+
+    impl CurvedFieldSpaceGeometry<2> for RiemannFree {
+        fn riemann(&self, _position: &[Field; 2]) -> crate::RiemannTensor<2> {
+            crate::RiemannTensor::new([[[[crate::Quantity::new(0.0); 2]; 2]; 2]; 2])
+        }
+    }
+
+    fn riemann_free_system(
+        radius: f64,
+    ) -> CovariantMultifieldSystem<QuadraticMultifieldPotential<2>, RiemannFree, 2> {
+        CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0e-6), Mass::new(1.5e-6)]),
+            RiemannFree(HyperbolicFieldSpace::new(Field::new(radius))),
+        )
+    }
+
+    #[test]
+    fn field_space_curvature_reaches_the_perturbation_mass_matrix() {
+        // Every other test in the crate runs on a flat field space, where the
+        // Riemann contribution to the mass matrix is identically zero. Holding
+        // the metric and connection fixed and zeroing only the curvature
+        // isolates that contribution.
+        let system = curved_system(CURVATURE_RADIUS);
+        let state = slow_roll_start_curved(&system, CURVED_START);
+
+        let curved = system.perturbation_mass_matrix(&state);
+        let without = riemann_free_system(CURVATURE_RADIUS).perturbation_mass_matrix(&state);
+
+        let entries = |matrix: &crate::FieldTensor2<_, _, _, f64, 2>| {
+            (0..2)
+                .flat_map(|row| (0..2).map(move |column| (row, column)))
+                .map(|(row, column)| matrix.components()[row][column].into_value())
+                .collect::<Vec<_>>()
+        };
+        let difference = entries(&curved)
+            .iter()
+            .zip(entries(&without))
+            .map(|(with, out)| (with - out).abs())
+            .fold(0.0, f64::max);
+        let scale = entries(&without)
+            .iter()
+            .map(|entry| entry.abs())
+            .fold(0.0, f64::max);
+
+        // Measured at 0.39% of the largest entry. The Riemann term carries
+        // two factors of the field velocity, so it is smallest at the start of
+        // a slow-roll trajectory and grows with epsilon; the spectra it feeds
+        // move by rather more.
+        assert!(
+            difference > 1.0e-3 * scale,
+            "curvature moved the mass matrix by {difference} against a scale of {scale}"
+        );
+    }
+
+    #[test]
+    fn a_curved_field_space_runs_end_to_end() {
+        let system = curved_system(CURVATURE_RADIUS);
+        let initial = slow_roll_start_curved(&system, CURVED_START);
+        let run = system
+            .run_two_field_spectra(initial, &quick_settings())
+            .unwrap();
+
+        let spectrum = run.spectra[0];
+        assert!(spectrum.p_r > 0.0);
+        assert!(spectrum.p_s > 0.0);
+        assert!(spectrum.r_c.abs() <= 1.0);
+        assert!(run.pivot.k.into_value() > 0.0);
+        assert!(!run.background.is_empty());
+    }
+
+    #[test]
+    fn curvature_changes_the_spectrum() {
+        // Same metric, same connection, same initial state; only the Riemann
+        // term differs. If the spectra agree, the curvature never reached the
+        // modes.
+        let curved = curved_system(CURVATURE_RADIUS);
+        let without = riemann_free_system(CURVATURE_RADIUS);
+        let initial = slow_roll_start_curved(&curved, CURVED_START);
+
+        let with_curvature = curved
+            .run_two_field_spectra(initial, &quick_settings())
+            .unwrap()
+            .spectra[0]
+            .p_r;
+        let without_curvature = without
+            .run_two_field_spectra(initial, &quick_settings())
+            .unwrap()
+            .spectra[0]
+            .p_r;
+
+        let relative = (with_curvature - without_curvature).abs() / without_curvature;
+
+        // Measured at 6.3e-3, two orders above the run-to-run noise.
+        assert!(
+            relative > 1.0e-3,
+            "curvature moved P_R by only {relative}: {with_curvature} against {without_curvature}"
+        );
     }
 
     #[test]

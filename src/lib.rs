@@ -29,10 +29,10 @@ pub use dimension::{
 pub use field_space::{
     ChristoffelSymbols, ContravariantField, CovariantField, CovariantPotentialHessian,
     CurvedFieldSpaceGeometry, FieldMetric, FieldSpaceGeometry, FieldTensor2, FieldTensor3,
-    FieldTensor4, FieldVector, FlatFieldSpace, GeometryValidationError, InverseFieldMetric,
-    KinematicBasis2, KinematicBasisError, Lower, LowerFirst, LoweredRiemannTensor, RaiseFirst,
-    RiemannIdentity, RiemannTensor, Tensor3Components, Tensor4Components, Upper,
-    validate_riemann_symmetries,
+    FieldTensor4, FieldVector, FlatFieldSpace, GeometryValidationError, HyperbolicFieldSpace,
+    InverseFieldMetric, KinematicBasis2, KinematicBasisError, Lower, LowerFirst,
+    LoweredRiemannTensor, RaiseFirst, RiemannIdentity, RiemannTensor, Tensor3Components,
+    Tensor4Components, Upper, validate_riemann_symmetries,
 };
 pub use integrate::{
     AdaptiveAttempt, AdaptiveSystem, EmbeddedStep, ErrorTolerances, StepSizeLimits, System,
