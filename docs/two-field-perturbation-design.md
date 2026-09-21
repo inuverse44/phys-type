@@ -377,6 +377,25 @@ Every implementation stage adds tests appropriate to its layer:
 Reference curves and tolerances are stored with enough metadata to make a
 failure scientifically interpretable rather than merely a changed snapshot.
 
+Two limitations of the first implementation are recorded here rather than
+left to be rediscovered.
+
+The absolute error tolerance is a single number applied to raw Planck-unit
+component values, while a run spans roughly fifty orders of magnitude: the
+scale factor reaches `1e20` and mode amplitudes, which carry
+`1 / (a sqrt(2k))`, fall below `1e-27`. An absolute floor anywhere near the
+mode amplitudes caps their accuracy regardless of the relative tolerance, and
+the symptom is subtle: results stop converging as `x_init` grows, settling on
+a plateau near `1e-3` instead. The driver therefore defaults to an absolute
+tolerance far below every component. A per-component absolute scale would
+remove the hazard, and the dimensioned signature of `normalized_mode_error`
+already permits one.
+
+Bunch-Davies initialization is leading order in `1/x_init`, so a spectrum
+carries a systematic error that falls off as `1/x_init^2`. This is a genuine
+approximation, not a numerical artifact, and is fixed by a convergence test
+rather than by an absolute threshold.
+
 ## Branch sequence
 
 Work proceeds in this order, one independently reviewable feature at a time:

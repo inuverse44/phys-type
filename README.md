@@ -37,6 +37,14 @@ post-inflation oscillations, run:
 cargo run --release --example diagnostics
 ```
 
+For a complete two-field adiabatic and entropy spectrum run, writing the
+background, spectra, and mode-evolution CSV files with reproducibility
+metadata:
+
+```sh
+cargo run --release --example two_field_spectra
+```
+
 Generate every diagnostic CSV and publication-quality PNG/PDF figure with one
 command:
 
@@ -70,6 +78,7 @@ checks are documented in
 | `potential` | Automatically differentiated potentials and `QuadraticPotential` |
 | `perturbation` | Covariant two-field mode matrices and Bunch-Davies evolution |
 | `spectra` | Mode covariance, Hermiticity checks, and adiabatic/entropy projections |
+| `spectrum_run` | The background survey, pivot convention, `k` grid driver, and CSV rows |
 | `integrate` | The `System` and `AdaptiveSystem` traits, fixed RK4, embedded Dormand-Prince 5(4), and the shared step-size controller |
 | `scalar_field` | `ScalarFieldSystem`, including the Friedmann constraint |
 | `multifield` | Const-generic canonical multifield states and dynamics |
@@ -158,6 +167,16 @@ the signed `C_RS`, and the correlation coefficient. Hermiticity, the imaginary
 residual of each projected spectrum, and any overshoot of `|r_C| <= 1` are
 checked against explicit tolerances and reported as typed errors instead of
 being silently discarded.
+
+`run_two_field_spectra` puts those pieces together. It surveys the background
+to the end of inflation, fixes `k_pivot = a_* H_*` a chosen number of e-folds
+earlier, carries every wavenumber to its own `x_init = k/(aH)` crossing before
+initializing the vacuum there, and reports spectra at one output time. A mode
+that cannot be placed deep enough inside the horizon is a typed error, not a
+silently poor approximation. Note that the single absolute error tolerance
+applies to raw Planck-unit values across a run spanning some fifty orders of
+magnitude, so it must sit far below the smallest component; the default does,
+and `docs/two-field-perturbation-design.md` records why.
 
 ## Compile-fail tests
 

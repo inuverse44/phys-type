@@ -15,6 +15,7 @@ pub mod potential;
 pub mod quantity;
 pub mod scalar_field;
 pub mod spectra;
+pub mod spectrum_run;
 pub mod state;
 
 pub use autodiff::{Dual, Jet};
@@ -56,6 +57,10 @@ pub use scalar_field::ScalarFieldSystem;
 pub use spectra::{
     DimensionlessSpectrum, FieldPowerSpectrum, ModeCovariance, ProjectedSpectra, SpectrumError,
     SpectrumTolerances, field_power_spectrum, hermiticity_residual, mode_covariance, project,
+};
+pub use spectrum_run::{
+    BackgroundRecord, ModeEvolutionRecord, Pivot, SpectrumRecord, SpectrumRun, SpectrumRunError,
+    SpectrumRunSettings, write_metadata,
 };
 pub use state::{State, StateDelta, StateDerivative};
 

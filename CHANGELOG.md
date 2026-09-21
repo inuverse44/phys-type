@@ -38,6 +38,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - An `AdaptiveSystem` error norm and a reusable Dormand-Prince step-size
   controller, implemented by the single-field background, both multifield
   backgrounds, and the two-field perturbation system.
+- A two-field spectrum driver covering the background survey, the
+  `k_pivot = a_* H_*` convention, per-wavenumber Bunch-Davies initialization at
+  `x_init`, CSV rows with reproducibility metadata, and an example that writes
+  the background, spectra, and mode-evolution files.
 
 ## [0.1.0] - 2026-09-21
 

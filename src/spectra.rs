@@ -30,6 +30,15 @@ pub type DimensionlessSpectrum = Dimensionless;
 ///
 /// Every tolerance is relative to the largest modulus in the spectrum matrix,
 /// so the same settings apply at any overall normalization.
+///
+/// The three are not equally tight, because they measure different things.
+/// Hermiticity holds by construction and fails only through rounding. The
+/// imaginary residual instead measures accumulated integration error: the
+/// antisymmetric part of `Sigma` is the equal-time field commutator, which
+/// vanishes at Bunch-Davies initialization and is conserved by the mode
+/// equations, so whatever survives to the output time was produced by the
+/// integrator. Choose it together with the integration tolerances rather than
+/// in isolation.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SpectrumTolerances {
     /// Largest accepted relative violation of `P^{IJ} = P^{JI*}`.
@@ -44,7 +53,7 @@ impl Default for SpectrumTolerances {
     fn default() -> Self {
         Self {
             hermiticity: 1.0e-8,
-            imaginary_residual: 1.0e-8,
+            imaginary_residual: 1.0e-6,
             correlation_overshoot: 1.0e-8,
         }
     }
@@ -541,6 +550,37 @@ mod tests {
         .unwrap_err();
 
         assert!(matches!(error, SpectrumError::NonPositiveSpectrum { .. }));
+    }
+
+    #[test]
+    fn the_imaginary_part_of_the_covariance_starts_at_zero_and_stays_small() {
+        // The antisymmetric part of Sigma is the equal-time field commutator.
+        // It vanishes exactly in the Bunch-Davies vacuum and is conserved, so
+        // any growth measures integration error rather than physics.
+        let system = system();
+        let state = system.bunch_davies_state(background(), 100.0).unwrap();
+        let initial = mode_covariance(&state.modes);
+
+        for row in initial.components() {
+            for entry in row {
+                assert_eq!(entry.value().im, 0.0);
+            }
+        }
+
+        let advanced = rk4_step(&system, Time::new(0.0), &state, Time::new(1.0));
+        let evolved = mode_covariance(&advanced.modes);
+        let scale = evolved
+            .components()
+            .iter()
+            .flatten()
+            .map(ComplexMagnitude::complex_magnitude)
+            .fold(0.0, f64::max);
+
+        for row in evolved.components() {
+            for entry in row {
+                assert!(entry.value().im.abs() < 1.0e-12 * scale);
+            }
+        }
     }
 
     #[test]
