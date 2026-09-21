@@ -1,7 +1,7 @@
 //! Driving the background integration and exporting its result.
 //!
-//! The crate does not plot. It produces rows that gnuplot or another external
-//! tool can read. Stored values stay dimensionful for as long as possible;
+//! The crate does not plot. It produces rows that external analysis tools can
+//! read. Stored values stay dimensionful for as long as possible;
 //! dimensions are removed only at the export boundary, by dividing out the
 //! appropriate power of the reduced Planck mass.
 
@@ -89,6 +89,8 @@ pub struct BackgroundRun {
     pub termination: Termination,
     /// The state at the final step.
     pub final_state: State,
+    /// The cosmic time at the final step.
+    pub final_time: Time,
     /// The number of steps actually taken.
     pub steps: usize,
 }
@@ -133,17 +135,18 @@ impl<P: Potential> ScalarFieldSystem<P> {
     /// e-folding number is reached or inflation ends.
     pub fn run(&self, initial: State, settings: RunSettings) -> BackgroundRun {
         let mut state = initial;
-        let mut records = vec![self.record(&initial, &state, Time::new(0.0))];
+        let mut time = Time::new(0.0);
+        let mut records = vec![self.record(&initial, &state, time)];
         let mut termination = Termination::StepLimitReached;
         let mut steps = 0;
 
         for step in 1..=settings.max_steps {
-            state = rk4_step(self, &state, settings.dt);
+            state = rk4_step(self, time, &state, settings.dt);
+            time = time + settings.dt;
             steps = step;
 
             let e_folds = state.e_folds(&initial);
             let epsilon_h = self.epsilon_h(&state);
-            let t = settings.dt * step as f64;
 
             let finished = if epsilon_h >= 1.0 {
                 termination = Termination::InflationEnded;
@@ -156,7 +159,7 @@ impl<P: Potential> ScalarFieldSystem<P> {
             };
 
             if finished || step % settings.sample_every == 0 {
-                records.push(self.record(&initial, &state, t));
+                records.push(self.record(&initial, &state, time));
             }
 
             if finished {
@@ -168,6 +171,7 @@ impl<P: Potential> ScalarFieldSystem<P> {
             records,
             termination,
             final_state: state,
+            final_time: time,
             steps,
         }
     }
@@ -240,5 +244,13 @@ mod tests {
 
         assert_eq!(lines.next(), Some("t,a,e_folds,phi,dphi,H,epsilon_h"));
         assert_eq!(lines.next().expect("a first row").split(',').count(), 7);
+    }
+
+    #[test]
+    fn final_time_matches_the_number_of_fixed_steps() {
+        let run = quadratic_run();
+        let expected = RunSettings::default().dt.into_value() * run.steps as f64;
+
+        assert_eq!(run.final_time.into_value(), expected);
     }
 }

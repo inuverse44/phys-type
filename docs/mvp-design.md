@@ -151,14 +151,23 @@ struct MultifieldState {
 
 ## Potential
 
-A potential is an interchangeable behavior:
+A potential formula is evaluated through a numerical value type `V`:
 
 ```rust
-trait Potential {
-    fn value(&self, phi: Field) -> Quantity<M4, f64>;
+trait PotentialValue<V> {
+    fn value(&self, phi: Field<V>) -> Quantity<M4, V>;
+}
+
+trait Potential: PotentialValue<f64> {
     fn gradient(&self, phi: Field) -> Quantity<M3, f64>;
 }
 ```
+
+`PotentialValue<V>` contains the formula and is not intrinsically tied to
+`f64`. The same formula can later be evaluated with automatic-differentiation
+value types. Model parameters such as masses and couplings remain fixed; the
+fields are the differentiation variables. In a multifield extension this
+means derivatives with respect to each field `phi^I`.
 
 The MVP implements a quadratic potential:
 
@@ -166,9 +175,12 @@ The MVP implements a quadratic potential:
 V(phi) = (1/2) m^2 phi^2
 ```
 
-The gradient is written explicitly. Automatic differentiation may later be
-implemented by using an automatic-differentiation number as the `Value` in
-`Quantity<Dimension, Value>` and adding an adapter around potentials.
+For the MVP, the gradient is still written explicitly. This is transitional:
+automatic differentiation may later evaluate `PotentialValue<V>` with a value
+type that carries derivatives. The potential interface should not grow one
+method at a time for second, third, or fourth derivatives. Instead, the
+evaluation side selects an automatic-differentiation type capable of carrying
+the required derivative order.
 
 ## Scalar-field system
 
@@ -202,6 +214,12 @@ H = +sqrt(((1/2) pi^2 + V(phi)) / (3 M_pl^2))
 The generic RK4 layer only requires the ability to calculate a state
 derivative. Knowledge of potentials and Friedmann dynamics belongs to the
 concrete scalar-field system, not to the integrator.
+
+The integrator receives both the current independent-variable value and the
+step size. The MVP uses cosmic time, while a later system may use a
+dimensionless e-folding variable. States and derivatives need to be `Clone`,
+but not `Copy`, so future array-backed multifield states are not excluded by
+the integrator interface.
 
 ```mermaid
 flowchart LR
@@ -242,8 +260,8 @@ epsilon_H = pi^2 / (2 M_pl^2 H^2)
 
 ## Output
 
-The core library does not implement plotting. It writes data suitable for
-gnuplot or another plotting tool:
+The core library does not implement plotting. It writes CSV as a stable
+boundary between the Rust calculation and external analysis:
 
 ```text
 t,a,e_folds,phi,dphi,H,epsilon_h
@@ -261,12 +279,17 @@ dphi    = (dphi/dt)/M_pl^2
 H       = H/M_pl
 ```
 
+The first visualization is a four-panel background overview made with Python,
+NumPy, and Matplotlib. Python dependencies are isolated from the Rust crate and
+managed by `uv`. The detailed design is recorded in
+[`visualization-design.md`](visualization-design.md).
+
 ## MVP success criteria
 
 1. The quadratic single-field background reaches the requested termination
    condition using fixed-step RK4.
-2. Results can be exported as CSV and plotted externally.
+2. Results can be exported as CSV and plotted externally with the documented
+   Python and Matplotlib workflow.
 3. A deliberately invalid expression with mismatched dimensions fails to
    compile.
 4. Compile-fail tests preserve this behavior as part of the library contract.
-

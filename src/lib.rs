@@ -18,7 +18,7 @@ pub use dimension::{
     MassPower,
 };
 pub use integrate::{System, rk4_step};
-pub use potential::{Potential, QuadraticPotential};
+pub use potential::{Potential, PotentialValue, QuadraticPotential};
 pub use quantity::{Quantity, Sqrt};
 pub use scalar_field::ScalarFieldSystem;
 pub use state::{State, StateDelta, StateDerivative};

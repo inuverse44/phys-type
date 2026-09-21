@@ -24,14 +24,26 @@ To integrate a quadratic inflationary background and write CSV:
 cargo run --release --example quadratic_inflation > inflation.csv
 ```
 
-The CSV goes to standard output and a summary to standard error. Plot it with
-any external tool, for example:
+The CSV goes to standard output and a summary to standard error. For the full
+set of diagnostic CSV files, including the inflationary attractor and ten
+post-inflation oscillations, run:
 
 ```sh
-gnuplot -e "set datafile separator ','; \
-            set key autotitle columnhead; \
-            plot 'inflation.csv' using 3:4 with lines; pause -1"
+cargo run --release --example diagnostics
 ```
+
+Generate publication-quality PNG and PDF figures with Python and Matplotlib:
+
+```sh
+uv run plots/background.py diagnostics/trajectory.csv
+uv run plots/attractor.py diagnostics/attractor.csv
+uv run plots/oscillation.py diagnostics/oscillation.csv
+```
+
+The plotting scripts declare their own Python dependencies, so `uv` creates an
+isolated environment automatically. The visualization design and physical
+checks are documented in
+[`docs/visualization-design.md`](docs/visualization-design.md).
 
 ## What the library provides
 

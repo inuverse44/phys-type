@@ -63,6 +63,15 @@ impl<P: Potential> ScalarFieldSystem<P> {
         (numerator / denominator).into_value()
     }
 
+    /// The scalar field equation-of-state parameter
+    /// `w = (K - V) / (K + V)`, where `K = (1/2) pi^2`.
+    pub fn equation_of_state(&self, state: &State) -> f64 {
+        let kinetic = state.pi * state.pi * 0.5;
+        let potential = self.potential.value(state.phi);
+
+        ((kinetic - potential) / (kinetic + potential)).into_value()
+    }
+
     /// The slow-roll estimate `dphi/dt ~= -V_phi / (3 H)` used to initialise
     /// the field velocity from `phi` alone.
     pub fn slow_roll_velocity(&self, state: &State) -> crate::FieldVelocity {
@@ -73,11 +82,12 @@ impl<P: Potential> ScalarFieldSystem<P> {
 }
 
 impl<P: Potential> System for ScalarFieldSystem<P> {
+    type IndependentVariable = crate::Time;
     type State = State;
     type Delta = StateDelta;
     type Derivative = StateDerivative;
 
-    fn derivative(&self, state: &State) -> StateDerivative {
+    fn derivative(&self, _time: crate::Time, state: &State) -> StateDerivative {
         let hubble = self.hubble(state);
 
         StateDerivative {
@@ -135,10 +145,28 @@ mod tests {
     }
 
     #[test]
+    fn equation_of_state_distinguishes_potential_and_kinetic_energy() {
+        let (system, _) = slow_roll_start(16.0);
+        let potential_dominated = State::new(
+            Field::new(16.0),
+            FieldVelocity::new(0.0),
+            ScaleFactor::new(1.0),
+        );
+        let kinetic_dominated = State::new(
+            Field::new(0.0),
+            FieldVelocity::new(1.0e-6),
+            ScaleFactor::new(1.0),
+        );
+
+        assert_eq!(system.equation_of_state(&potential_dominated), -1.0);
+        assert_eq!(system.equation_of_state(&kinetic_dominated), 1.0);
+    }
+
+    #[test]
     fn a_single_step_expands_the_universe_and_lowers_the_field() {
         let (system, state) = slow_roll_start(16.0);
 
-        let next = rk4_step(&system, &state, Time::new(100.0));
+        let next = rk4_step(&system, Time::new(0.0), &state, Time::new(100.0));
 
         assert!(next.a.into_value() > state.a.into_value());
         assert!(next.phi.into_value() < state.phi.into_value());
@@ -152,11 +180,13 @@ mod tests {
             density: EnergyDensity,
         }
 
-        impl Potential for FlatPotential {
+        impl crate::PotentialValue<f64> for FlatPotential {
             fn value(&self, _phi: Field) -> EnergyDensity {
                 self.density
             }
+        }
 
+        impl Potential for FlatPotential {
             fn gradient(&self, _phi: Field) -> crate::PotentialGradient {
                 crate::PotentialGradient::new(0.0)
             }
@@ -176,8 +206,10 @@ mod tests {
         let steps = 1_000;
 
         let mut state = initial;
+        let mut time = Time::new(0.0);
         for _ in 0..steps {
-            state = rk4_step(&system, &state, dt);
+            state = rk4_step(&system, time, &state, dt);
+            time = time + dt;
         }
 
         let elapsed = 1.0e3 * steps as f64;

@@ -1,2 +1,4 @@
 /target
 /diagnostics
+__pycache__/
+*.py[cod]
