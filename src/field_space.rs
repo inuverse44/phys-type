@@ -155,6 +155,9 @@ pub type FieldMetric<const N: usize> = FieldTensor2<Lower, Lower, M0, f64, N>;
 /// An inverse metric `G^IJ` with two upper, dimensionless field-space indices.
 pub type InverseFieldMetric<const N: usize> = FieldTensor2<Upper, Upper, M0, f64, N>;
 
+/// A covariant potential Hessian `V_;IJ`.
+pub type CovariantPotentialHessian<const N: usize> = FieldTensor2<Lower, Lower, M2, f64, N>;
+
 /// Christoffel symbols `Gamma^I_JK` for scalar fields of mass dimension one.
 ///
 /// A derivative with respect to a field contributes dimension `M^-1`, so the

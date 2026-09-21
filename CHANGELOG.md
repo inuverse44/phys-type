@@ -15,6 +15,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Covariant multifield background equations with pluggable metric, inverse
   metric, and Christoffel symbols.
 - An oriented two-field adiabatic/entropy basis and signed turn rate.
+- Second-order `Jet<N>` automatic differentiation for a potential's value,
+  complete gradient, and Hessian in one evaluation.
+- Covariant potential Hessians including the Christoffel correction.
 
 ## [0.1.0] - 2026-09-21
 

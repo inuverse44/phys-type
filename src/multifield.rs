@@ -5,9 +5,10 @@ use core::ops::{Add, Mul};
 use crate::integrate::System;
 use crate::potential::MultifieldPotential;
 use crate::{
-    ContravariantField, EnergyDensity, Field, FieldSpaceGeometry, FieldVelocity, Hubble,
-    KinematicBasis2, KinematicBasisError, M0, M1, M2, M3, Mass, PotentialGradient, Quantity,
-    ScaleFactor, Time,
+    ContravariantField, CovariantPotentialHessian, EnergyDensity, Field, FieldSpaceGeometry,
+    FieldVelocity, Hubble, KinematicBasis2, KinematicBasisError, M0, M1, M2, M3, Mass,
+    PotentialDerivatives, PotentialGradient, PotentialHessian, Quantity, ScaleFactor, Time,
+    TwiceDifferentiableMultifieldPotential,
 };
 
 /// The values, velocities, and common scale factor of `N` scalar fields.
@@ -182,6 +183,39 @@ where
         raised
             .into_components()
             .map(|component| -(component / (hubble * 3.0)))
+    }
+}
+
+impl<P, G, const N: usize> CovariantMultifieldSystem<P, G, N>
+where
+    P: TwiceDifferentiableMultifieldPotential<N>,
+    G: FieldSpaceGeometry<N>,
+{
+    /// Computes potential value, coordinate gradient, and coordinate Hessian.
+    pub fn potential_derivatives(&self, state: &MultifieldState<N>) -> PotentialDerivatives<N> {
+        self.potential.derivatives(state.phi)
+    }
+
+    /// Computes `V_;IJ = V_,IJ - Gamma^K_IJ V_,K`.
+    pub fn covariant_potential_hessian(
+        &self,
+        state: &MultifieldState<N>,
+    ) -> CovariantPotentialHessian<N> {
+        let derivatives = self.potential.derivatives(state.phi);
+        let connection = self.geometry.christoffel(&state.phi);
+
+        CovariantPotentialHessian::new(core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                let correction: f64 = (0..N)
+                    .map(|upper| {
+                        connection.components()[upper][first][second].value()
+                            * derivatives.gradient[upper].value()
+                    })
+                    .sum();
+
+                PotentialHessian::new(derivatives.hessian[first][second].into_value() - correction)
+            })
+        }))
     }
 }
 
@@ -447,6 +481,24 @@ mod tests {
         let derivative = system.derivative(Time::new(0.0), &state);
 
         assert_eq!(derivative.dpi_dt[0].into_value(), -2.0);
+    }
+
+    #[test]
+    fn covariant_hessian_includes_the_connection_correction() {
+        let potential = QuadraticMultifieldPotential::new([Mass::new(2.0), Mass::new(3.0)]);
+        let system = CovariantMultifieldSystem::in_planck_units(potential, ConnectedFlatSpace);
+        let state = MultifieldState::new(
+            [Field::new(3.0), Field::new(4.0)],
+            [FieldVelocity::new(0.0), FieldVelocity::new(0.0)],
+            ScaleFactor::new(1.0),
+        );
+
+        let hessian = system
+            .covariant_potential_hessian(&state)
+            .into_components()
+            .map(|row| row.map(Quantity::into_value));
+
+        assert_eq!(hessian, [[4.0, 0.0], [0.0, -15.0]]);
     }
 
     #[test]

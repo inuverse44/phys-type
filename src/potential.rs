@@ -2,7 +2,7 @@
 
 use core::ops::{Add, Mul};
 
-use crate::{Dual, EnergyDensity, Field, Mass, PotentialGradient};
+use crate::{Dual, EnergyDensity, Field, Jet, Mass, PotentialGradient, PotentialHessian};
 
 /// A scalar field potential formula evaluated with numerical value type `V`.
 ///
@@ -58,6 +58,48 @@ pub trait MultifieldPotential<const N: usize>:
 
 impl<T, const N: usize> MultifieldPotential<N> for T where
     T: MultifieldPotentialValue<f64, N> + MultifieldPotentialValue<Dual, N>
+{
+}
+
+/// Value, gradient, and coordinate Hessian from one potential evaluation.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PotentialDerivatives<const N: usize> {
+    /// Potential energy density.
+    pub value: EnergyDensity,
+    /// Coordinate gradient `V_,I`.
+    pub gradient: [PotentialGradient; N],
+    /// Coordinate Hessian `V_,IJ`.
+    pub hessian: [[PotentialHessian; N]; N],
+}
+
+/// A multifield potential that supports second-order automatic
+/// differentiation.
+pub trait TwiceDifferentiableMultifieldPotential<const N: usize>:
+    MultifieldPotential<N> + MultifieldPotentialValue<Jet<N>, N>
+{
+    /// Evaluates the value, every gradient component, and the full Hessian in
+    /// one second-order forward-mode pass.
+    fn derivatives(&self, phi: [Field; N]) -> PotentialDerivatives<N> {
+        let fields =
+            core::array::from_fn(|index| Field::new(Jet::variable(phi[index].into_value(), index)));
+        let result =
+            <Self as MultifieldPotentialValue<Jet<N>, N>>::value(self, fields).into_value();
+
+        PotentialDerivatives {
+            value: EnergyDensity::new(result.value),
+            gradient: result.gradient.map(PotentialGradient::new),
+            hessian: result.hessian.map(|row| row.map(PotentialHessian::new)),
+        }
+    }
+
+    /// Computes the coordinate Hessian `V_,IJ`.
+    fn hessian(&self, phi: [Field; N]) -> [[PotentialHessian; N]; N] {
+        self.derivatives(phi).hessian
+    }
+}
+
+impl<T, const N: usize> TwiceDifferentiableMultifieldPotential<N> for T where
+    T: MultifieldPotential<N> + MultifieldPotentialValue<Jet<N>, N>
 {
 }
 
@@ -218,5 +260,23 @@ mod tests {
 
         assert_eq!(value, 90.0);
         assert_eq!(gradient, [12.0, 36.0]);
+    }
+
+    #[test]
+    fn multifield_quadratic_hessian_matches_the_mass_matrix() {
+        let potential = QuadraticMultifieldPotential::new([Mass::new(2.0), Mass::new(3.0)]);
+        let fields = [Field::new(3.0), Field::new(4.0)];
+
+        let derivatives = potential.derivatives(fields);
+        let hessian = derivatives
+            .hessian
+            .map(|row| row.map(|entry| entry.into_value()));
+
+        assert_eq!(derivatives.value.into_value(), 90.0);
+        assert_eq!(
+            derivatives.gradient.map(|entry| entry.into_value()),
+            [12.0, 36.0]
+        );
+        assert_eq!(hessian, [[4.0, 0.0], [0.0, 9.0]]);
     }
 }

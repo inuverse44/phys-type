@@ -59,7 +59,7 @@ checks are documented in
 
 | Module | Contents |
 | --- | --- |
-| `autodiff` | First-order forward-mode automatic differentiation with `Dual` |
+| `autodiff` | First-order `Dual` and value/gradient/Hessian `Jet<N>` autodiff |
 | `dimension` | `MassPower<E>` and the type-level `DimMul`, `DimDiv`, `DimSqrt` |
 | `field_space` | Typed tensor variance, metrics, connections, and kinematic bases |
 | `quantity` | `Quantity<D, V>` and its arithmetic |
@@ -106,6 +106,12 @@ supplies `G_IJ`, `G^IJ`, and `Gamma^I_JK`. `FlatFieldSpace` exactly reproduces
 the canonical solver. For two fields, `kinematics` returns the normalized
 adiabatic tangent, continuously oriented entropy normal, `dot_sigma`, and the
 signed dimensionless turn rate.
+
+Potentials that can be evaluated with `Jet<N>` automatically implement
+`TwiceDifferentiableMultifieldPotential<N>`. A single formula evaluation
+returns `V`, `V_,I`, and `V_,IJ`; the covariant system then constructs
+`V_;IJ = V_,IJ - Gamma^K_IJ V_,K` with lower tensor indices and dimension
+`M^2`.
 
 ## Compile-fail tests
 

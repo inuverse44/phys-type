@@ -15,7 +15,7 @@ pub mod quantity;
 pub mod scalar_field;
 pub mod state;
 
-pub use autodiff::Dual;
+pub use autodiff::{Dual, Jet};
 pub use background::{
     AdaptiveRunSettings, AdaptiveStep, BackgroundRun, Record, RunSettings, Termination,
 };
@@ -24,9 +24,9 @@ pub use dimension::{
     MassPower,
 };
 pub use field_space::{
-    ChristoffelSymbols, ContravariantField, CovariantField, FieldMetric, FieldSpaceGeometry,
-    FieldTensor2, FieldVector, FlatFieldSpace, InverseFieldMetric, KinematicBasis2,
-    KinematicBasisError, Lower, Upper,
+    ChristoffelSymbols, ContravariantField, CovariantField, CovariantPotentialHessian, FieldMetric,
+    FieldSpaceGeometry, FieldTensor2, FieldVector, FlatFieldSpace, InverseFieldMetric,
+    KinematicBasis2, KinematicBasisError, Lower, Upper,
 };
 pub use integrate::{EmbeddedStep, System, rk4_step, rk45_step};
 pub use multifield::{
@@ -34,8 +34,8 @@ pub use multifield::{
     MultifieldSystem, TwoFieldKinematics,
 };
 pub use potential::{
-    MultifieldPotential, MultifieldPotentialValue, Potential, PotentialValue,
-    QuadraticMultifieldPotential, QuadraticPotential,
+    MultifieldPotential, MultifieldPotentialValue, Potential, PotentialDerivatives, PotentialValue,
+    QuadraticMultifieldPotential, QuadraticPotential, TwiceDifferentiableMultifieldPotential,
 };
 pub use quantity::{Quantity, Sqrt};
 pub use scalar_field::ScalarFieldSystem;
@@ -55,6 +55,8 @@ pub type Hubble<V = f64> = Quantity<M1, V>;
 pub type EnergyDensity<V = f64> = Quantity<M4, V>;
 /// The gradient of a potential, `dV/dphi`.
 pub type PotentialGradient<V = f64> = Quantity<M3, V>;
+/// An entry in the coordinate or covariant Hessian of a potential.
+pub type PotentialHessian<V = f64> = Quantity<M2, V>;
 /// A mass, such as the reduced Planck mass.
 pub type Mass<V = f64> = Quantity<M1, V>;
 /// Cosmic time `t`.
