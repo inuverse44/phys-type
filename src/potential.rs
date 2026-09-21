@@ -1,6 +1,6 @@
 //! Scalar field potentials.
 
-use core::ops::Mul;
+use core::ops::{Add, Mul};
 
 use crate::{Dual, EnergyDensity, Field, Mass, PotentialGradient};
 
@@ -27,11 +27,60 @@ pub trait Potential: PotentialValue<f64> + PotentialValue<Dual> {
 
 impl<T> Potential for T where T: PotentialValue<f64> + PotentialValue<Dual> {}
 
+/// A multifield potential formula evaluated with numerical value type `V`.
+pub trait MultifieldPotentialValue<V, const N: usize> {
+    /// Evaluates `V(phi^1, ..., phi^N)`.
+    fn value(&self, phi: [Field<V>; N]) -> EnergyDensity<V>;
+}
+
+/// A multifield potential with a gradient obtained by seeding one active
+/// field at a time.
+pub trait MultifieldPotential<const N: usize>:
+    MultifieldPotentialValue<f64, N> + MultifieldPotentialValue<Dual, N>
+{
+    /// Computes all components `dV/dphi^I` by forward-mode autodiff.
+    fn gradient(&self, phi: [Field; N]) -> [PotentialGradient; N] {
+        core::array::from_fn(|active| {
+            let fields = core::array::from_fn(|index| {
+                let value = phi[index].into_value();
+                Field::new(if index == active {
+                    Dual::variable(value)
+                } else {
+                    Dual::constant(value)
+                })
+            });
+            let result = <Self as MultifieldPotentialValue<Dual, N>>::value(self, fields);
+
+            PotentialGradient::new(result.into_value().derivative)
+        })
+    }
+}
+
+impl<T, const N: usize> MultifieldPotential<N> for T where
+    T: MultifieldPotentialValue<f64, N> + MultifieldPotentialValue<Dual, N>
+{
+}
+
 /// The quadratic potential `V(phi) = (1/2) m^2 phi^2`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct QuadraticPotential {
     /// The field mass `m`.
     pub mass: Mass,
+}
+
+/// A separable quadratic potential
+/// `V(phi) = sum_I (1/2) m_I^2 (phi^I)^2`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct QuadraticMultifieldPotential<const N: usize> {
+    /// One mass for each scalar field.
+    pub masses: [Mass; N],
+}
+
+impl<const N: usize> QuadraticMultifieldPotential<N> {
+    /// Builds a separable quadratic potential from its field masses.
+    pub const fn new(masses: [Mass; N]) -> Self {
+        Self { masses }
+    }
 }
 
 impl QuadraticPotential {
@@ -47,6 +96,21 @@ where
 {
     fn value(&self, phi: Field<V>) -> EnergyDensity<V> {
         phi.clone() * phi * self.mass * self.mass * 0.5
+    }
+}
+
+impl<V, const N: usize> MultifieldPotentialValue<V, N> for QuadraticMultifieldPotential<N>
+where
+    V: From<f64> + Clone + Add<V, Output = V> + Mul<V, Output = V> + Mul<f64, Output = V>,
+{
+    fn value(&self, phi: [Field<V>; N]) -> EnergyDensity<V> {
+        phi.into_iter().zip(self.masses).fold(
+            EnergyDensity::new(V::from(0.0)),
+            |total, (field, mass)| {
+                let term: EnergyDensity<V> = field.clone() * field * mass * mass * 0.5;
+                total + term
+            },
+        )
     }
 }
 
@@ -142,5 +206,17 @@ mod tests {
         let analytic = potential.gradient(Field::new(phi)).into_value();
 
         assert!((numerical - analytic).abs() < 1.0e-18);
+    }
+
+    #[test]
+    fn multifield_quadratic_value_and_gradient_match_closed_forms() {
+        let potential = QuadraticMultifieldPotential::new([Mass::new(2.0), Mass::new(3.0)]);
+        let fields = [Field::new(3.0), Field::new(4.0)];
+
+        let value = potential.value(fields).into_value();
+        let gradient = potential.gradient(fields).map(|entry| entry.into_value());
+
+        assert_eq!(value, 90.0);
+        assert_eq!(gradient, [12.0, 36.0]);
     }
 }

@@ -8,6 +8,7 @@ pub mod autodiff;
 pub mod background;
 pub mod dimension;
 pub mod integrate;
+pub mod multifield;
 pub mod potential;
 pub mod quantity;
 pub mod scalar_field;
@@ -22,7 +23,13 @@ pub use dimension::{
     MassPower,
 };
 pub use integrate::{EmbeddedStep, System, rk4_step, rk45_step};
-pub use potential::{Potential, PotentialValue, QuadraticPotential};
+pub use multifield::{
+    MultifieldState, MultifieldStateDelta, MultifieldStateDerivative, MultifieldSystem,
+};
+pub use potential::{
+    MultifieldPotential, MultifieldPotentialValue, Potential, PotentialValue,
+    QuadraticMultifieldPotential, QuadraticPotential,
+};
 pub use quantity::{Quantity, Sqrt};
 pub use scalar_field::ScalarFieldSystem;
 pub use state::{State, StateDelta, StateDerivative};

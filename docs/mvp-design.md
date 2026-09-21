@@ -16,11 +16,11 @@ integrated while dimensionally invalid expressions fail at compile time.
 - Mass exponents support half-integer steps, such as `M^(1/2)`.
 - `typenum` performs the internal type-level integer arithmetic.
 - Numerical calculations initially use `f64`.
-- The core representation remains generic over its stored value so that
-  `ndarray` and automatic-differentiation number types can be added later.
+- The core representation remains generic over its stored value. The `Dual`
+  automatic-differentiation type is one such value representation.
 - A small, fixed-step RK4 implementation establishes the numerical baseline.
-- Post-MVP extensions add first-order automatic differentiation and adaptive
-  Dormand-Prince 5(4). Multifield tensors remain future work.
+- Post-MVP extensions add first-order automatic differentiation, adaptive
+  Dormand-Prince 5(4), and fixed-size canonical multifield backgrounds.
 
 ## Core quantity
 
@@ -138,16 +138,20 @@ State + StateDelta     -> State
 
 The intermediate type is named `StateDelta`.
 
-For a later multifield implementation, values with the same dimension will be
-grouped as arrays:
+The canonical multifield implementation groups equal-dimension values in
+const-generic arrays:
 
 ```rust
-struct MultifieldState {
-    phi: Quantity<M1, Array1<f64>>,
-    pi: Quantity<M2, Array1<f64>>,
+struct MultifieldState<const N: usize> {
+    phi: [Field; N],
+    pi: [FieldVelocity; N],
     a: ScaleFactor,
 }
 ```
+
+This first version assumes a flat field-space metric and canonical kinetic
+terms. Curved field-space geometry and dynamically sized tensors remain
+separate future extensions.
 
 ## Potential
 
@@ -168,8 +172,9 @@ trait Potential: PotentialValue<f64> + PotentialValue<Dual> {
 `PotentialValue<V>` contains the formula and is not intrinsically tied to
 `f64`. The same formula is evaluated with the first-order forward-mode `Dual`
 type to obtain the gradient. Model parameters such as masses and couplings
-remain fixed; the field is the differentiation variable. In a multifield
-extension this means derivatives with respect to each field `phi^I`.
+remain fixed; the field is the differentiation variable. The multifield
+interface evaluates the formula once per active `phi^I` to obtain every
+gradient component.
 
 The MVP implements a quadratic potential:
 
@@ -221,8 +226,8 @@ integrator.
 The integrator receives both the current independent-variable value and the
 step size. The MVP uses cosmic time, while a later system may use a
 dimensionless e-folding variable. States and derivatives need to be `Clone`,
-but not `Copy`, so future array-backed multifield states are not excluded by
-the integrator interface.
+but not `Copy`; the const-generic array-backed multifield state uses this same
+integrator interface directly.
 
 ```mermaid
 flowchart LR

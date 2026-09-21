@@ -56,6 +56,7 @@ checks are documented in
 | `potential` | Automatically differentiated potentials and `QuadraticPotential` |
 | `integrate` | The `System` trait, fixed RK4, and embedded Dormand-Prince 5(4) |
 | `scalar_field` | `ScalarFieldSystem`, including the Friedmann constraint |
+| `multifield` | Const-generic canonical multifield states and dynamics |
 | `background` | The integration driver, termination conditions, and CSV export |
 
 Units are natural (`c = hbar = 1`) with `M_pl = 1`, so every dimension is a
@@ -73,6 +74,10 @@ let run = system.run_adaptive(initial, AdaptiveRunSettings::default());
 Each adaptive attempt records its step size, normalized local error, and
 acceptance decision in `run.adaptive_steps`. Fixed-step RK4 remains available
 through `system.run(initial, RunSettings::default())`.
+
+Canonical multifield systems use fixed-size arrays and the same generic
+integrators. `QuadraticMultifieldPotential<N>` supplies one mass per field and
+obtains every gradient component through automatic differentiation.
 
 ## Compile-fail tests
 
