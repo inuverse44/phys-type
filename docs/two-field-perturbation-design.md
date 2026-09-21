@@ -264,9 +264,10 @@ interoperability boundaries such as CSV. Both columns are emitted, even when
 a particular observable is expected to be real, and the imaginary part is
 checked against the reality tolerance before the split. `Im P^12` is the one
 that matters: the diagonal entries of the spectrum matrix are sums of squared
-moduli and so are real by construction, while the off-diagonal entry is the
-equal-time field commutator, which vanishes in the vacuum and is conserved, so
-whatever appears in that column was produced by the integrator.
+moduli and so are real by construction, while twice the imaginary
+off-diagonal part is the antisymmetric equal-time correlator and is
+proportional to the field commutator. It vanishes in the vacuum and is
+conserved, so whatever appears in that column was produced by the integrator.
 
 ## Spectra and normalization
 

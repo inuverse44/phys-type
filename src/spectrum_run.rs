@@ -309,8 +309,9 @@ pub struct SpectrumRecord {
     pub re_p_12: f64,
     /// `Im P^{12} / M_pl^2`.
     ///
-    /// Emitted even though it is expected to vanish: it is the equal-time
-    /// field commutator, which is zero in the vacuum and conserved, so what
+    /// Emitted even though it is expected to vanish: twice this imaginary
+    /// part forms the antisymmetric equal-time correlator proportional to the
+    /// field commutator. It is zero in the vacuum and conserved, so what
     /// survives here measures accumulated integration error.
     pub im_p_12: f64,
     /// `P_{Q_sigma} / M_pl^2`.
@@ -2022,9 +2023,9 @@ mod tests {
 
     #[test]
     fn the_cross_spectrum_reports_its_imaginary_part() {
-        // Im P^12 is the equal-time field commutator: zero in the vacuum and
-        // conserved, so it measures accumulated integration error rather than
-        // physics. It is emitted anyway, and checked before being split.
+        // Twice Im P^12 forms the antisymmetric equal-time correlator
+        // proportional to the field commutator. It is zero in the vacuum and
+        // conserved, so an emitted residual diagnoses integration error.
         let system = system([1.0e-6, 1.5e-6]);
         let initial = slow_roll_start(&system, [12.0, 8.0]);
         let run = system
