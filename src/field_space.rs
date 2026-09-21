@@ -8,7 +8,7 @@ use core::marker::PhantomData;
 use core::ops::{Add, Mul, Neg, Sub};
 
 use crate::dimension::DimMul;
-use crate::{Field, FieldVelocity, M0, M2, M3, MMinus1, Quantity};
+use crate::{Field, FieldVelocity, M0, M2, M3, MMinus1, MMinus2, Quantity};
 
 /// Dense components of a rank-three field-space tensor.
 pub type Tensor3Components<D, V, const N: usize> = [[[Quantity<D, V>; N]; N]; N];
@@ -442,6 +442,44 @@ pub type InverseFieldMetric<const N: usize> = FieldTensor2<Upper, Upper, M0, f64
 /// A covariant potential Hessian `V_;IJ`.
 pub type CovariantPotentialHessian<const N: usize> = FieldTensor2<Lower, Lower, M2, f64, N>;
 
+/// Field-space Riemann curvature in the convention `R^I_JKL`.
+pub type RiemannTensor<const N: usize> = FieldTensor4<Upper, Lower, Lower, Lower, MMinus2, f64, N>;
+
+/// Field-space Riemann curvature with all four indices lowered.
+pub type LoweredRiemannTensor<const N: usize> =
+    FieldTensor4<Lower, Lower, Lower, Lower, MMinus2, f64, N>;
+
+impl<const N: usize> FieldTensor4<Upper, Lower, Lower, Lower, MMinus2, f64, N> {
+    /// Returns identically zero curvature.
+    pub fn zero() -> Self {
+        Self::new([[[[Quantity::new(0.0); N]; N]; N]; N])
+    }
+
+    /// Forms `R^I_LMJ velocity^L velocity^M`.
+    ///
+    /// The result has mixed indices `(I, J)` and mass dimension `M^2`, ready
+    /// for the linear perturbation mass matrix.
+    pub fn contract_velocities(
+        &self,
+        velocity: &ContravariantField<M2, f64, N>,
+    ) -> FieldTensor2<Upper, Lower, M2, f64, N> {
+        FieldTensor2::new(core::array::from_fn(|upper| {
+            core::array::from_fn(|lower| {
+                Quantity::new(
+                    (0..N)
+                        .flat_map(|first| (0..N).map(move |second| (first, second)))
+                        .map(|(first, second)| {
+                            self.components[upper][first][second][lower].value()
+                                * velocity.components[first].value()
+                                * velocity.components[second].value()
+                        })
+                        .sum(),
+                )
+            })
+        }))
+    }
+}
+
 /// Christoffel symbols `Gamma^I_JK` for scalar fields of mass dimension one.
 ///
 /// A derivative with respect to a field contributes dimension `M^-1`, so the
@@ -499,6 +537,16 @@ pub trait FieldSpaceGeometry<const N: usize> {
     fn christoffel(&self, position: &[Field; N]) -> ChristoffelSymbols<N>;
 }
 
+/// A field-space geometry that supplies analytic Riemann curvature.
+///
+/// Curvature is a separate capability so background-only geometries do not
+/// need to manufacture it. Implementations must use the crate convention
+/// `[nabla_K, nabla_L] A^I = R^I_JKL A^J`.
+pub trait CurvedFieldSpaceGeometry<const N: usize>: FieldSpaceGeometry<N> {
+    /// Returns `R^I_JKL` at the supplied background position.
+    fn riemann(&self, position: &[Field; N]) -> RiemannTensor<N>;
+}
+
 /// Euclidean field space in Cartesian coordinates.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FlatFieldSpace;
@@ -515,6 +563,105 @@ impl<const N: usize> FieldSpaceGeometry<N> for FlatFieldSpace {
     fn christoffel(&self, _position: &[Field; N]) -> ChristoffelSymbols<N> {
         ChristoffelSymbols::zero()
     }
+}
+
+impl<const N: usize> CurvedFieldSpaceGeometry<N> for FlatFieldSpace {
+    fn riemann(&self, _position: &[Field; N]) -> RiemannTensor<N> {
+        RiemannTensor::zero()
+    }
+}
+
+/// Riemann identity checked by [`validate_riemann_symmetries`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RiemannIdentity {
+    /// `R_IJKL = -R_JIKL`.
+    FirstPairAntisymmetry,
+    /// `R_IJKL = -R_IJLK`.
+    SecondPairAntisymmetry,
+    /// `R_IJKL = R_KLIJ`.
+    PairExchange,
+    /// `R_IJKL + R_IKLJ + R_ILJK = 0`.
+    FirstBianchi,
+    /// Validation requires a finite, non-negative absolute tolerance.
+    InvalidTolerance,
+}
+
+/// A component-level failure of a field-space curvature identity.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GeometryValidationError {
+    /// The identity that failed.
+    pub identity: RiemannIdentity,
+    /// Component indices `(I, J, K, L)` at the first failure.
+    pub indices: [usize; 4],
+    /// Absolute residual of the identity.
+    pub residual: f64,
+    /// Requested absolute tolerance.
+    pub tolerance: f64,
+}
+
+/// Validates the Levi-Civita symmetries of an all-lower Riemann tensor.
+pub fn validate_riemann_symmetries<const N: usize>(
+    riemann: &LoweredRiemannTensor<N>,
+    tolerance: f64,
+) -> Result<(), GeometryValidationError> {
+    if tolerance < 0.0 || !tolerance.is_finite() {
+        return Err(GeometryValidationError {
+            identity: RiemannIdentity::InvalidTolerance,
+            indices: [0; 4],
+            residual: tolerance,
+            tolerance,
+        });
+    }
+
+    let component = |first: usize, second: usize, third: usize, fourth: usize| {
+        *riemann.components[first][second][third][fourth].value()
+    };
+
+    for first in 0..N {
+        for second in 0..N {
+            for third in 0..N {
+                for fourth in 0..N {
+                    let indices = [first, second, third, fourth];
+                    let checks = [
+                        (
+                            RiemannIdentity::FirstPairAntisymmetry,
+                            component(first, second, third, fourth)
+                                + component(second, first, third, fourth),
+                        ),
+                        (
+                            RiemannIdentity::SecondPairAntisymmetry,
+                            component(first, second, third, fourth)
+                                + component(first, second, fourth, third),
+                        ),
+                        (
+                            RiemannIdentity::PairExchange,
+                            component(first, second, third, fourth)
+                                - component(third, fourth, first, second),
+                        ),
+                        (
+                            RiemannIdentity::FirstBianchi,
+                            component(first, second, third, fourth)
+                                + component(first, third, fourth, second)
+                                + component(first, fourth, second, third),
+                        ),
+                    ];
+
+                    for (identity, residual) in checks {
+                        if residual.abs() > tolerance {
+                            return Err(GeometryValidationError {
+                                identity,
+                                indices,
+                                residual: residual.abs(),
+                                tolerance,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Why an orthonormal two-field kinematic basis could not be constructed.
@@ -801,5 +948,72 @@ mod tests {
         assert_eq!(lowered.components()[0][0][1][1].into_value(), 10.0);
         assert_eq!(lowered.components()[1][0][1][1].into_value(), 21.0);
         assert_eq!(restored, tensor);
+    }
+
+    fn constant_curvature_two_field_space(curvature: f64) -> LoweredRiemannTensor<2> {
+        LoweredRiemannTensor::new(core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|third| {
+                    core::array::from_fn(|fourth| {
+                        let first_term = f64::from(first == third && second == fourth);
+                        let second_term = f64::from(first == fourth && second == third);
+                        Quantity::new(curvature * (first_term - second_term))
+                    })
+                })
+            })
+        }))
+    }
+
+    #[test]
+    fn constant_curvature_tensor_satisfies_riemann_identities() {
+        let lowered = constant_curvature_two_field_space(2.0);
+
+        assert_eq!(validate_riemann_symmetries(&lowered, 1.0e-14), Ok(()));
+    }
+
+    #[test]
+    fn riemann_velocity_contraction_has_expected_indices_and_dimension() {
+        let lowered = constant_curvature_two_field_space(2.0);
+        let riemann: RiemannTensor<2> = InverseFieldMetric::<2>::euclidean().raise_first(&lowered);
+        let velocity =
+            ContravariantField::<M2, f64, 2>::new([Quantity::new(3.0), Quantity::new(4.0)]);
+
+        let contracted: FieldTensor2<Upper, Lower, M2, f64, 2> =
+            riemann.contract_velocities(&velocity);
+        let values = contracted
+            .into_components()
+            .map(|row| row.map(Quantity::into_value));
+
+        assert_eq!(values, [[-32.0, 24.0], [24.0, -18.0]]);
+    }
+
+    #[test]
+    fn validation_reports_the_failed_identity_and_component() {
+        let mut components = constant_curvature_two_field_space(1.0).into_components();
+        components[0][1][0][1] = Quantity::new(2.0);
+        let invalid = LoweredRiemannTensor::new(components);
+
+        let error = validate_riemann_symmetries(&invalid, 1.0e-14).unwrap_err();
+
+        assert_eq!(error.identity, RiemannIdentity::FirstBianchi);
+        assert_eq!(error.indices, [0, 0, 1, 1]);
+        assert_eq!(error.residual, 1.0);
+    }
+
+    #[test]
+    fn flat_geometry_supplies_exactly_zero_curvature() {
+        let position = [Field::new(1.0), Field::new(2.0)];
+        let riemann =
+            <FlatFieldSpace as CurvedFieldSpaceGeometry<2>>::riemann(&FlatFieldSpace, &position);
+
+        assert!(
+            riemann
+                .components()
+                .iter()
+                .flatten()
+                .flatten()
+                .flatten()
+                .all(|component| component.into_value() == 0.0)
+        );
     }
 }

@@ -22,6 +22,8 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   physical dimension.
 - Slot-specific first-index raising/lowering for higher-rank tensors, with
   compile-fail coverage for variance errors and connection/tensor confusion.
+- A convention-fixed `RiemannTensor`, analytic curved-geometry capability,
+  typed velocity contraction, and structured Levi-Civita symmetry validation.
 
 ## [0.1.0] - 2026-09-21
 

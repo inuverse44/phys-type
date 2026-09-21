@@ -24,10 +24,12 @@ pub use dimension::{
     MassPower,
 };
 pub use field_space::{
-    ChristoffelSymbols, ContravariantField, CovariantField, CovariantPotentialHessian, FieldMetric,
-    FieldSpaceGeometry, FieldTensor2, FieldTensor3, FieldTensor4, FieldVector, FlatFieldSpace,
-    InverseFieldMetric, KinematicBasis2, KinematicBasisError, Lower, LowerFirst, RaiseFirst,
-    Tensor3Components, Tensor4Components, Upper,
+    ChristoffelSymbols, ContravariantField, CovariantField, CovariantPotentialHessian,
+    CurvedFieldSpaceGeometry, FieldMetric, FieldSpaceGeometry, FieldTensor2, FieldTensor3,
+    FieldTensor4, FieldVector, FlatFieldSpace, GeometryValidationError, InverseFieldMetric,
+    KinematicBasis2, KinematicBasisError, Lower, LowerFirst, LoweredRiemannTensor, RaiseFirst,
+    RiemannIdentity, RiemannTensor, Tensor3Components, Tensor4Components, Upper,
+    validate_riemann_symmetries,
 };
 pub use integrate::{EmbeddedStep, System, rk4_step, rk45_step};
 pub use multifield::{

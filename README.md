@@ -109,6 +109,12 @@ rank. Metrics implement slot-specific `LowerFirst` and inverse metrics
 implement `RaiseFirst`; already-lower indices are rejected at compile time.
 `ChristoffelSymbols` deliberately remains a distinct non-tensor type.
 
+`RiemannTensor<N>` fixes the convention `R^I_JKL` and dimension `M^-2`.
+`CurvedFieldSpaceGeometry<N>` supplies it analytically, while
+`contract_velocities` produces the mixed `M^2` curvature contribution needed
+by the perturbation mass matrix. All-lower curvature can be checked for pair
+symmetries and the first Bianchi identity with structured validation errors.
+
 `CovariantMultifieldSystem<P, G, N>` accepts a `FieldSpaceGeometry<N>` that
 supplies `G_IJ`, `G^IJ`, and `Gamma^I_JK`. `FlatFieldSpace` exactly reproduces
 the canonical solver. For two fields, `kinematics` returns the normalized
