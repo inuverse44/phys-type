@@ -11,6 +11,7 @@
 //! background is an optimization that can be added without changing the rows
 //! produced here.
 
+use std::fmt;
 use std::io::{self, Write};
 
 use crate::integrate::{
@@ -116,9 +117,15 @@ pub enum SpectrumRunError {
         required: f64,
     },
     /// A stage could not meet its tolerances at the minimum step size.
-    MinimumStepReached,
+    MinimumStepReached {
+        /// The part of the run whose tolerance could not be met.
+        stage: SpectrumRunStage,
+    },
     /// A stage exhausted its step budget.
-    StepLimitReached,
+    StepLimitReached {
+        /// The part of the run that exhausted its step budget.
+        stage: SpectrumRunStage,
+    },
     /// A mode had not left the horizon by the requested output time, so the
     /// reported spectrum would still be its vacuum rather than a physical
     /// result.
@@ -145,6 +152,86 @@ pub enum SpectrumRunError {
     /// The adiabatic/entropy basis was undefined along the background.
     KinematicBasis(KinematicBasisError),
 }
+
+/// A stage of a spectrum run, retained in integration errors.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SpectrumRunStage {
+    /// Locating the end of inflation and sampling the background.
+    BackgroundSurvey,
+    /// Locating the requested pivot e-folding time.
+    Pivot,
+    /// Locating the Bunch-Davies initialization point for one mode.
+    ModeStart {
+        /// Comoving wavenumber in Planck units.
+        k: f64,
+    },
+    /// Evolving one initialized mode to the requested output time.
+    ModeEvolution {
+        /// Comoving wavenumber in Planck units.
+        k: f64,
+    },
+}
+
+impl fmt::Display for SpectrumRunStage {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BackgroundSurvey => formatter.write_str("background survey"),
+            Self::Pivot => formatter.write_str("pivot search"),
+            Self::ModeStart { k } => write!(formatter, "mode-start search for k={k:e} M_pl"),
+            Self::ModeEvolution { k } => write!(formatter, "mode evolution for k={k:e} M_pl"),
+        }
+    }
+}
+
+impl fmt::Display for SpectrumRunError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidSettings(message) => {
+                write!(formatter, "invalid spectrum settings: {message}")
+            }
+            Self::InflationDidNotEnd { e_folds } => {
+                write!(
+                    formatter,
+                    "inflation did not end within {e_folds:e} e-folds"
+                )
+            }
+            Self::NotEnoughEFolds {
+                available,
+                required,
+            } => write!(
+                formatter,
+                "only {available:e} e-folds are available, but {required:e} are required"
+            ),
+            Self::MinimumStepReached { stage } => {
+                write!(formatter, "minimum step size reached during {stage}")
+            }
+            Self::StepLimitReached { stage } => {
+                write!(formatter, "step limit reached during {stage}")
+            }
+            Self::OutputBeforeHorizonExit { k, k_over_ah } => write!(
+                formatter,
+                "mode k={k:e} M_pl is still inside the horizon at output (k/(aH)={k_over_ah:e})"
+            ),
+            Self::ModeInitialization { k, source } => {
+                write!(
+                    formatter,
+                    "could not initialize mode k={k:e} M_pl: {source:?}"
+                )
+            }
+            Self::Spectrum { k, source } => {
+                write!(formatter, "could not project mode k={k:e} M_pl: {source:?}")
+            }
+            Self::KinematicBasis(source) => {
+                write!(
+                    formatter,
+                    "could not construct the kinematic basis: {source:?}"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for SpectrumRunError {}
 
 /// The pivot convention actually realized by a run.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -445,12 +532,17 @@ pub fn write_metadata<W: Write>(
 /// The crossing is refined inside the last accepted step, so the returned
 /// state sits just on the positive side of the event. `on_accepted` observes
 /// every accepted step, including the refined final one.
+struct AdvanceControl<'a, A> {
+    settings: &'a SpectrumRunSettings,
+    tolerances: &'a ErrorTolerances<A>,
+    stage: SpectrumRunStage,
+}
+
 fn advance_until<S, Event, Observe>(
     system: &S,
     initial_state: S::State,
     initial_time: Time,
-    settings: &SpectrumRunSettings,
-    tolerances: &ErrorTolerances<S::AbsoluteTolerance>,
+    control: AdvanceControl<'_, S::AbsoluteTolerance>,
     mut event: Event,
     mut on_accepted: Observe,
 ) -> Result<(S::State, Time), SpectrumRunError>
@@ -460,6 +552,9 @@ where
     Event: FnMut(&S::State) -> f64,
     Observe: FnMut(&S::State, Time),
 {
+    let settings = control.settings;
+    let tolerances = control.tolerances;
+    let stage = control.stage;
     let limits = StepSizeLimits {
         min: settings.min_dt,
         max: settings.max_dt,
@@ -488,13 +583,13 @@ where
             time = time + dt;
             on_accepted(&state, time);
         } else if dt <= settings.min_dt {
-            return Err(SpectrumRunError::MinimumStepReached);
+            return Err(SpectrumRunError::MinimumStepReached { stage });
         }
 
         dt = next_step_size(dt, attempt.error_ratio, &limits);
     }
 
-    Err(SpectrumRunError::StepLimitReached)
+    Err(SpectrumRunError::StepLimitReached { stage })
 }
 
 /// Bisects inside one accepted step for the largest sub-step that keeps the
@@ -625,8 +720,11 @@ where
             self,
             initial,
             Time::new(0.0),
-            settings,
-            &background_tolerances(settings),
+            AdvanceControl {
+                settings,
+                tolerances: &background_tolerances(settings),
+                stage: SpectrumRunStage::BackgroundSurvey,
+            },
             |state| {
                 let remaining = settings.max_e_folds - state.e_folds(&initial);
                 let inflating = 1.0 - self.epsilon_h(state);
@@ -678,8 +776,11 @@ where
             self,
             initial,
             Time::new(0.0),
-            settings,
-            &background_tolerances(settings),
+            AdvanceControl {
+                settings,
+                tolerances: &background_tolerances(settings),
+                stage: SpectrumRunStage::Pivot,
+            },
             |state| target - state.e_folds(&initial),
             |_, _| {},
         )?;
@@ -723,8 +824,11 @@ where
             self,
             initial,
             Time::new(0.0),
-            settings,
-            &background_tolerances(settings),
+            AdvanceControl {
+                settings,
+                tolerances: &background_tolerances(settings),
+                stage: SpectrumRunStage::ModeStart { k: k.into_value() },
+            },
             |state| (k / (state.a * self.hubble(state))).into_value() - start_depth(settings),
             |_, _| {},
         )?;
@@ -753,8 +857,11 @@ where
             &system,
             mode_state,
             start_time,
-            settings,
-            &settings.tolerances,
+            AdvanceControl {
+                settings,
+                tolerances: &settings.tolerances,
+                stage: SpectrumRunStage::ModeEvolution { k: k.into_value() },
+            },
             |state| e_folds_at_output - state.background.e_folds(&initial),
             |state, _| {
                 accepted += 1;
@@ -1200,6 +1307,30 @@ mod tests {
     }
 
     #[test]
+    fn integration_errors_report_the_stage_and_implement_error() {
+        fn accepts_error(_: &dyn std::error::Error) {}
+
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let settings = SpectrumRunSettings {
+            max_steps: 1,
+            ..SpectrumRunSettings::default()
+        };
+        let error = system
+            .run_two_field_spectra(initial, &settings)
+            .unwrap_err();
+
+        accepts_error(&error);
+        assert_eq!(
+            error,
+            SpectrumRunError::StepLimitReached {
+                stage: SpectrumRunStage::BackgroundSurvey,
+            }
+        );
+        assert!(error.to_string().contains("background survey"));
+    }
+
+    #[test]
     fn a_run_without_enough_e_folds_is_reported() {
         let system = system([1.0e-6, 1.5e-6]);
         // Starting below the slow-roll attractor ends inflation almost at once.
@@ -1465,8 +1596,13 @@ mod tests {
             system,
             state,
             time,
-            settings,
-            &settings.tolerances,
+            AdvanceControl {
+                settings,
+                tolerances: &settings.tolerances,
+                stage: SpectrumRunStage::ModeEvolution {
+                    k: system.k.into_value(),
+                },
+            },
             |state| target - state.background.e_folds(initial),
             |_, _| {},
         )
@@ -1578,8 +1714,13 @@ mod tests {
             &background,
             initial,
             Time::new(0.0),
-            &settings,
-            &background_tolerances(&settings),
+            AdvanceControl {
+                settings: &settings,
+                tolerances: &background_tolerances(&settings),
+                stage: SpectrumRunStage::ModeStart {
+                    k: perturbation.k.into_value(),
+                },
+            },
             |state| {
                 (perturbation.k / (state.a * background.hubble(state))).into_value()
                     - start_depth(&settings)

@@ -62,7 +62,7 @@ pub use spectra::{
 };
 pub use spectrum_run::{
     BackgroundRecord, ModeEvolutionRecord, Pivot, SpectrumRecord, SpectrumRun, SpectrumRunError,
-    SpectrumRunSettings, write_metadata,
+    SpectrumRunSettings, SpectrumRunStage, write_metadata,
 };
 pub use state::{State, StateDelta, StateDerivative};
 

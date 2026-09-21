@@ -92,7 +92,7 @@ fn main() -> io::Result<()> {
     let run = match system.run_two_field_spectra(initial_state(&system), &settings) {
         Ok(run) => run,
         Err(error) => {
-            eprintln!("the run could not be completed: {error:?}");
+            eprintln!("the run could not be completed: {error}");
             std::process::exit(1);
         }
     };
