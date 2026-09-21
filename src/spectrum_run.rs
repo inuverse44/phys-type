@@ -942,8 +942,8 @@ fn validate(settings: &SpectrumRunSettings) -> Result<(), SpectrumRunError> {
             "k_count must be positive",
         ));
     }
-    if settings.k_min_over_pivot.is_nan()
-        || settings.k_max_over_pivot.is_nan()
+    if !settings.k_min_over_pivot.is_finite()
+        || !settings.k_max_over_pivot.is_finite()
         || settings.k_min_over_pivot <= 0.0
         || settings.k_max_over_pivot < settings.k_min_over_pivot
     {
@@ -951,16 +951,84 @@ fn validate(settings: &SpectrumRunSettings) -> Result<(), SpectrumRunError> {
             "the k grid must be positive and ordered",
         ));
     }
-    // Written without a negated comparison so that a NaN is rejected
-    // explicitly rather than by falling through a flipped inequality.
-    if settings.e_folds_before_exit.is_nan() || settings.e_folds_before_exit <= 0.0 {
+    if !settings.e_folds_before_exit.is_finite()
+        || settings.e_folds_before_exit <= 0.0
+        || !start_depth(settings).is_finite()
+    {
         return Err(SpectrumRunError::InvalidSettings(
-            "modes must start before their horizon exit",
+            "the mode start must be finite and before horizon exit",
         ));
     }
-    if settings.min_dt.into_value() <= 0.0 || settings.max_dt < settings.min_dt {
+    if !settings.pivot_e_folds_before_end.is_finite()
+        || settings.pivot_e_folds_before_end < 0.0
+        || !settings.output_e_folds_before_end.is_finite()
+        || settings.output_e_folds_before_end < 0.0
+    {
         return Err(SpectrumRunError::InvalidSettings(
-            "step size limits must be positive and ordered",
+            "pivot and output times must be finite and no later than inflation end",
+        ));
+    }
+    if !settings.max_e_folds.is_finite() || settings.max_e_folds <= 0.0 {
+        return Err(SpectrumRunError::InvalidSettings(
+            "max_e_folds must be positive and finite",
+        ));
+    }
+    if settings.max_steps == 0 {
+        return Err(SpectrumRunError::InvalidSettings(
+            "max_steps must be positive",
+        ));
+    }
+
+    let initial_dt = settings.initial_dt.into_value();
+    let min_dt = settings.min_dt.into_value();
+    let max_dt = settings.max_dt.into_value();
+    if !initial_dt.is_finite()
+        || !min_dt.is_finite()
+        || !max_dt.is_finite()
+        || min_dt <= 0.0
+        || initial_dt < min_dt
+        || initial_dt > max_dt
+        || max_dt < min_dt
+    {
+        return Err(SpectrumRunError::InvalidSettings(
+            "step sizes must be positive, finite, and ordered",
+        ));
+    }
+    let absolute = &settings.tolerances.absolute;
+    let valid_absolute = absolute
+        .background
+        .phi
+        .iter()
+        .all(|value| value.into_value().is_finite() && value.into_value() >= 0.0)
+        && absolute
+            .background
+            .pi
+            .iter()
+            .all(|value| value.into_value().is_finite() && value.into_value() >= 0.0)
+        && absolute.background.a.into_value().is_finite()
+        && absolute.background.a.into_value() >= 0.0
+        && absolute.rescaled_amplitude.into_value().is_finite()
+        && absolute.rescaled_amplitude.into_value() >= 0.0
+        && absolute.rescaled_velocity.into_value().is_finite()
+        && absolute.rescaled_velocity.into_value() >= 0.0;
+    if !valid_absolute
+        || !settings.tolerances.relative.is_finite()
+        || settings.tolerances.relative <= 0.0
+    {
+        return Err(SpectrumRunError::InvalidSettings(
+            "integration tolerances must be finite and non-negative, with positive relative tolerance",
+        ));
+    }
+    let spectrum = settings.spectrum_tolerances;
+    if !spectrum.hermiticity.is_finite()
+        || spectrum.hermiticity < 0.0
+        || !spectrum.imaginary_residual.is_finite()
+        || spectrum.imaginary_residual < 0.0
+        || !spectrum.correlation_overshoot.is_finite()
+        || spectrum.correlation_overshoot < 0.0
+    {
+        return Err(SpectrumRunError::InvalidSettings(
+            "spectrum tolerances must be finite and non-negative",
         ));
     }
     if settings.background_sample_every == 0 || settings.mode_sample_every == 0 {
@@ -1076,6 +1144,63 @@ mod tests {
             system.run_two_field_spectra(initial, &settings),
             Err(SpectrumRunError::InvalidSettings(_))
         ));
+    }
+
+    #[test]
+    fn every_numerical_setting_is_validated_before_integration() {
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let invalid = [
+            SpectrumRunSettings {
+                initial_dt: Time::new(1.0e6),
+                ..SpectrumRunSettings::default()
+            },
+            SpectrumRunSettings {
+                max_steps: 0,
+                ..SpectrumRunSettings::default()
+            },
+            SpectrumRunSettings {
+                max_e_folds: f64::NAN,
+                ..SpectrumRunSettings::default()
+            },
+            SpectrumRunSettings {
+                e_folds_before_exit: 1.0e3,
+                ..SpectrumRunSettings::default()
+            },
+            SpectrumRunSettings {
+                pivot_e_folds_before_end: -1.0,
+                ..SpectrumRunSettings::default()
+            },
+            SpectrumRunSettings {
+                output_e_folds_before_end: f64::NAN,
+                ..SpectrumRunSettings::default()
+            },
+            SpectrumRunSettings {
+                k_max_over_pivot: f64::INFINITY,
+                ..SpectrumRunSettings::default()
+            },
+            SpectrumRunSettings {
+                tolerances: ErrorTolerances::new(
+                    TwoFieldPerturbationTolerance::background_in_planck_units(1.0e-20),
+                    f64::NAN,
+                ),
+                ..SpectrumRunSettings::default()
+            },
+            SpectrumRunSettings {
+                spectrum_tolerances: SpectrumTolerances {
+                    imaginary_residual: -1.0,
+                    ..SpectrumTolerances::default()
+                },
+                ..SpectrumRunSettings::default()
+            },
+        ];
+
+        for settings in invalid {
+            assert!(matches!(
+                system.run_two_field_spectra(initial, &settings),
+                Err(SpectrumRunError::InvalidSettings(_))
+            ));
+        }
     }
 
     #[test]
