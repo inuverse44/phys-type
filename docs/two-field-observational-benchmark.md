@@ -46,6 +46,11 @@ observable pivot neighborhood.  A separate figure follows the pivot mode in
 time and is the appropriate comparison to the standard mass-ratio-seven
 double-inflation evolution plot.
 
+Mode evolution is exported every five accepted integration steps.  This is an
+output-sampling choice, not an integrator step size: it resolves the sharp turn
+in the plotted polyline without changing the adaptive error control or the
+final spectrum.
+
 ## Amplitude normalization
 
 The shape parameters and the overall energy scale have separate jobs.  The

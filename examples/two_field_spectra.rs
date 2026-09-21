@@ -178,6 +178,10 @@ fn main() -> io::Result<()> {
         k_min_over_pivot: 0.01,
         k_max_over_pivot: 100.0,
         k_count: 41,
+        // The turn is sharp in e-fold time. Keep enough accepted states to
+        // draw its entropy trough and curvature transfer without angular
+        // line segments; this changes CSV sampling, not integration accuracy.
+        mode_sample_every: 5,
         ..SpectrumRunSettings::default()
     };
     let calibration = calibrate(&settings);
