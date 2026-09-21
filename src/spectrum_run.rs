@@ -1894,7 +1894,7 @@ mod tests {
     ) -> CovariantMultifieldSystem<QuadraticMultifieldPotential<2>, HyperbolicFieldSpace, 2> {
         CovariantMultifieldSystem::in_planck_units(
             QuadraticMultifieldPotential::new([Mass::new(1.0e-6), Mass::new(1.5e-6)]),
-            HyperbolicFieldSpace::new(Field::new(radius)),
+            HyperbolicFieldSpace::new(Field::new(radius)).unwrap(),
         )
     }
 
@@ -1933,7 +1933,7 @@ mod tests {
     ) -> CovariantMultifieldSystem<QuadraticMultifieldPotential<2>, RiemannFree, 2> {
         CovariantMultifieldSystem::in_planck_units(
             QuadraticMultifieldPotential::new([Mass::new(1.0e-6), Mass::new(1.5e-6)]),
-            RiemannFree(HyperbolicFieldSpace::new(Field::new(radius))),
+            RiemannFree(HyperbolicFieldSpace::new(Field::new(radius)).unwrap()),
         )
     }
 

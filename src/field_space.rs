@@ -4,6 +4,7 @@
 //! an upper field-space index and one with a lower index are therefore
 //! different Rust types even when their components have the same dimension.
 
+use core::fmt;
 use core::marker::PhantomData;
 use core::ops::{Add, Mul, Neg, Sub};
 
@@ -590,13 +591,35 @@ impl<const N: usize> CurvedFieldSpaceGeometry<N> for FlatFieldSpace {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct HyperbolicFieldSpace {
     /// The curvature radius `L`; the Gaussian curvature is `-1/L^2`.
-    pub curvature_radius: Field,
+    curvature_radius: Field,
 }
 
+/// An invalid parameter for [`HyperbolicFieldSpace`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InvalidCurvatureRadius;
+
+impl fmt::Display for InvalidCurvatureRadius {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("the hyperbolic curvature radius must be positive and finite")
+    }
+}
+
+impl std::error::Error for InvalidCurvatureRadius {}
+
 impl HyperbolicFieldSpace {
-    /// Builds a field space of curvature radius `L`.
-    pub const fn new(curvature_radius: Field) -> Self {
-        Self { curvature_radius }
+    /// Builds a field space of positive, finite curvature radius `L`.
+    pub fn new(curvature_radius: Field) -> Result<Self, InvalidCurvatureRadius> {
+        let value = curvature_radius.into_value();
+        if !value.is_finite() || value <= 0.0 {
+            return Err(InvalidCurvatureRadius);
+        }
+
+        Ok(Self { curvature_radius })
+    }
+
+    /// Returns the curvature radius `L`.
+    pub const fn curvature_radius(&self) -> Field {
+        self.curvature_radius
     }
 
     /// `sinh(phi^1 / L)` and `cosh(phi^1 / L)` at a position.
@@ -1117,7 +1140,7 @@ mod tests {
 
     #[test]
     fn the_hyperbolic_geometry_satisfies_the_riemann_identities() {
-        let geometry = HyperbolicFieldSpace::new(Field::new(7.0));
+        let geometry = HyperbolicFieldSpace::new(Field::new(7.0)).unwrap();
         let position = [Field::new(3.0), Field::new(1.0)];
         let lowered = geometry
             .metric(&position)
@@ -1127,8 +1150,21 @@ mod tests {
     }
 
     #[test]
+    fn hyperbolic_geometry_rejects_an_invalid_curvature_radius() {
+        for radius in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(
+                HyperbolicFieldSpace::new(Field::new(radius)),
+                Err(InvalidCurvatureRadius)
+            );
+        }
+
+        let geometry = HyperbolicFieldSpace::new(Field::new(7.0)).unwrap();
+        assert_eq!(geometry.curvature_radius(), Field::new(7.0));
+    }
+
+    #[test]
     fn the_hyperbolic_metric_and_its_inverse_are_reciprocal() {
-        let geometry = HyperbolicFieldSpace::new(Field::new(7.0));
+        let geometry = HyperbolicFieldSpace::new(Field::new(7.0)).unwrap();
         let position = [Field::new(3.0), Field::new(1.0)];
         let metric = geometry.metric(&position);
         let inverse = geometry.inverse_metric(&position);
@@ -1151,7 +1187,7 @@ mod tests {
     fn the_hyperbolic_curvature_scalar_is_minus_two_over_the_radius_squared() {
         // In two dimensions R = 2K, and K = -1/L^2 for this geometry.
         let radius = 7.0;
-        let geometry = HyperbolicFieldSpace::new(Field::new(radius));
+        let geometry = HyperbolicFieldSpace::new(Field::new(radius)).unwrap();
         let position = [Field::new(3.0), Field::new(1.0)];
         let riemann = geometry.riemann(&position);
         let inverse = geometry.inverse_metric(&position);
@@ -1178,7 +1214,7 @@ mod tests {
     fn the_hyperbolic_connection_is_metric_compatible() {
         // nabla_K G_IJ = 0, checked against a finite-difference derivative of
         // the metric.
-        let geometry = HyperbolicFieldSpace::new(Field::new(7.0));
+        let geometry = HyperbolicFieldSpace::new(Field::new(7.0)).unwrap();
         let position = [Field::new(3.0), Field::new(1.0)];
         let step = 1.0e-6;
         let connection = geometry.christoffel(&position);
