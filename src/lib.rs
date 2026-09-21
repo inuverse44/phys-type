@@ -14,6 +14,7 @@ pub mod perturbation;
 pub mod potential;
 pub mod quantity;
 pub mod scalar_field;
+pub mod spectra;
 pub mod state;
 
 pub use autodiff::{Dual, Jet};
@@ -49,6 +50,10 @@ pub use potential::{
 };
 pub use quantity::{Quantity, Sqrt};
 pub use scalar_field::ScalarFieldSystem;
+pub use spectra::{
+    DimensionlessSpectrum, FieldPowerSpectrum, ModeCovariance, ProjectedSpectra, SpectrumError,
+    SpectrumTolerances, field_power_spectrum, hermiticity_residual, mode_covariance, project,
+};
 pub use state::{State, StateDelta, StateDerivative};
 
 /// A dimensionless quantity, such as the scale factor.

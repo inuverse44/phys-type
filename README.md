@@ -69,6 +69,7 @@ checks are documented in
 | `state` | `State`, `StateDerivative`, `StateDelta` |
 | `potential` | Automatically differentiated potentials and `QuadraticPotential` |
 | `perturbation` | Covariant two-field mode matrices and Bunch-Davies evolution |
+| `spectra` | Mode covariance, Hermiticity checks, and adiabatic/entropy projections |
 | `integrate` | The `System` trait, fixed RK4, and embedded Dormand-Prince 5(4) |
 | `scalar_field` | `ScalarFieldSystem`, including the Friedmann constraint |
 | `multifield` | Const-generic canonical multifield states and dynamics |
@@ -141,6 +142,16 @@ physical dimensions. Real and imaginary parts are separated only for output.
 ratio `|dz| / (a_tol + r_tol |z|)`, where the absolute tolerance carries the
 dimension of the component it bounds and the modulus keeps one acceptance
 decision for both parts.
+
+`mode_covariance` forms the Hermitian `Sigma^IJ = sum_A U^I_A U^{J*}_A` and
+`field_power_spectrum` applies the `k^3 / (2 pi^2)` normalization, so the
+`M^-1` covariance and the `M^2` spectrum cannot be confused and the
+normalization cannot be applied twice. `project` contracts the two upper
+indices with lowered adiabatic and entropy covectors and returns `P_R`, `P_S`,
+the signed `C_RS`, and the correlation coefficient. Hermiticity, the imaginary
+residual of each projected spectrum, and any overshoot of `|r_C| <= 1` are
+checked against explicit tolerances and reported as typed errors instead of
+being silently discarded.
 
 ## Compile-fail tests
 

@@ -31,6 +31,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Dimensioned `Complex64` mode values, native conjugation/Hermitian algebra,
   and a modulus-based normalized error whose absolute tolerance keeps the
   physical dimension of the component it bounds.
+- Hermitian mode covariance, `k^3 / (2 pi^2)` field power spectra, and
+  adiabatic/entropy projections yielding `P_R`, `P_S`, signed `C_RS`, and a
+  correlation coefficient, each guarded by explicit reality and range
+  tolerances.
 
 ## [0.1.0] - 2026-09-21
 
