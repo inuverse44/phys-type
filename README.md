@@ -68,6 +68,7 @@ checks are documented in
 | `quantity` | `Quantity<D, V>` and its arithmetic |
 | `state` | `State`, `StateDerivative`, `StateDelta` |
 | `potential` | Automatically differentiated potentials and `QuadraticPotential` |
+| `perturbation` | Covariant two-field mode matrices and Bunch-Davies evolution |
 | `integrate` | The `System` trait, fixed RK4, and embedded Dormand-Prince 5(4) |
 | `scalar_field` | `ScalarFieldSystem`, including the Friedmann constraint |
 | `multifield` | Const-generic canonical multifield states and dynamics |
@@ -126,6 +127,12 @@ Potentials that can be evaluated with `Jet<N>` automatically implement
 returns `V`, `V_,I`, and `V_,IJ`; the covariant system then constructs
 `V_;IJ = V_,IJ - Gamma^K_IJ V_,K` with lower tensor indices and dimension
 `M^2`.
+
+`TwoFieldPerturbationSystem` evolves the background together with two
+independent complex vacuum modes for one comoving `k`. Its mass matrix includes
+the covariant potential Hessian, field-space Riemann term, and gravitational
+correction. Bunch-Davies initialization checks `k/(aH)` explicitly, and the
+canonical Wronskian is available as a numerical invariant.
 
 ## Compile-fail tests
 

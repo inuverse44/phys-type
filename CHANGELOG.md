@@ -24,6 +24,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   compile-fail coverage for variance errors and connection/tensor confusion.
 - A convention-fixed `RiemannTensor`, analytic curved-geometry capability,
   typed velocity contraction, and structured Levi-Civita symmetry validation.
+- A complete covariant linear mass matrix including potential, Riemann, and
+  gravitational contributions.
+- Joint background and complex two-mode evolution with dimension-safe Fourier
+  amplitudes, Bunch-Davies initialization, and Wronskian diagnostics.
 
 ## [0.1.0] - 2026-09-21
 

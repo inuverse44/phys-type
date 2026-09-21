@@ -5,10 +5,10 @@ use core::ops::{Add, Mul};
 use crate::integrate::System;
 use crate::potential::MultifieldPotential;
 use crate::{
-    ContravariantField, CovariantPotentialHessian, EnergyDensity, Field, FieldSpaceGeometry,
-    FieldVelocity, Hubble, KinematicBasis2, KinematicBasisError, M0, M1, M2, M3, Mass,
-    PotentialDerivatives, PotentialGradient, PotentialHessian, Quantity, ScaleFactor, Time,
-    TwiceDifferentiableMultifieldPotential,
+    ContravariantField, CovariantPotentialHessian, CurvedFieldSpaceGeometry, EnergyDensity, Field,
+    FieldSpaceGeometry, FieldTensor2, FieldVelocity, Hubble, KinematicBasis2, KinematicBasisError,
+    Lower, M0, M1, M2, M3, Mass, PotentialDerivatives, PotentialGradient, PotentialHessian,
+    Quantity, ScaleFactor, Time, TwiceDifferentiableMultifieldPotential, Upper,
 };
 
 /// The values, velocities, and common scale factor of `N` scalar fields.
@@ -183,6 +183,67 @@ where
         raised
             .into_components()
             .map(|component| -(component / (hubble * 3.0)))
+    }
+}
+
+impl<P, G, const N: usize> CovariantMultifieldSystem<P, G, N>
+where
+    P: TwiceDifferentiableMultifieldPotential<N>,
+    G: CurvedFieldSpaceGeometry<N>,
+{
+    /// Builds the mixed-index covariant mass matrix `C^I_J` for linear field
+    /// perturbations in spatially flat gauge.
+    pub fn perturbation_mass_matrix(
+        &self,
+        state: &MultifieldState<N>,
+    ) -> FieldTensor2<Upper, Lower, M2, f64, N> {
+        let metric = self.geometry.metric(&state.phi);
+        let inverse = self.geometry.inverse_metric(&state.phi);
+        let velocity = ContravariantField::new(state.pi);
+        let lowered_velocity = metric.lower(&velocity);
+        let covariant_hessian = self.covariant_potential_hessian(state);
+        let raised_hessian: FieldTensor2<Upper, Lower, M2, f64, N> =
+            FieldTensor2::new(core::array::from_fn(|upper| {
+                core::array::from_fn(|lower| {
+                    Quantity::new(
+                        (0..N)
+                            .map(|contracted| {
+                                inverse.components()[upper][contracted].value()
+                                    * covariant_hessian.components()[contracted][lower].value()
+                            })
+                            .sum(),
+                    )
+                })
+            }));
+        let curvature = self
+            .geometry
+            .riemann(&state.phi)
+            .contract_velocities(&velocity);
+        let gradient = crate::CovariantField::new(self.potential.gradient(state.phi));
+        let raised_gradient = inverse.raise(&gradient).into_components();
+        let hubble = self.hubble(state);
+        let covariant_acceleration = ContravariantField::new(core::array::from_fn(|index| {
+            state.pi[index] * hubble * -3.0 - raised_gradient[index]
+        }));
+        let lowered_acceleration = metric.lower(&covariant_acceleration);
+        let epsilon = self.epsilon_h(state);
+        let planck_squared = self.m_pl * self.m_pl;
+
+        FieldTensor2::new(core::array::from_fn(|upper| {
+            core::array::from_fn(|lower| {
+                let gravitational =
+                    (state.pi[upper] * lowered_velocity.components()[lower] * (3.0 + epsilon)
+                        + (covariant_acceleration.components()[upper]
+                            * lowered_velocity.components()[lower]
+                            + state.pi[upper] * lowered_acceleration.components()[lower])
+                            / hubble)
+                        / planck_squared;
+
+                raised_hessian.components()[upper][lower]
+                    - curvature.components()[upper][lower]
+                    - gravitational
+            })
+        }))
     }
 }
 
@@ -499,6 +560,26 @@ mod tests {
             .map(|row| row.map(Quantity::into_value));
 
         assert_eq!(hessian, [[4.0, 0.0], [0.0, -15.0]]);
+    }
+
+    #[test]
+    fn perturbation_mass_matrix_reduces_to_the_potential_hessian_at_rest() {
+        let system = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(2.0), Mass::new(3.0)]),
+            FlatFieldSpace,
+        );
+        let state = MultifieldState::new(
+            [Field::new(3.0), Field::new(4.0)],
+            [FieldVelocity::new(0.0), FieldVelocity::new(0.0)],
+            ScaleFactor::new(1.0),
+        );
+
+        let mass = system
+            .perturbation_mass_matrix(&state)
+            .into_components()
+            .map(|row| row.map(Quantity::into_value));
+
+        assert_eq!(mass, [[4.0, 0.0], [0.0, 9.0]]);
     }
 
     #[test]

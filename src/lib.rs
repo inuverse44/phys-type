@@ -10,6 +10,7 @@ pub mod dimension;
 pub mod field_space;
 pub mod integrate;
 pub mod multifield;
+pub mod perturbation;
 pub mod potential;
 pub mod quantity;
 pub mod scalar_field;
@@ -21,7 +22,7 @@ pub use background::{
 };
 pub use dimension::{
     DimDiv, DimMul, DimSqrt, M0, M1, M2, M3, M3Over2, M4, M5Over2, MHalf, MMinus1, MMinus2,
-    MassPower,
+    MMinusHalf, MassPower,
 };
 pub use field_space::{
     ChristoffelSymbols, ContravariantField, CovariantField, CovariantPotentialHessian,
@@ -35,6 +36,11 @@ pub use integrate::{EmbeddedStep, System, rk4_step, rk45_step};
 pub use multifield::{
     CovariantMultifieldSystem, MultifieldState, MultifieldStateDelta, MultifieldStateDerivative,
     MultifieldSystem, TwoFieldKinematics,
+};
+pub use perturbation::{
+    ComplexMatrix2, ModeAcceleration, ModeAmplitude, ModeInitializationError, ModeVelocity,
+    TwoFieldModes, TwoFieldPerturbationDelta, TwoFieldPerturbationDerivative,
+    TwoFieldPerturbationState, TwoFieldPerturbationSystem,
 };
 pub use potential::{
     MultifieldPotential, MultifieldPotentialValue, Potential, PotentialDerivatives, PotentialValue,
