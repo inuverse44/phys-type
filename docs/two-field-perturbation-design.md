@@ -440,10 +440,19 @@ Hubble drag cancels exactly and the sub-horizon solution oscillates at fixed
 size instead of decaying like `1/a`. The canonical Wronskian keeps one power
 of `a` rather than three.
 
-The measured effect is that the absolute tolerance stops mattering. Before
-the rescaling, a floor of `1e-30` already destroyed convergence; afterwards
-the spectra are unchanged from `1e-45` up to about `1e-14`, roughly sixteen
-orders of headroom, and the two formulations agree to ten significant digits.
+The measured effect is that the absolute tolerance stops mattering. Measured
+with the single global floor that was in use at the time, a value of `1e-30`
+destroyed convergence before the rescaling, while afterwards the spectra were
+unchanged from `1e-45` up to about `1e-14`: roughly sixteen orders of
+headroom. The two formulations agree to ten significant digits, which is a
+strong cross-check given that the drag term, the `a''/a` term, the Wronskian
+prefactor and the initialization all differ between them.
+
+That global floor no longer exists; the next section replaces it with one
+tolerance per group of components. Re-measured against the mode tolerance
+alone, the curvature spectrum moves by `3e-9` at a mode floor of `1e-16` and
+by `9e-7` at `1e-10`, so the setting has stopped being delicate in either
+form.
 
 This is conditioning, not a change to the type-level contract: `a` is
 dimensionless, so `v` and `U` share the dimension `M^-1/2` and the type

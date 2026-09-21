@@ -1520,6 +1520,19 @@ mod tests {
     }
 
     #[test]
+    fn probe_nearly_aligned_trajectory() {
+        let system = system([1.0e-6, 1.5e-6]);
+        for second in [0.0, 1.0e-8, 1.0e-4, 1.0e-2, 1.0] {
+            let initial = slow_roll_start(&system, [12.0, second]);
+            let outcome = system.run_two_field_spectra(initial, &quick_settings());
+            match outcome {
+                Ok(run) => println!("phi_2 = {second:e}: ok, P_R = {:.6e}", run.spectra[0].p_r),
+                Err(error) => println!("phi_2 = {second:e}: {error:?}"),
+            }
+        }
+    }
+
+    #[test]
     fn csv_rows_match_their_headers() {
         let system = system([1.0e-6, 1.5e-6]);
         let initial = slow_roll_start(&system, [12.0, 8.0]);
