@@ -11,12 +11,15 @@ use crate::{
     MultifieldStateDerivative, Quantity, Time, TwiceDifferentiableMultifieldPotential,
 };
 
-/// Fourier mode amplitude `U^I_A`, with dimension fixed by
+/// Rescaled Fourier mode amplitude `v^I_A = a U^I_A`, with dimension fixed by
 /// `P_Q = k^3 |U|^2 / (2 pi^2)`.
+///
+/// The rescaling is dimensionless, so this is also the dimension of the
+/// unrescaled `U^I_A`. Only the rescaled variable is ever integrated.
 pub type ModeAmplitude<V = Complex64> = Quantity<MMinusHalf, V>;
-/// Covariant time derivative `D_t U^I_A`.
+/// Covariant time derivative `D_t v^I_A`.
 pub type ModeVelocity<V = Complex64> = Quantity<MHalf, V>;
-/// Covariant second derivative of a mode amplitude.
+/// Covariant second derivative of a rescaled mode amplitude.
 pub type ModeAcceleration<V = Complex64> = Quantity<M3Over2, V>;
 /// A dimensionless complex `2 x 2` diagnostic matrix.
 pub type ComplexMatrix2 = [[Complex64; 2]; 2];
@@ -57,14 +60,25 @@ pub fn normalized_mode_error<D>(
     error.complex_magnitude() / (absolute_tolerance.into_value() + relative_tolerance * scale)
 }
 
-/// The two independent complex two-field mode functions.
+/// The two independent complex two-field mode functions, rescaled by the
+/// scale factor.
+///
+/// The integrated variable is `v^I_A = a U^I_A`. Inside the horizon `U`
+/// carries a factor `1 / (a sqrt(2k))` and so decays by many orders of
+/// magnitude before a mode exits, which forces the absolute error tolerance
+/// far below anything the background needs. The rescaled amplitude instead
+/// oscillates at fixed size, and its Hubble drag drops from `3H` to `H`.
+///
+/// Recovering `U` divides by `a`, which
+/// [`crate::spectra::mode_covariance`] does once, at the one place where the
+/// spectra are formed.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TwoFieldModes {
-    /// `U^I_A`; first index is field space and the second labels the
-    /// independent vacuum oscillator.
-    pub amplitude: [[ModeAmplitude; 2]; 2],
-    /// `D_t U^I_A` with the same index order.
-    pub velocity: [[ModeVelocity; 2]; 2],
+    /// `v^I_A = a U^I_A`; the first index is field space and the second
+    /// labels the independent vacuum oscillator.
+    pub rescaled_amplitude: [[ModeAmplitude; 2]; 2],
+    /// `D_t v^I_A` with the same index order.
+    pub rescaled_velocity: [[ModeVelocity; 2]; 2],
 }
 
 /// Background and mode matrix for one comoving wavenumber.
@@ -105,8 +119,8 @@ impl Add<TwoFieldPerturbationDelta> for TwoFieldPerturbationState {
         Self {
             background: self.background + rhs.background,
             modes: TwoFieldModes {
-                amplitude: add_matrices(self.modes.amplitude, rhs.amplitude),
-                velocity: add_matrices(self.modes.velocity, rhs.velocity),
+                rescaled_amplitude: add_matrices(self.modes.rescaled_amplitude, rhs.amplitude),
+                rescaled_velocity: add_matrices(self.modes.rescaled_velocity, rhs.velocity),
             },
         }
     }
@@ -221,27 +235,28 @@ where
             .map_err(ModeInitializationError::KinematicBasis)?
             .basis;
         let normalization = (self.k * 2.0).sqrt();
-        let scalar_amplitude: ModeAmplitude<f64> =
-            Dimensionless::new(1.0) / (background.a * normalization);
+        // The rescaled vacuum amplitude carries no factor of the scale
+        // factor, so it is the same size for every mode: |v| = 1/sqrt(2k).
+        let scalar_amplitude: ModeAmplitude<f64> = Dimensionless::new(1.0) / normalization;
         let physical_wavenumber = self.k / background.a;
-        let frequency = Quantity::<M1, Complex64>::new(Complex64::new(
-            -hubble.into_value(),
-            -physical_wavenumber.into_value(),
-        ));
+        // D_t v = a D_t U + a H U = -i (k/a) v: rescaling cancels the Hubble
+        // term exactly, leaving a pure oscillation.
+        let frequency =
+            Quantity::<M1, Complex64>::new(Complex64::new(0.0, -physical_wavenumber.into_value()));
         let frames = [basis.tangent, basis.normal];
-        let amplitude = core::array::from_fn(|field| {
+        let rescaled_amplitude = core::array::from_fn(|field| {
             core::array::from_fn(|mode| {
                 let value = (frames[mode].components()[field] * scalar_amplitude).into_value();
                 ModeAmplitude::new(Complex64::new(value, 0.0))
             })
         });
-        let velocity = amplitude.map(|row| row.map(|entry| entry * frequency));
+        let rescaled_velocity = rescaled_amplitude.map(|row| row.map(|entry| entry * frequency));
 
         Ok(TwoFieldPerturbationState {
             background,
             modes: TwoFieldModes {
-                amplitude,
-                velocity,
+                rescaled_amplitude,
+                rescaled_velocity,
             },
         })
     }
@@ -250,21 +265,25 @@ where
     /// the identity matrix.
     pub fn wronskian(&self, state: &TwoFieldPerturbationState) -> ComplexMatrix2 {
         let metric = self.background.geometry.metric(&state.background.phi);
-        let a_cubed = state.background.a.into_value().powi(3);
+        // With v = a U the canonical Wronskian keeps one power of a rather
+        // than three, because two are cancelled by the rescaling.
+        let scale_factor = state.background.a.into_value();
         core::array::from_fn(|left_mode| {
             core::array::from_fn(|right_mode| {
                 let difference = (0..2)
                     .flat_map(|first| (0..2).map(move |second| (first, second)))
                     .fold(Complex64::new(0.0, 0.0), |sum, (first, second)| {
                         let g = *metric.components()[first][second].value();
-                        let u_left = state.modes.amplitude[first][left_mode].into_value();
-                        let p_left = state.modes.velocity[first][left_mode].into_value();
-                        let u_right = state.modes.amplitude[second][right_mode].into_value();
-                        let p_right = state.modes.velocity[second][right_mode].into_value();
+                        let u_left = state.modes.rescaled_amplitude[first][left_mode].into_value();
+                        let p_left = state.modes.rescaled_velocity[first][left_mode].into_value();
+                        let u_right =
+                            state.modes.rescaled_amplitude[second][right_mode].into_value();
+                        let p_right =
+                            state.modes.rescaled_velocity[second][right_mode].into_value();
                         sum + g * (u_left.conj() * p_right - p_left.conj() * u_right)
                     });
 
-                Complex64::new(0.0, a_cubed) * difference
+                Complex64::new(0.0, scale_factor) * difference
             })
         })
     }
@@ -287,6 +306,10 @@ where
         let mass = self.background.perturbation_mass_matrix(&state.background);
         let physical_wavenumber = self.k / state.background.a;
         let wave_number_squared = physical_wavenumber * physical_wavenumber;
+        // Rescaling U by a turns `D_t^2 U + 3H D_t U + (M + k^2/a^2) U = 0`
+        // into `D_t^2 v + H D_t v + (M + k^2/a^2 - (2 - epsilon_H) H^2) v = 0`.
+        // The subtracted term is `a''/a` written in cosmic time.
+        let expansion = hubble * hubble * (2.0 - self.background.epsilon_h(&state.background));
         let amplitude = core::array::from_fn(|upper| {
             core::array::from_fn(|mode| {
                 let connection_term = (0..2)
@@ -296,10 +319,10 @@ where
                         |sum, (first, second)| {
                             sum + connection.components()[upper][first][second]
                                 * state.background.pi[first]
-                                * state.modes.amplitude[second][mode]
+                                * state.modes.rescaled_amplitude[second][mode]
                         },
                     );
-                state.modes.velocity[upper][mode] - connection_term
+                state.modes.rescaled_velocity[upper][mode] - connection_term
             })
         });
         let velocity = core::array::from_fn(|upper| {
@@ -308,11 +331,11 @@ where
                     ModeAcceleration::new(Complex64::new(0.0, 0.0)),
                     |sum, lower| {
                         let entry = if upper == lower {
-                            mass.components()[upper][lower] + wave_number_squared
+                            mass.components()[upper][lower] + wave_number_squared - expansion
                         } else {
                             mass.components()[upper][lower]
                         };
-                        sum + entry * state.modes.amplitude[lower][mode]
+                        sum + entry * state.modes.rescaled_amplitude[lower][mode]
                     },
                 );
                 let connection_term = (0..2)
@@ -322,11 +345,13 @@ where
                         |sum, (first, second)| {
                             sum + connection.components()[upper][first][second]
                                 * state.background.pi[first]
-                                * state.modes.velocity[second][mode]
+                                * state.modes.rescaled_velocity[second][mode]
                         },
                     );
 
-                state.modes.velocity[upper][mode] * hubble * -3.0 - restoring - connection_term
+                state.modes.rescaled_velocity[upper][mode] * hubble * -1.0
+                    - restoring
+                    - connection_term
             })
         });
 
@@ -366,15 +391,15 @@ where
             .map(|(field, mode)| {
                 let amplitude = normalized_mode_error(
                     error.amplitude[field][mode],
-                    current.modes.amplitude[field][mode],
-                    next.modes.amplitude[field][mode],
+                    current.modes.rescaled_amplitude[field][mode],
+                    next.modes.rescaled_amplitude[field][mode],
                     ModeAmplitude::<f64>::new(tolerances.absolute),
                     tolerances.relative,
                 );
                 let velocity = normalized_mode_error(
                     error.velocity[field][mode],
-                    current.modes.velocity[field][mode],
-                    next.modes.velocity[field][mode],
+                    current.modes.rescaled_velocity[field][mode],
+                    next.modes.rescaled_velocity[field][mode],
                     ModeVelocity::<f64>::new(tolerances.absolute),
                     tolerances.relative,
                 );
@@ -536,7 +561,10 @@ mod tests {
         let advanced = rk4_step(&system, Time::new(0.0), &initial, Time::new(1.0));
 
         assert!(advanced.background.a.into_value() > initial.background.a.into_value());
-        assert_ne!(advanced.modes.amplitude, initial.modes.amplitude);
+        assert_ne!(
+            advanced.modes.rescaled_amplitude,
+            initial.modes.rescaled_amplitude
+        );
     }
 
     #[test]

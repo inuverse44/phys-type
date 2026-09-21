@@ -38,15 +38,12 @@ pub struct SpectrumRunSettings {
     pub max_dt: Time,
     /// Tolerances for the shared adaptive controller.
     ///
-    /// The absolute tolerance applies to raw Planck-unit values, and a run
-    /// spans an enormous range of them: the scale factor reaches `1e20` while
-    /// mode amplitudes, which carry a factor `1 / (a sqrt(2k))`, fall below
-    /// `1e-27`. An absolute floor anywhere near the mode amplitudes silently
-    /// caps their accuracy no matter how small the relative tolerance is, so
-    /// the default sits far below every component and leaves the relative
-    /// term in control. A per-component absolute scale would remove the
-    /// hazard; the dimensioned signature of `normalized_mode_error` already
-    /// allows one.
+    /// The absolute tolerance applies to raw Planck-unit values, so it has to
+    /// sit below every component of the state. Because the modes are
+    /// integrated rescaled as `v = a U`, the smallest of them starts at
+    /// `1 / sqrt(2k)` rather than at `1 / (a sqrt(2k))`, and the default
+    /// below has room to spare: the answer is unchanged up to about `1e-14`
+    /// and only degrades beyond it.
     pub tolerances: ErrorTolerances,
     /// A safety limit on attempted steps in any one stage.
     pub max_steps: usize,
@@ -79,7 +76,7 @@ impl Default for SpectrumRunSettings {
             min_dt: Time::new(1.0e-6),
             max_dt: Time::new(1.0e5),
             tolerances: ErrorTolerances {
-                absolute: 1.0e-45,
+                absolute: 1.0e-20,
                 relative: 1.0e-10,
             },
             max_steps: 1_000_000,
@@ -736,7 +733,10 @@ where
             &kinematics,
         ));
 
-        let matrix = field_power_spectrum(k, &mode_covariance(&final_state.modes));
+        let matrix = field_power_spectrum(
+            k,
+            &mode_covariance(&final_state.modes, final_state.background.a),
+        );
         let components = matrix.components();
         let squared = (self.m_pl * self.m_pl).into_value();
 
@@ -794,7 +794,8 @@ where
             .map_err(SpectrumRunError::KinematicBasis)?;
         let metric = self.geometry.metric(&state.background.phi);
         let hubble = self.hubble(&state.background);
-        let matrix = field_power_spectrum(system.k, &mode_covariance(&state.modes));
+        let matrix =
+            field_power_spectrum(system.k, &mode_covariance(&state.modes, state.background.a));
         let projected = project(
             &matrix,
             &metric,
@@ -1150,6 +1151,46 @@ mod tests {
 
         assert!(second < 0.5 * first, "{first} then {second}");
         assert!(third < 0.5 * second, "{second} then {third}");
+    }
+
+    #[test]
+    fn the_answer_is_insensitive_to_the_absolute_tolerance() {
+        // Before the modes were rescaled by the scale factor, an absolute
+        // floor of 1e-30 already sat above the mode amplitudes and silently
+        // capped their accuracy. The rescaled amplitude starts at
+        // 1 / sqrt(2k) and grows with the scale factor afterwards, so the
+        // floor can be raised by many orders without moving the answer.
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let curvature = |absolute| {
+            system
+                .run_two_field_spectra(
+                    initial,
+                    &SpectrumRunSettings {
+                        tolerances: ErrorTolerances {
+                            absolute,
+                            relative: 1.0e-10,
+                        },
+                        ..quick_settings()
+                    },
+                )
+                .unwrap()
+                .spectra[0]
+                .p_r
+        };
+
+        let reference = curvature(1.0e-45);
+        for absolute in [1.0e-30, 1.0e-20, 1.0e-16] {
+            let value = curvature(absolute);
+            let relative = (value - reference).abs() / reference;
+
+            // Raising the floor across twenty-nine orders of magnitude moves
+            // the answer by less than a part in ten million.
+            assert!(
+                relative < 1.0e-7,
+                "absolute {absolute:e} moved P_R by {relative:e}"
+            );
+        }
     }
 
     #[test]

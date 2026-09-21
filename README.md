@@ -184,8 +184,12 @@ initializing the vacuum there, and reports spectra at one output time. A mode
 that cannot be placed deep enough inside the horizon is a typed error, not a
 silently poor approximation. Note that the single absolute error tolerance
 applies to raw Planck-unit values across a run spanning some fifty orders of
-magnitude, so it must sit far below the smallest component; the default does,
-and `docs/two-field-perturbation-design.md` records why.
+magnitude, so it must sit far below the smallest component. The modes are
+integrated rescaled as `v = a U`, which keeps the vacuum amplitude at
+`1/sqrt(2k)` instead of letting it decay with the scale factor, and leaves the
+answer unchanged across some thirty orders of absolute tolerance;
+`docs/two-field-perturbation-design.md` records the measurement and what is
+still left to do.
 
 ## Compile-fail tests
 

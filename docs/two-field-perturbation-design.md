@@ -393,28 +393,54 @@ number.
 An absolute floor anywhere near the mode amplitudes caps their accuracy no
 matter how small the relative tolerance is. The symptom is subtle, because
 nothing fails: the spectra simply stop converging as `x_init` grows, settling
-on a plateau near `1e-3`. The driver therefore defaults to an absolute
-tolerance far below every component, which is a workaround rather than a fix.
+on a plateau near `1e-3`.
 
-The fix is to stop evolving quantities with that range. In conformal time,
-with the rescaled mode variable
+The implemented remedy is to stop evolving a quantity with that range. The
+mode matrix is integrated rescaled,
 
 ```math
-v^I = a\,U^I,
-\qquad
-\mathrm d\tau = \frac{\mathrm dt}{a},
+v^I{}_A = a\,U^I{}_A,
 ```
 
-the sub-horizon solution is `v ~ e^{-ik tau} / sqrt(2k)`, which oscillates
-with no secular decay, so one relative tolerance is appropriate for every
-mode component. Evolving `ln a` instead of `a`, or taking `N` as the
-independent variable, does the same for the background. The dimensional
-bookkeeping barely moves: `a` is dimensionless and conformal time keeps
-`M^-1`, so this is numerical conditioning rather than a change to the
-type-level contract.
+which turns
 
-A per-component absolute scale is the smaller, complementary change; the
-dimensioned signature of `normalized_mode_error` already permits one.
+```math
+D_t^2 U + 3H D_t U + \left(M + \frac{k^2}{a^2}\right)U = 0
+```
+
+into
+
+```math
+D_t^2 v + H D_t v
++ \left(M + \frac{k^2}{a^2} - (2-\epsilon_H)H^2\right)v = 0,
+```
+
+where the subtracted term is `a''/a` written in cosmic time. The vacuum
+initialization becomes `|v| = 1/sqrt(2k)` with `D_t v = -i(k/a)v`, so the
+Hubble drag cancels exactly and the sub-horizon solution oscillates at fixed
+size instead of decaying like `1/a`. The canonical Wronskian keeps one power
+of `a` rather than three.
+
+The measured effect is that the absolute tolerance stops mattering. Before
+the rescaling, a floor of `1e-30` already destroyed convergence; afterwards
+the spectra are unchanged from `1e-45` up to about `1e-14`, roughly sixteen
+orders of headroom, and the two formulations agree to ten significant digits.
+
+This is conditioning, not a change to the type-level contract: `a` is
+dimensionless, so `v` and `U` share the dimension `M^-1/2` and the type
+system cannot separate them. The rescaling is therefore undone in exactly
+one place, `mode_covariance`, which takes the scale factor as an argument so
+that the conversion cannot be forgotten silently.
+
+Two things are deliberately left undone. The rescaled amplitude grows with
+`a` once a mode is outside the horizon, so the range is moved into a benign
+region rather than eliminated; a per-component absolute scale, which the
+dimensioned signature of `normalized_mode_error` already permits, would
+remove the hazard outright. And the independent variable is still cosmic
+time: conformal time would additionally make the sub-horizon frequency
+constant at `k`, but `Time` and a conformal time would share the dimension
+`M^-1` and so would be the same type, which needs its own marker to stay
+safe.
 
 Relatedly, normalizing `a = 1` at the initial state rather than at the end of
 inflation is what makes `k_pivot` print as `5.5e14 M_pl`. The number is
@@ -453,9 +479,12 @@ Work proceeds in this order, one independently reviewable feature at a time:
     output, and physical validation against the analytic limits.
 11. `feature/two-field-spectrum-plots` -- the four-panel scientific figure and
     reproducible generation command.
-12. `feature/conformal-time-modes` -- conformal time with `v^I = a U^I`, and a
-    background evolved in `ln a`, removing the dynamic range that currently
-    limits mode accuracy.
+12. `feature/rescaled-mode-variable` -- integrate `v^I = a U^I` so the mode
+    amplitudes stop decaying with the scale factor.
+13. `feature/per-component-tolerances` -- a dimensioned absolute scale per
+    component group, removing the remaining dependence on one global floor.
+14. `feature/conformal-time-modes` -- conformal time as a distinct
+    independent-variable type, and a background evolved in `ln a`.
 
 Each branch starts from the updated default branch, contains one conceptual
 change, passes `cargo fmt --check`, `cargo clippy --all-targets`, and

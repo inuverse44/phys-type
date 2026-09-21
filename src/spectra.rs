@@ -13,7 +13,7 @@ use num_complex::Complex64;
 use crate::{
     ComplexMagnitude, ContravariantField, CovariantField, CurvedFieldSpaceGeometry, Dimensionless,
     FieldMetric, FieldTensor2, Hubble, KinematicBasis2, KinematicBasisError, M0, M2, MMinus1, Mass,
-    ModeAmplitude, Quantity, TwiceDifferentiableMultifieldPotential, TwoFieldModes,
+    ModeAmplitude, Quantity, ScaleFactor, TwiceDifferentiableMultifieldPotential, TwoFieldModes,
     TwoFieldPerturbationState, TwoFieldPerturbationSystem, Upper,
 };
 
@@ -118,22 +118,28 @@ pub struct ProjectedSpectra {
     pub correlation: f64,
 }
 
-/// Builds `Sigma^{IJ} = sum_A U^I_A U^{J*}_A` from a mode matrix.
+/// Builds `Sigma^{IJ} = sum_A U^I_A U^{J*}_A` from a rescaled mode matrix.
 ///
-/// The sum runs over the independent vacuum oscillators, so the result is
-/// Hermitian by construction up to floating-point rounding.
-pub fn mode_covariance(modes: &TwoFieldModes) -> ModeCovariance {
+/// The modes are integrated as `v^I_A = a U^I_A`, so this is the one place
+/// where the rescaling is undone: the sum carries `1 / a^2`. It runs over the
+/// independent vacuum oscillators, so the result is Hermitian by construction
+/// up to floating-point rounding.
+pub fn mode_covariance(modes: &TwoFieldModes, scale_factor: ScaleFactor) -> ModeCovariance {
+    let squared = scale_factor * scale_factor;
+
     ModeCovariance::new(core::array::from_fn(|row| {
         core::array::from_fn(|column| {
-            (0..2).fold(
+            let rescaled = (0..2).fold(
                 Quantity::<MMinus1, Complex64>::new(Complex64::new(0.0, 0.0)),
                 |sum, mode| {
                     let conjugate =
-                        ModeAmplitude::new(modes.amplitude[column][mode].value().conj());
+                        ModeAmplitude::new(modes.rescaled_amplitude[column][mode].value().conj());
 
-                    sum + modes.amplitude[row][mode] * conjugate
+                    sum + modes.rescaled_amplitude[row][mode] * conjugate
                 },
-            )
+            );
+
+            rescaled / squared
         })
     }))
 }
@@ -335,7 +341,8 @@ where
             .map_err(SpectrumError::KinematicBasis)?;
         let metric = self.background.geometry.metric(&state.background.phi);
         let hubble = self.background.hubble(&state.background);
-        let spectrum = field_power_spectrum(self.k, &mode_covariance(&state.modes));
+        let spectrum =
+            field_power_spectrum(self.k, &mode_covariance(&state.modes, state.background.a));
 
         project(&spectrum, &metric, &kinematics.basis, hubble, tolerances)
     }
@@ -381,7 +388,8 @@ mod tests {
     fn mode_covariance_is_hermitian() {
         let system = system();
         let state = system.bunch_davies_state(background(), 100.0).unwrap();
-        let spectrum = field_power_spectrum(system.k, &mode_covariance(&state.modes));
+        let spectrum =
+            field_power_spectrum(system.k, &mode_covariance(&state.modes, state.background.a));
 
         assert!(hermiticity_residual(&spectrum) < 1.0e-14);
     }
@@ -391,7 +399,8 @@ mod tests {
         let system = system();
         let initial = background();
         let state = system.bunch_davies_state(initial, 100.0).unwrap();
-        let spectrum = field_power_spectrum(system.k, &mode_covariance(&state.modes));
+        let spectrum =
+            field_power_spectrum(system.k, &mode_covariance(&state.modes, state.background.a));
 
         // With U^I_A = e_A^I / (a sqrt(2k)), the covariance is the inverse
         // metric over 2 k a^2, so P^{IJ} = (k/a)^2 G^{IJ} / (4 pi^2).
@@ -559,7 +568,7 @@ mod tests {
         // any growth measures integration error rather than physics.
         let system = system();
         let state = system.bunch_davies_state(background(), 100.0).unwrap();
-        let initial = mode_covariance(&state.modes);
+        let initial = mode_covariance(&state.modes, state.background.a);
 
         for row in initial.components() {
             for entry in row {
@@ -568,7 +577,7 @@ mod tests {
         }
 
         let advanced = rk4_step(&system, Time::new(0.0), &state, Time::new(1.0));
-        let evolved = mode_covariance(&advanced.modes);
+        let evolved = mode_covariance(&advanced.modes, advanced.background.a);
         let scale = evolved
             .components()
             .iter()
@@ -602,10 +611,10 @@ mod tests {
     fn mode_velocities_do_not_enter_the_covariance() {
         let system = system();
         let mut state = system.bunch_davies_state(background(), 100.0).unwrap();
-        let before = mode_covariance(&state.modes);
+        let before = mode_covariance(&state.modes, state.background.a);
 
-        state.modes.velocity = [[ModeVelocity::new(Complex64::new(7.0, -3.0)); 2]; 2];
+        state.modes.rescaled_velocity = [[ModeVelocity::new(Complex64::new(7.0, -3.0)); 2]; 2];
 
-        assert_eq!(mode_covariance(&state.modes), before);
+        assert_eq!(mode_covariance(&state.modes, state.background.a), before);
     }
 }

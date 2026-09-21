@@ -46,6 +46,13 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the single-field diagnostics, with run provenance read from the CSV metadata
   block and captioned on the figure.
 
+### Changed
+
+- Two-field modes are integrated as `v = a U` rather than `U`, so the absolute
+  error tolerance no longer has to sit below decaying mode amplitudes.
+  `TwoFieldModes` exposes `rescaled_amplitude` and `rescaled_velocity`, and
+  `mode_covariance` takes the scale factor that undoes the rescaling.
+
 ## [0.1.0] - 2026-09-21
 
 ### Added
