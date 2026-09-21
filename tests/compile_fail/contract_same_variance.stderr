@@ -1,0 +1,7 @@
+error[E0599]: no method named `contract` found for struct `FieldVector<phys_type::Upper, MassPower<typenum::int::PInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>>>, f64, 2>` in the current scope
+  --> tests/compile_fail/contract_same_variance.rs:13:24
+   |
+13 |     let _invalid = lhs.contract(&rhs);
+   |                        ^^^^^^^^ method not found in `FieldVector<phys_type::Upper, MassPower<typenum::int::PInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>>>, f64, 2>`
+   |
+   = note: the method was found for `FieldVector<phys_type::Lower, Dl, f64, N>`

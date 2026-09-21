@@ -7,6 +7,7 @@
 pub mod autodiff;
 pub mod background;
 pub mod dimension;
+pub mod field_space;
 pub mod integrate;
 pub mod multifield;
 pub mod potential;
@@ -21,6 +22,10 @@ pub use background::{
 pub use dimension::{
     DimDiv, DimMul, DimSqrt, M0, M1, M2, M3, M3Over2, M4, M5Over2, MHalf, MMinus1, MMinus2,
     MassPower,
+};
+pub use field_space::{
+    ContravariantField, CovariantField, FieldMetric, FieldTensor2, FieldVector, InverseFieldMetric,
+    Lower, Upper,
 };
 pub use integrate::{EmbeddedStep, System, rk4_step, rk45_step};
 pub use multifield::{

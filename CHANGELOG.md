@@ -6,6 +6,13 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Fixed-size field-space vectors and rank-two tensors with compile-time upper
+  and lower indices.
+- Explicit metric raise/lower operations and opposite-variance contraction.
+- Compile-fail coverage for invalid field-space index operations.
+
 ## [0.1.0] - 2026-09-21
 
 ### Added

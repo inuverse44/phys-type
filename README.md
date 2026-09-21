@@ -61,6 +61,7 @@ checks are documented in
 | --- | --- |
 | `autodiff` | First-order forward-mode automatic differentiation with `Dual` |
 | `dimension` | `MassPower<E>` and the type-level `DimMul`, `DimDiv`, `DimSqrt` |
+| `field_space` | Fixed-size vectors/tensors with typed upper and lower indices |
 | `quantity` | `Quantity<D, V>` and its arithmetic |
 | `state` | `State`, `StateDerivative`, `StateDelta` |
 | `potential` | Automatically differentiated potentials and `QuadraticPotential` |
@@ -93,6 +94,12 @@ The current multifield solver is a flat, canonical background implementation.
 It does not yet evolve quantum perturbations or power spectra. Those stages,
 including typed upper/lower field-space indices, are tracked in the two-field
 perturbation design.
+
+Field-space variance is already available independently of physical
+dimension. `FieldMetric<N>::lower` maps an upper-index vector to a lower-index
+vector, `InverseFieldMetric<N>::raise` performs the inverse operation, and
+only opposite-variance vectors expose contraction. Invalid index operations
+are covered by compile-fail tests.
 
 ## Compile-fail tests
 
