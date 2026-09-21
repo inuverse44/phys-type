@@ -1,0 +1,22 @@
+# Changelog
+
+All notable changes to this project will be documented in this file. The
+format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
+the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.1.0] - 2026-09-21
+
+### Added
+
+- Compile-time mass dimensions with half-integer exponents.
+- Dimension-aware quantities, states, derivatives, and state changes.
+- Forward-mode automatic differentiation for potential gradients.
+- Fixed-step RK4 and adaptive Dormand–Prince 5(4) integration.
+- Single-field and canonical const-generic multifield backgrounds.
+- Compile-fail tests for dimensionally invalid expressions.
+- CSV diagnostics and reproducible Matplotlib visualization workflow.
+
+[Unreleased]: https://github.com/inuverse44/phys-type/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/inuverse44/phys-type/releases/tag/v0.1.0

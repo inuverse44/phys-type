@@ -96,3 +96,13 @@ message, refresh the expectations with:
 ```sh
 TRYBUILD=overwrite cargo test --test compile_fail
 ```
+
+## Contributing and license
+
+Development and verification steps are documented in
+[`CONTRIBUTING.md`](CONTRIBUTING.md). Changes are recorded in
+[`CHANGELOG.md`](CHANGELOG.md).
+
+This project is dual-licensed under the
+[MIT license](LICENSE-MIT) or [Apache License 2.0](LICENSE-APACHE), at your
+option.
