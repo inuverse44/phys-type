@@ -413,6 +413,10 @@ diagnostics/two_field_final_spectra.png
 diagnostics/two_field_final_spectra.pdf
 ```
 
+基準モデルから生成した参照図は`docs/figures/`にもPNGとPDFで保存する。
+`diagnostics/`は再生成可能な作業出力、`docs/figures/`はレビューやREADMEから
+直接参照する版という役割分担にする。
+
 横軸は`k/k_pivot`、縦軸は無次元の`P_R`と`P_S`で、両方とも対数軸とする。
 二つの系列を単純に足したものを曲率スペクトルとは呼ばない。図中の`P_R`は、
 等曲率modeからのsourceを含めて終了時まで発展させた曲率modeから直接構成する。

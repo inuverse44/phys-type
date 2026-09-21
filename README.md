@@ -60,6 +60,11 @@ axis at the end of inflation:
 uv run plots/final_spectra.py diagnostics/two_field_spectra.csv
 ```
 
+A reference result generated at the end of inflation is tracked as
+[`docs/figures/two_field_final_spectra.png`](docs/figures/two_field_final_spectra.png)
+with a vector
+[`PDF`](docs/figures/two_field_final_spectra.pdf).
+
 Generate every diagnostic CSV and publication-quality PNG/PDF figure with one
 command:
 
