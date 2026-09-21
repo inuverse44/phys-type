@@ -62,6 +62,12 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `project_modes` reports the curvature and entropy amplitude of each
   independent mode, which the super-horizon transfer matrix needs.
 
+### Fixed
+
+- A spectrum run refuses a wavenumber that has not left the horizon by the
+  requested output time, instead of reporting its Bunch-Davies vacuum as a
+  spectrum.
+
 ## [0.1.0] - 2026-09-21
 
 ### Added

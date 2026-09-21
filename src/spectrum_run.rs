@@ -119,6 +119,15 @@ pub enum SpectrumRunError {
     MinimumStepReached,
     /// A stage exhausted its step budget.
     StepLimitReached,
+    /// A mode had not left the horizon by the requested output time, so the
+    /// reported spectrum would still be its vacuum rather than a physical
+    /// result.
+    OutputBeforeHorizonExit {
+        /// The wavenumber in Planck units.
+        k: f64,
+        /// `k/(aH)` at the output time, which must be below one.
+        k_over_ah: f64,
+    },
     /// A mode could not be placed in the Bunch-Davies vacuum.
     ModeInitialization {
         /// The wavenumber in Planck units.
@@ -757,6 +766,18 @@ where
 
         if let Some(error) = sample_error {
             return Err(error);
+        }
+
+        // A mode that has not left the horizon by the output time still holds
+        // its vacuum, which would be reported as a spectrum. The driver
+        // refuses rather than returning a number that looks physical.
+        let depth =
+            (k / (final_state.background.a * self.hubble(&final_state.background))).into_value();
+        if !(depth < 1.0) {
+            return Err(SpectrumRunError::OutputBeforeHorizonExit {
+                k: k.into_value(),
+                k_over_ah: depth,
+            });
         }
 
         let (projected, kinematics) =
@@ -1528,6 +1549,34 @@ mod tests {
             match outcome {
                 Ok(run) => println!("phi_2 = {second:e}: ok, P_R = {:.6e}", run.spectra[0].p_r),
                 Err(error) => println!("phi_2 = {second:e}: {error:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_mode_still_inside_the_horizon_is_refused() {
+        // With the pivot exiting six e-folds before the end, asking for
+        // output earlier than that leaves the mode inside the horizon, where
+        // its "spectrum" is just the vacuum it was initialized with.
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let at = |output| {
+            system.run_two_field_spectra(
+                initial,
+                &SpectrumRunSettings {
+                    output_e_folds_before_end: output,
+                    ..quick_settings()
+                },
+            )
+        };
+
+        assert!(at(2.0).is_ok());
+        for output in [6.5, 7.5] {
+            match at(output) {
+                Err(SpectrumRunError::OutputBeforeHorizonExit { k_over_ah, .. }) => {
+                    assert!(k_over_ah >= 1.0, "reported k/(aH) = {k_over_ah}");
+                }
+                other => panic!("expected a refusal at output {output}, got {other:?}"),
             }
         }
     }

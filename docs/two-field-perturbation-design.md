@@ -225,7 +225,11 @@ Only the relative phase matters for spectra, so the implementation may set
 the common initial phase to zero. The normalization is checked by a conserved
 Wronskian. Runs that cannot place every requested mode sufficiently inside
 the horizon return a typed error instead of silently using a poor vacuum
-approximation.
+approximation. The same applies at the other end: a mode that has not left
+the horizon by the requested output time still holds its vacuum, and
+reporting that as a spectrum would look entirely physical — positive,
+Hermitian, and orders of magnitude too large. The driver checks `k/(aH) < 1`
+at the output time and refuses otherwise.
 
 The first correctness-oriented release evolves `Complex64` mode components
 and the background together for each `k` through the existing integrator.

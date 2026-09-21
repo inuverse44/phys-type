@@ -182,7 +182,9 @@ to the end of inflation, fixes `k_pivot = a_* H_*` a chosen number of e-folds
 earlier, carries every wavenumber to a stated number of e-folds before its own
 horizon exit before initializing the vacuum there, and reports spectra at one
 output time. A mode that cannot be placed deep enough inside the horizon is a
-typed error, not a silently poor approximation.
+typed error, not a silently poor approximation, and so is one that has not
+left the horizon by the output time, whose vacuum would otherwise be reported
+as a spectrum.
 
 A run spans tens of orders of magnitude, so absolute error tolerances are per
 group of components and carry each group's dimension: a tolerance meant for
