@@ -492,9 +492,14 @@ pub struct TwoFieldPerturbationTolerance {
 one quantity cannot bound another, and a compile-fail test holds that open.
 
 The mode tolerances default to zero, which is the point rather than an
-oversight. A mode component is complex and is normalized by its modulus,
-and the modulus of a physical mode does not vanish, so no floor is needed to
-keep the ratio finite. Any floor placed there becomes the accuracy ceiling of
+oversight. A mode error is normalized by a modulus, and the modulus of a
+physical mode does not vanish, so no floor is needed to keep the ratio finite.
+That argument is about the mode, not about each component of the mode matrix,
+and the norm follows it: every component is measured against the largest
+modulus in its matrix. An individual component can sit exactly at zero — an
+axis-aligned trajectory puts exact zeros off the diagonal — and normalizing
+such a component by itself would give it an unbounded ratio as soon as
+rounding made its error non-zero. Any floor placed there becomes the accuracy ceiling of
 the modes instead, which is exactly how the run used to lose its convergence
 in `x_init` without anything failing. The background components are real and
 can pass through zero, so they keep a floor, and one raw Planck-unit number

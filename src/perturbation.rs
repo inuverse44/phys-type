@@ -40,26 +40,30 @@ impl<D> ComplexMagnitude for Quantity<D, Complex64> {
 }
 
 /// The dimensionless normalized error of one complex component,
-/// `|dz| / (a_tol + r_tol |z|)`.
+/// `|dz| / (a_tol + r_tol * reference)`.
 ///
-/// The absolute tolerance carries the component's own dimension, so a
-/// tolerance meant for a mode amplitude cannot be applied to a mode velocity.
-/// The relative tolerance and the returned error are dimensionless. Both the
-/// current and the advanced value enter the scale, matching the background
-/// integrator, and the modulus keeps a single acceptance decision for the real
-/// and imaginary parts together.
+/// The absolute tolerance and the reference carry the component's own
+/// dimension, so a tolerance meant for a mode amplitude cannot be applied to a
+/// mode velocity. The relative tolerance and the returned error are
+/// dimensionless, and the modulus keeps a single acceptance decision for the
+/// real and imaginary parts together.
+///
+/// `reference` is the magnitude the component is measured against, and for a
+/// mode matrix it is the largest modulus in the matrix rather than the
+/// component's own. An individual component may sit exactly at zero — an
+/// axis-aligned trajectory puts exact zeros off the diagonal — while the mode
+/// as a whole does not, and normalizing each component by itself would let an
+/// arbitrarily small one dominate the norm.
 pub fn normalized_mode_error<D>(
     error: Quantity<D, Complex64>,
-    current: Quantity<D, Complex64>,
-    next: Quantity<D, Complex64>,
+    reference: Quantity<D, f64>,
     absolute_tolerance: Quantity<D, f64>,
     relative_tolerance: f64,
 ) -> f64 {
-    let magnitude = current.complex_magnitude().max(next.complex_magnitude());
-    let scale = absolute_tolerance.into_value() + relative_tolerance * magnitude;
+    let scale = absolute_tolerance.into_value() + relative_tolerance * reference.into_value().abs();
     if scale == 0.0 {
-        // A vanished component under pure relative control: an exact zero
-        // error is fine, anything else is unbounded.
+        // A vanished mode under pure relative control: an exact zero error is
+        // fine, anything else is unbounded.
         return if error.complex_magnitude() == 0.0 {
             0.0
         } else {
@@ -68,6 +72,21 @@ pub fn normalized_mode_error<D>(
     }
 
     error.complex_magnitude() / scale
+}
+
+/// The largest modulus in a mode matrix over both of two states.
+fn mode_matrix_scale<D: Copy>(
+    current: &[[Quantity<D, Complex64>; 2]; 2],
+    next: &[[Quantity<D, Complex64>; 2]; 2],
+) -> Quantity<D, f64> {
+    let largest = current
+        .iter()
+        .chain(next.iter())
+        .flatten()
+        .map(ComplexMagnitude::complex_magnitude)
+        .fold(0.0, f64::max);
+
+    Quantity::new(largest)
 }
 
 /// The two independent complex two-field mode functions, rescaled by the
@@ -427,20 +446,29 @@ where
             &ErrorTolerances::new(tolerances.absolute.background, tolerances.relative),
         );
 
+        // One scale per mode matrix, not per component: see
+        // `normalized_mode_error`.
+        let amplitude_scale = mode_matrix_scale(
+            &current.modes.rescaled_amplitude,
+            &next.modes.rescaled_amplitude,
+        );
+        let velocity_scale = mode_matrix_scale(
+            &current.modes.rescaled_velocity,
+            &next.modes.rescaled_velocity,
+        );
+
         (0..2)
             .flat_map(|field| (0..2).map(move |mode| (field, mode)))
             .map(|(field, mode)| {
                 let amplitude = normalized_mode_error(
                     error.amplitude[field][mode],
-                    current.modes.rescaled_amplitude[field][mode],
-                    next.modes.rescaled_amplitude[field][mode],
+                    amplitude_scale,
                     tolerances.absolute.rescaled_amplitude,
                     tolerances.relative,
                 );
                 let velocity = normalized_mode_error(
                     error.velocity[field][mode],
-                    current.modes.rescaled_velocity[field][mode],
-                    next.modes.rescaled_velocity[field][mode],
+                    velocity_scale,
                     tolerances.absolute.rescaled_velocity,
                     tolerances.relative,
                 );
@@ -484,40 +512,72 @@ mod tests {
     #[test]
     fn normalized_error_uses_the_modulus_of_the_whole_complex_component() {
         let error = ModeAmplitude::new(Complex64::new(3.0e-9, 4.0e-9));
-        let current = ModeAmplitude::new(Complex64::new(1.0, 0.0));
-        let next = ModeAmplitude::new(Complex64::new(0.0, 2.0));
+        let reference = ModeAmplitude::<f64>::new(2.0);
         let absolute = ModeAmplitude::<f64>::new(0.0);
 
-        // |error| = 5e-9 and the scale is max(1, 2) = 2.
-        let ratio = normalized_mode_error(error, current, next, absolute, 1.0e-9);
+        // |error| = 5e-9 against a reference of 2.
+        let ratio = normalized_mode_error(error, reference, absolute, 1.0e-9);
 
         assert!((ratio - 2.5).abs() < 1.0e-12);
     }
 
     #[test]
     fn a_purely_imaginary_error_is_not_ignored() {
-        let current = ModeAmplitude::new(Complex64::new(1.0, 0.0));
+        let reference = ModeAmplitude::<f64>::new(1.0);
         let absolute = ModeAmplitude::<f64>::new(0.0);
         let real_error = ModeAmplitude::new(Complex64::new(1.0e-6, 0.0));
         let imaginary_error = ModeAmplitude::new(Complex64::new(0.0, 1.0e-6));
 
-        let from_real = normalized_mode_error(real_error, current, current, absolute, 1.0e-9);
-        let from_imaginary =
-            normalized_mode_error(imaginary_error, current, current, absolute, 1.0e-9);
+        let from_real = normalized_mode_error(real_error, reference, absolute, 1.0e-9);
+        let from_imaginary = normalized_mode_error(imaginary_error, reference, absolute, 1.0e-9);
 
         assert_eq!(from_real, from_imaginary);
         assert!(from_real > 1.0);
     }
 
     #[test]
-    fn a_vanishing_component_falls_back_to_the_absolute_tolerance() {
+    fn a_vanished_mode_falls_back_to_the_absolute_tolerance() {
         let error = ModeAmplitude::new(Complex64::new(1.0e-13, 0.0));
-        let zero = ModeAmplitude::new(Complex64::new(0.0, 0.0));
         let absolute = ModeAmplitude::<f64>::new(1.0e-12);
 
-        let ratio = normalized_mode_error(error, zero, zero, absolute, 1.0e-9);
+        let ratio = normalized_mode_error(error, ModeAmplitude::<f64>::new(0.0), absolute, 1.0e-9);
 
         assert!(ratio < 1.0);
+    }
+
+    #[test]
+    fn a_zero_component_does_not_dominate_the_mode_norm() {
+        // An axis-aligned trajectory puts exact zeros off the diagonal of the
+        // mode matrix. Normalizing each component by its own modulus would
+        // give those an unbounded ratio as soon as rounding made their error
+        // non-zero; normalizing by the matrix keeps them harmless.
+        let system = system();
+        let background = MultifieldState::new(
+            [Field::new(12.0), Field::new(0.0)],
+            [FieldVelocity::new(-3.0e-6), FieldVelocity::new(0.0)],
+            ScaleFactor::new(1.0),
+        );
+        let state = system.bunch_davies_state(background, 100.0).unwrap();
+        assert_eq!(
+            state.modes.rescaled_amplitude[0][1].complex_magnitude(),
+            0.0
+        );
+
+        let tolerances = ErrorTolerances::new(
+            TwoFieldPerturbationTolerance::background_in_planck_units(1.0e-12),
+            1.0e-8,
+        );
+        let mut delta = zero_delta();
+        // Rounding-sized noise in the component that sits at zero.
+        delta.amplitude[0][1] = ModeAmplitude::new(Complex64::new(1.0e-16, 0.0));
+
+        let ratio = system.error_ratio(&state, &state, &delta, &tolerances);
+
+        assert!(ratio.is_finite(), "ratio was {ratio}");
+        assert!(
+            ratio < 1.0,
+            "a rounding-sized error was treated as large: {ratio}"
+        );
     }
 
     fn zero_delta() -> TwoFieldPerturbationDelta {
