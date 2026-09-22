@@ -72,9 +72,8 @@ and the version/tag history is internally consistent.
 
 1. **Completed:** export both horizon-exit and requested-output spectra, with
    `N`, `k/(aH)`, and explicit evaluation-epoch metadata.
-2. Normalize the scale factor at the end of inflation, or export normalized
-   wavenumbers as the canonical values, so a pivot is not presented as an
-   unreadable raw value near `1e9 M_pl`.
+2. **Completed:** make `k/k_pivot` the canonical exported coordinate and label
+   the normalization-dependent raw value as `k_internal_over_m_pl`.
 3. Add an observational/likelihood boundary that names the pivot convention
    and data release.  The current `A_s = 2.1e-9` remains a benchmark target,
    not a fit.

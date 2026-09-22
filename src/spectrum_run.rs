@@ -306,8 +306,9 @@ impl BackgroundRecord {
 pub struct SpectrumRecord {
     /// `k / k_pivot`.
     pub k_over_pivot: f64,
-    /// `k / M_pl`.
-    pub k: f64,
+    /// Internal `k / M_pl`, which depends on the arbitrary normalization of
+    /// the scale factor. Use [`Self::k_over_pivot`] for comparisons.
+    pub k_internal_over_m_pl: f64,
     /// `N = ln(a / a_initial)` at this evaluation epoch.
     pub e_folds: f64,
     /// `k / (a H)` at this evaluation epoch.
@@ -343,7 +344,7 @@ pub struct SpectrumRecord {
 
 impl SpectrumRecord {
     /// The CSV header matching [`SpectrumRecord::to_csv_row`].
-    pub const CSV_HEADER: &'static str = "k_over_pivot,k,N,k_over_aH,P_11,P_22,Re_P_12,Im_P_12,P_Qsigma,P_Qs,C_Qsigma_Qs,P_R,P_S,C_RS,r_C";
+    pub const CSV_HEADER: &'static str = "k_over_pivot,k_internal_over_m_pl,N,k_over_aH,P_11,P_22,Re_P_12,Im_P_12,P_Qsigma,P_Qs,C_Qsigma_Qs,P_R,P_S,C_RS,r_C";
 
     /// Formats the row as comma-separated values.
     pub fn to_csv_row(&self) -> String {
@@ -351,7 +352,7 @@ impl SpectrumRecord {
             "{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},\
              {:.9e},{:.9e},{:.9e}",
             self.k_over_pivot,
-            self.k,
+            self.k_internal_over_m_pl,
             self.e_folds,
             self.k_over_ah,
             self.p_11,
@@ -536,7 +537,11 @@ pub fn write_metadata<W: Write>(
         "# pivot: k_pivot = a H at N_end - {:e}",
         settings.pivot_e_folds_before_end
     )?;
-    writeln!(writer, "# k_pivot_over_m_pl: {:e}", pivot.k.into_value())?;
+    writeln!(
+        writer,
+        "# k_pivot_internal_over_m_pl: {:e}",
+        pivot.k.into_value()
+    )?;
     writeln!(
         writer,
         "# hubble_at_pivot_over_m_pl: {:e}",
@@ -1173,7 +1178,7 @@ where
 
         Ok(SpectrumRecord {
             k_over_pivot,
-            k: (k / self.m_pl).into_value(),
+            k_internal_over_m_pl: (k / self.m_pl).into_value(),
             e_folds: state.background.e_folds(initial),
             k_over_ah: (k / (background.a * self.hubble(&background))).into_value(),
             p_11: components[0][0].value().re / squared,
@@ -2343,7 +2348,7 @@ mod tests {
 
         assert!(text.contains("# revision: abc123"));
         assert!(text.contains("# e_folds_before_exit: 2e0"));
-        assert!(text.contains("# k_pivot_over_m_pl: 1.5e-5"));
+        assert!(text.contains("# k_pivot_internal_over_m_pl: 1.5e-5"));
         assert!(text.lines().all(|line| line.starts_with('#')));
     }
 }

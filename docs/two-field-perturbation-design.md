@@ -329,8 +329,10 @@ point tolerance.
 
 The scale factor has an arbitrary normalization. Configuration therefore
 defines a pivot `k_pivot` by `k_pivot = a_* H_*` at a selected number of
-e-folds before the end of inflation, and reports both `k/k_pivot` and the
-internal comoving `k`.
+e-folds before the end of inflation. `k/k_pivot` is the canonical exported
+coordinate. The raw comoving value is retained only as
+`k_internal_over_m_pl`, explicitly marking its dependence on the internal
+scale-factor normalization.
 
 ## Data products and figures
 
@@ -344,7 +346,7 @@ N, phi_1, phi_2, pi_1, pi_2, H, epsilon_H,
 e_sigma_1, e_sigma_2, e_s_1, e_s_2, eta_perp
 
 horizon_exit_spectra.csv and spectra.csv:
-k_over_pivot, k, N, k_over_aH, P_11, P_22, Re_P_12, Im_P_12,
+k_over_pivot, k_internal_over_m_pl, N, k_over_aH, P_11, P_22, Re_P_12, Im_P_12,
 P_Qsigma, P_Qs, C_Qsigma_Qs, P_R, P_S, C_RS, r_C
 
 mode_evolution.csv:

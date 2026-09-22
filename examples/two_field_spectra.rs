@@ -232,7 +232,7 @@ fn main() -> io::Result<()> {
 
     eprintln!("e-folds of inflation   {:.4}", run.pivot.e_folds_at_end);
     eprintln!("pivot at N             {:.4}", run.pivot.e_folds_at_pivot);
-    eprintln!("k_pivot                {:e} M_pl", run.pivot.k.into_value());
+    eprintln!("k_pivot (internal)     {:e} M_pl", run.pivot.k.into_value());
     eprintln!(
         "H at pivot             {:e} M_pl",
         run.pivot.hubble.into_value()
