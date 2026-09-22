@@ -86,12 +86,18 @@ transfer is directly inspectable, and observational assumptions are explicit.
 
 ### P2: remove avoidable repeated work
 
-Store background checkpoints once and interpolate them for independent mode
-evolution.  The current driver deliberately re-integrates the background for
-every wavenumber because that was the simplest correct reference path.
+**Completed:** store background checkpoints once and interpolate them for
+independent mode evolution.  The former driver that re-integrated the
+background for every wavenumber remains as a test-only numerical reference.
 
-Acceptance: the optimized and reference drivers agree within the declared
-integration tolerance, including through the sharpest turn in the benchmark.
+The implementation contract is fixed in
+[`background-checkpoint-interpolation.md`](background-checkpoint-interpolation.md):
+accepted survey states are interpolated with cubic Hermite segments in `N`,
+while the current coupled driver remains the numerical reference in tests.
+
+Acceptance met: the optimized and reference drivers agree within the declared
+regression tolerance, including a held-out background point in the sharpest
+turn and the complete 41-point benchmark.
 
 ### P3: extend the physics
 

@@ -22,6 +22,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `k/k_pivot` is the canonical spectrum coordinate. Raw comoving wavenumbers
   are labeled `k_internal_over_m_pl` because they depend on the arbitrary
   scale-factor normalization.
+- Spectrum runs now integrate the background once, store every accepted state,
+  and evolve each mode independently against cubic-Hermite interpolation in
+  elapsed e-folds. The former coupled driver remains a numerical test oracle.
 
 ## [0.2.0] - 2026-09-22
 

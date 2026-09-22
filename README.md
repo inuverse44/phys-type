@@ -21,6 +21,9 @@ toward non-Gaussianity are specified in
 The implemented milestone, known limitations, release state, and ordered next
 steps are summarized in
 [`docs/current-status-and-roadmap.md`](docs/current-status-and-roadmap.md).
+The shared background trajectory and independent-mode optimization are
+specified and numerically compared with the reference driver in
+[`docs/background-checkpoint-interpolation.md`](docs/background-checkpoint-interpolation.md).
 
 ## Running it
 

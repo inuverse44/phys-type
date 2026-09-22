@@ -6,28 +6,33 @@
 //! Bunch-Davies vacuum there, and evolved together with the background. The
 //! spectra are projected at one requested output time.
 //!
-//! Re-integrating the background for every wavenumber is deliberate. It keeps
-//! the first implementation obviously correct; interpolating a stored
-//! background is an optimization that can be added without changing the rows
-//! produced here.
+//! The accepted background survey states form one cubic-Hermite trajectory in
+//! elapsed e-folds. Every wavenumber then evolves only its mode matrix against
+//! that immutable trajectory. The former coupled background-plus-mode path is
+//! retained in tests as a numerical reference.
 
 use std::fmt;
 use std::io::{self, Write};
 
 use crate::integrate::{
-    AdaptiveSystem, ErrorTolerances, StepSizeLimits, adaptive_step, next_step_size, rk45_step,
+    AdaptiveSystem, ErrorTolerances, StepSizeLimits, System, adaptive_step, next_step_size,
+    rk45_step,
 };
 use crate::spectra::{
     ProjectedSpectra, SpectrumError, SpectrumTolerances, field_power_spectrum, mode_covariance,
     project,
 };
 use crate::{
-    ConformalTime, ConformalTwoFieldPerturbationState, ConformalTwoFieldPerturbationSystem,
-    ConformalTwoFieldPerturbationTolerance, ContravariantField, CovariantMultifieldSystem,
-    CurvedFieldSpaceGeometry, KinematicBasisError, M0, Mass, ModeInitializationError,
+    Complex64, ComplexMagnitude, ConformalBackgroundState, ConformalTwoFieldPerturbationState,
+    ConformalTwoFieldPerturbationSystem, ConformalTwoFieldPerturbationTolerance,
+    ContravariantField, CovariantMultifieldSystem, CurvedFieldSpaceGeometry, KinematicBasisError,
+    M0, Mass, ModeAcceleration, ModeAmplitude, ModeInitializationError, ModeVelocity,
     MultifieldState, MultifieldStateDelta, ScaleFactor, Time,
-    TwiceDifferentiableMultifieldPotential, TwoFieldKinematics,
+    TwiceDifferentiableMultifieldPotential, TwoFieldKinematics, TwoFieldModes,
 };
+
+#[cfg(test)]
+use crate::ConformalTime;
 
 /// Everything the run needs beyond the physical model and its initial state.
 #[derive(Clone, Copy, Debug)]
@@ -490,6 +495,10 @@ pub fn write_metadata<W: Write>(
         "# generator: phys-type {}",
         env!("CARGO_PKG_VERSION")
     )?;
+    writeln!(
+        writer,
+        "# background_strategy: shared_cubic_hermite_in_e_folds"
+    )?;
     if let Some(revision) = revision {
         writeln!(writer, "# revision: {revision}")?;
     }
@@ -676,6 +685,7 @@ where
 /// attempt the proposed interval is converted with `d eta = dt / a`.  This
 /// keeps the existing, physically readable controller limits while the ODE
 /// itself sees a distinct conformal-time coordinate.
+#[cfg(test)]
 fn advance_conformal_until<S, Event, Observe, Scale>(
     system: &S,
     initial_state: S::State,
@@ -733,6 +743,7 @@ where
     Err(SpectrumRunError::StepLimitReached { stage })
 }
 
+#[cfg(test)]
 fn refine_conformal_crossing<S, Event>(
     system: &S,
     conformal_time: ConformalTime,
@@ -769,6 +780,363 @@ where
     (best, deta * best_fraction)
 }
 
+#[derive(Clone, Copy, Debug)]
+struct BackgroundCheckpoint {
+    e_folds: f64,
+    state: MultifieldState<2>,
+    dphi_dn: [crate::Field; 2],
+    dpi_dn: [crate::FieldVelocity; 2],
+}
+
+#[derive(Clone, Debug)]
+struct BackgroundTrajectory {
+    initial: MultifieldState<2>,
+    checkpoints: Vec<BackgroundCheckpoint>,
+}
+
+impl BackgroundTrajectory {
+    fn state_at(&self, e_folds: f64) -> MultifieldState<2> {
+        let last = self.checkpoints.len() - 1;
+        let upper = self
+            .checkpoints
+            .partition_point(|checkpoint| checkpoint.e_folds < e_folds)
+            .clamp(1, last);
+        let left = self.checkpoints[upper - 1];
+        let right = self.checkpoints[upper];
+        let width = right.e_folds - left.e_folds;
+        let fraction = ((e_folds - left.e_folds) / width).clamp(0.0, 1.0);
+        let squared = fraction * fraction;
+        let cubed = squared * fraction;
+        let h00 = 2.0 * cubed - 3.0 * squared + 1.0;
+        let h10 = cubed - 2.0 * squared + fraction;
+        let h01 = -2.0 * cubed + 3.0 * squared;
+        let h11 = cubed - squared;
+
+        MultifieldState::new(
+            core::array::from_fn(|index| {
+                left.state.phi[index] * h00
+                    + left.dphi_dn[index] * (width * h10)
+                    + right.state.phi[index] * h01
+                    + right.dphi_dn[index] * (width * h11)
+            }),
+            core::array::from_fn(|index| {
+                left.state.pi[index] * h00
+                    + left.dpi_dn[index] * (width * h10)
+                    + right.state.pi[index] * h01
+                    + right.dpi_dn[index] * (width * h11)
+            }),
+            ScaleFactor::new((self.initial.a.into_value().ln() + e_folds).exp()),
+        )
+    }
+
+    fn crossing(&self, mut event: impl FnMut(&MultifieldState<2>) -> f64) -> Option<f64> {
+        let mut left = self.checkpoints[0].e_folds;
+        let left_value = event(&self.checkpoints[0].state);
+        if left_value <= 0.0 {
+            return Some(left);
+        }
+
+        for checkpoint in &self.checkpoints[1..] {
+            let right = checkpoint.e_folds;
+            let right_value = event(&checkpoint.state);
+            if right_value <= 0.0 {
+                let mut low = left;
+                let mut high = right;
+                for _ in 0..60 {
+                    let middle = 0.5 * (low + high);
+                    if event(&self.state_at(middle)) > 0.0 {
+                        low = middle;
+                    } else {
+                        high = middle;
+                    }
+                    if high - low <= 1.0e-13 {
+                        break;
+                    }
+                }
+                // Preserve the positive side, matching `refine_crossing` and
+                // keeping Bunch-Davies initialization at least as deep as
+                // requested.
+                return Some(low);
+            }
+            left = right;
+        }
+
+        None
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ModesInEFolds(TwoFieldModes);
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ModeDeltaInEFolds {
+    amplitude: [[ModeAmplitude; 2]; 2],
+    velocity: [[ModeVelocity; 2]; 2],
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ModeDerivativeInEFolds {
+    amplitude: [[ModeAmplitude; 2]; 2],
+    velocity: [[ModeVelocity; 2]; 2],
+}
+
+impl core::ops::Add<ModeDeltaInEFolds> for ModesInEFolds {
+    type Output = Self;
+
+    fn add(self, rhs: ModeDeltaInEFolds) -> Self::Output {
+        Self(TwoFieldModes {
+            rescaled_amplitude: core::array::from_fn(|field| {
+                core::array::from_fn(|mode| {
+                    self.0.rescaled_amplitude[field][mode] + rhs.amplitude[field][mode]
+                })
+            }),
+            rescaled_velocity: core::array::from_fn(|field| {
+                core::array::from_fn(|mode| {
+                    self.0.rescaled_velocity[field][mode] + rhs.velocity[field][mode]
+                })
+            }),
+        })
+    }
+}
+
+impl core::ops::Add for ModeDerivativeInEFolds {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            amplitude: core::array::from_fn(|field| {
+                core::array::from_fn(|mode| {
+                    self.amplitude[field][mode] + rhs.amplitude[field][mode]
+                })
+            }),
+            velocity: core::array::from_fn(|field| {
+                core::array::from_fn(|mode| self.velocity[field][mode] + rhs.velocity[field][mode])
+            }),
+        }
+    }
+}
+
+impl core::ops::Mul<f64> for ModeDerivativeInEFolds {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self {
+            amplitude: self.amplitude.map(|row| row.map(|entry| entry * rhs)),
+            velocity: self.velocity.map(|row| row.map(|entry| entry * rhs)),
+        }
+    }
+}
+
+impl core::ops::Mul<crate::Dimensionless> for ModeDerivativeInEFolds {
+    type Output = ModeDeltaInEFolds;
+
+    fn mul(self, rhs: crate::Dimensionless) -> Self::Output {
+        let rhs = rhs.into_value();
+        ModeDeltaInEFolds {
+            amplitude: self.amplitude.map(|row| row.map(|entry| entry * rhs)),
+            velocity: self.velocity.map(|row| row.map(|entry| entry * rhs)),
+        }
+    }
+}
+
+struct InterpolatedModeSystem<'a, P, G> {
+    background: &'a CovariantMultifieldSystem<P, G, 2>,
+    trajectory: &'a BackgroundTrajectory,
+    k: Mass,
+}
+
+impl<P, G> System for InterpolatedModeSystem<'_, P, G>
+where
+    P: TwiceDifferentiableMultifieldPotential<2>,
+    G: CurvedFieldSpaceGeometry<2>,
+{
+    type IndependentVariable = crate::Dimensionless;
+    type State = ModesInEFolds;
+    type Delta = ModeDeltaInEFolds;
+    type Derivative = ModeDerivativeInEFolds;
+
+    fn derivative(&self, e_folds: crate::Dimensionless, state: &Self::State) -> Self::Derivative {
+        let background = self.trajectory.state_at(e_folds.into_value());
+        let scale_factor = background.a;
+        let hubble = self.background.hubble(&background);
+        let connection = self.background.geometry.christoffel(&background.phi);
+        let mass = self.background.perturbation_mass_matrix(&background);
+        let conformal_field_velocity = background.pi.map(|entry| entry * scale_factor);
+        let scale_factor_squared = scale_factor * scale_factor;
+        let expansion =
+            hubble * hubble * scale_factor_squared * (2.0 - self.background.epsilon_h(&background));
+        let wave_number_squared = self.k * self.k;
+        let a_h = scale_factor * hubble;
+
+        let amplitude = core::array::from_fn(|upper| {
+            core::array::from_fn(|mode| {
+                let connection_term = (0..2)
+                    .flat_map(|first| (0..2).map(move |second| (first, second)))
+                    .fold(
+                        ModeVelocity::new(Complex64::new(0.0, 0.0)),
+                        |sum, (first, second)| {
+                            sum + connection.components()[upper][first][second]
+                                * conformal_field_velocity[first]
+                                * state.0.rescaled_amplitude[second][mode]
+                        },
+                    );
+                (state.0.rescaled_velocity[upper][mode] - connection_term) / a_h
+            })
+        });
+        let velocity = core::array::from_fn(|upper| {
+            core::array::from_fn(|mode| {
+                let restoring = (0..2).fold(
+                    ModeAcceleration::new(Complex64::new(0.0, 0.0)),
+                    |sum, lower| {
+                        let entry = if upper == lower {
+                            mass.components()[upper][lower] * scale_factor_squared
+                                + wave_number_squared
+                                - expansion
+                        } else {
+                            mass.components()[upper][lower] * scale_factor_squared
+                        };
+                        sum + entry * state.0.rescaled_amplitude[lower][mode]
+                    },
+                );
+                let connection_term = (0..2)
+                    .flat_map(|first| (0..2).map(move |second| (first, second)))
+                    .fold(
+                        ModeAcceleration::new(Complex64::new(0.0, 0.0)),
+                        |sum, (first, second)| {
+                            sum + connection.components()[upper][first][second]
+                                * conformal_field_velocity[first]
+                                * state.0.rescaled_velocity[second][mode]
+                        },
+                    );
+                (-restoring - connection_term) / a_h
+            })
+        });
+
+        ModeDerivativeInEFolds {
+            amplitude,
+            velocity,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ModeTolerancesInEFolds {
+    amplitude: ModeAmplitude<f64>,
+    velocity: ModeVelocity<f64>,
+}
+
+impl<P, G> AdaptiveSystem for InterpolatedModeSystem<'_, P, G>
+where
+    P: TwiceDifferentiableMultifieldPotential<2>,
+    G: CurvedFieldSpaceGeometry<2>,
+{
+    type AbsoluteTolerance = ModeTolerancesInEFolds;
+
+    fn error_ratio(
+        &self,
+        current: &Self::State,
+        next: &Self::State,
+        error: &Self::Delta,
+        tolerances: &ErrorTolerances<Self::AbsoluteTolerance>,
+    ) -> f64 {
+        let amplitude_scale = mode_scale(&current.0.rescaled_amplitude, &next.0.rescaled_amplitude);
+        let velocity_scale = mode_scale(&current.0.rescaled_velocity, &next.0.rescaled_velocity);
+
+        (0..2)
+            .flat_map(|field| (0..2).map(move |mode| (field, mode)))
+            .map(|(field, mode)| {
+                crate::perturbation::normalized_mode_error(
+                    error.amplitude[field][mode],
+                    amplitude_scale,
+                    tolerances.absolute.amplitude,
+                    tolerances.relative,
+                )
+                .max(crate::perturbation::normalized_mode_error(
+                    error.velocity[field][mode],
+                    velocity_scale,
+                    tolerances.absolute.velocity,
+                    tolerances.relative,
+                ))
+            })
+            .fold(0.0, f64::max)
+    }
+}
+
+fn mode_scale<D: Copy>(
+    current: &[[crate::Quantity<D, Complex64>; 2]; 2],
+    next: &[[crate::Quantity<D, Complex64>; 2]; 2],
+) -> crate::Quantity<D, f64> {
+    crate::Quantity::new(
+        current
+            .iter()
+            .chain(next.iter())
+            .flatten()
+            .map(ComplexMagnitude::complex_magnitude)
+            .fold(0.0, f64::max),
+    )
+}
+
+fn advance_interpolated_modes<P, G, Observe>(
+    system: &InterpolatedModeSystem<'_, P, G>,
+    initial_state: ModesInEFolds,
+    initial_e_folds: f64,
+    target_e_folds: f64,
+    settings: &SpectrumRunSettings,
+    stage: SpectrumRunStage,
+    mut on_accepted: Observe,
+) -> Result<ModesInEFolds, SpectrumRunError>
+where
+    P: TwiceDifferentiableMultifieldPotential<2>,
+    G: CurvedFieldSpaceGeometry<2>,
+    Observe: FnMut(&ModesInEFolds, f64),
+{
+    let limits = StepSizeLimits {
+        min: settings.min_dt,
+        max: settings.max_dt,
+    };
+    let tolerances = ErrorTolerances::new(
+        ModeTolerancesInEFolds {
+            amplitude: settings.tolerances.absolute.rescaled_amplitude,
+            velocity: settings.tolerances.absolute.rescaled_velocity,
+        },
+        settings.tolerances.relative,
+    );
+    let mut state = initial_state;
+    let mut e_folds = initial_e_folds;
+    let mut dt = settings.initial_dt;
+
+    for _ in 0..settings.max_steps {
+        let remaining = target_e_folds - e_folds;
+        if remaining <= 1.0e-13 {
+            return Ok(state);
+        }
+        let background = system.trajectory.state_at(e_folds);
+        let hubble = system.background.hubble(&background).into_value();
+        let proposed_dn = hubble * dt.into_value();
+        let dn = proposed_dn.min(remaining);
+        let effective_dt = Time::new(dn / hubble);
+        let attempt = adaptive_step(
+            system,
+            crate::Dimensionless::new(e_folds),
+            &state,
+            crate::Dimensionless::new(dn),
+            &tolerances,
+        );
+
+        if attempt.accepted {
+            state = attempt.state;
+            e_folds += dn;
+            on_accepted(&state, e_folds);
+        } else if effective_dt <= settings.min_dt {
+            return Err(SpectrumRunError::MinimumStepReached { stage });
+        }
+
+        dt = next_step_size(effective_dt, attempt.error_ratio, &limits);
+    }
+
+    Err(SpectrumRunError::StepLimitReached { stage })
+}
+
 impl<P, G> CovariantMultifieldSystem<P, G, 2>
 where
     P: TwiceDifferentiableMultifieldPotential<2> + Clone,
@@ -783,7 +1151,7 @@ where
     ) -> Result<SpectrumRun, SpectrumRunError> {
         validate(settings)?;
 
-        let (background, e_folds_at_end) = self.survey_background(initial, settings)?;
+        let (background, trajectory, e_folds_at_end) = self.survey_background(initial, settings)?;
         let e_folds_at_pivot = e_folds_at_end - settings.pivot_e_folds_before_end;
         let e_folds_at_output = e_folds_at_end - settings.output_e_folds_before_end;
         if e_folds_at_pivot < 0.0 || e_folds_at_output < 0.0 {
@@ -795,7 +1163,7 @@ where
             });
         }
 
-        let pivot_state = self.advance_to_e_folds(initial, settings, e_folds_at_pivot)?;
+        let pivot_state = trajectory.state_at(e_folds_at_pivot);
         let pivot_hubble = self.hubble(&pivot_state);
         let pivot = Pivot {
             k: pivot_state.a * pivot_hubble,
@@ -813,6 +1181,7 @@ where
             let (record, horizon_exit_record, rows) = self.evolve_one_mode(
                 initial,
                 settings,
+                &trajectory,
                 pivot.k * k_over_pivot,
                 k_over_pivot,
                 e_folds_at_output,
@@ -837,7 +1206,7 @@ where
         &self,
         initial: MultifieldState<2>,
         settings: &SpectrumRunSettings,
-    ) -> Result<(Vec<BackgroundRecord>, f64), SpectrumRunError> {
+    ) -> Result<(Vec<BackgroundRecord>, BackgroundTrajectory, f64), SpectrumRunError> {
         let initial_kinematics = self
             .kinematics(&initial, None)
             .map_err(SpectrumRunError::KinematicBasis)?;
@@ -845,6 +1214,7 @@ where
         let mut previous_normal = Some(initial_kinematics.basis.normal);
         let mut basis_error = None;
         let mut accepted = 0_usize;
+        let mut checkpoints = vec![self.background_checkpoint(&initial, &initial)];
 
         // Inflation ends where epsilon_H reaches one. The survey also stops if
         // the e-folding budget runs out first, which is reported separately.
@@ -865,6 +1235,7 @@ where
             },
             |state, _| {
                 accepted += 1;
+                checkpoints.push(self.background_checkpoint(&initial, state));
                 if basis_error.is_some() {
                     return;
                 }
@@ -894,30 +1265,30 @@ where
             .map_err(SpectrumRunError::KinematicBasis)?;
         rows.push(self.background_record(&initial, &final_state, &final_kinematics));
 
-        Ok((rows, e_folds))
+        Ok((
+            rows,
+            BackgroundTrajectory {
+                initial,
+                checkpoints,
+            },
+            e_folds,
+        ))
     }
 
-    /// Integrates the background to a requested e-folding number.
-    fn advance_to_e_folds(
+    fn background_checkpoint(
         &self,
-        initial: MultifieldState<2>,
-        settings: &SpectrumRunSettings,
-        target: f64,
-    ) -> Result<MultifieldState<2>, SpectrumRunError> {
-        let (state, _) = advance_until(
-            self,
-            initial,
-            Time::new(0.0),
-            AdvanceControl {
-                settings,
-                tolerances: &background_tolerances(settings),
-                stage: SpectrumRunStage::Pivot,
-            },
-            |state| target - state.e_folds(&initial),
-            |_, _| {},
-        )?;
+        initial: &MultifieldState<2>,
+        state: &MultifieldState<2>,
+    ) -> BackgroundCheckpoint {
+        let hubble = self.hubble(state);
+        let derivative = self.derivative(Time::new(0.0), state);
 
-        Ok(state)
+        BackgroundCheckpoint {
+            e_folds: state.e_folds(initial),
+            state: *state,
+            dphi_dn: derivative.dphi_dt.map(|entry| entry / hubble),
+            dpi_dn: derivative.dpi_dt.map(|entry| entry / hubble),
+        }
     }
 
     fn background_record(
@@ -940,8 +1311,211 @@ where
         }
     }
 
-    /// Carries one wavenumber from its `x_init` crossing to the output time.
+    /// Carries one wavenumber against the stored background trajectory.
     fn evolve_one_mode(
+        &self,
+        initial: MultifieldState<2>,
+        settings: &SpectrumRunSettings,
+        trajectory: &BackgroundTrajectory,
+        k: Mass,
+        k_over_pivot: f64,
+        e_folds_at_output: f64,
+    ) -> Result<(SpectrumRecord, SpectrumRecord, Vec<ModeEvolutionRecord>), SpectrumRunError> {
+        let conformal_system = ConformalTwoFieldPerturbationSystem::new(self.clone(), k);
+        let start_e_folds = trajectory
+            .crossing(|state| {
+                (k / (state.a * self.hubble(state))).into_value() - start_depth(settings)
+            })
+            .ok_or(SpectrumRunError::StepLimitReached {
+                stage: SpectrumRunStage::ModeStart { k: k.into_value() },
+            })?;
+        let horizon_e_folds = trajectory
+            .crossing(|state| (k / (state.a * self.hubble(state))).into_value() - 1.0)
+            .ok_or(SpectrumRunError::StepLimitReached {
+                stage: SpectrumRunStage::HorizonExit { k: k.into_value() },
+            })?;
+        let start_background = trajectory.state_at(start_e_folds);
+        let initialized = conformal_system
+            .bunch_davies_state(start_background, start_depth(settings))
+            .map_err(|source| SpectrumRunError::ModeInitialization {
+                k: k.into_value(),
+                source,
+            })?;
+        let mode_system = InterpolatedModeSystem {
+            background: self,
+            trajectory,
+            k,
+        };
+        let mut state = ModesInEFolds(initialized.modes);
+        let initial_combined = ConformalTwoFieldPerturbationState {
+            background: ConformalBackgroundState::from_cosmic(start_background),
+            modes: state.0,
+        };
+        let (projected, kinematics) =
+            self.project_state(&conformal_system, &initial_combined, settings, None)?;
+        let mut rows = vec![self.mode_record(
+            &initial,
+            &initial_combined,
+            k,
+            k_over_pivot,
+            &projected,
+            &kinematics,
+        )];
+        let mut previous_normal = Some(kinematics.basis.normal);
+        let mut sample_error = None;
+        let mut accepted = 0_usize;
+
+        state = advance_interpolated_modes(
+            &mode_system,
+            state,
+            start_e_folds,
+            horizon_e_folds,
+            settings,
+            SpectrumRunStage::HorizonExit { k: k.into_value() },
+            |modes, e_folds| {
+                accepted += 1;
+                if sample_error.is_some() || !accepted.is_multiple_of(settings.mode_sample_every) {
+                    return;
+                }
+                let combined = ConformalTwoFieldPerturbationState {
+                    background: ConformalBackgroundState::from_cosmic(trajectory.state_at(e_folds)),
+                    modes: modes.0,
+                };
+                match self.project_state(
+                    &conformal_system,
+                    &combined,
+                    settings,
+                    previous_normal.as_ref(),
+                ) {
+                    Ok((projected, kinematics)) => {
+                        previous_normal = Some(kinematics.basis.normal);
+                        rows.push(self.mode_record(
+                            &initial,
+                            &combined,
+                            k,
+                            k_over_pivot,
+                            &projected,
+                            &kinematics,
+                        ));
+                    }
+                    Err(error) => sample_error = Some(error),
+                }
+            },
+        )?;
+        if let Some(error) = sample_error {
+            return Err(error);
+        }
+
+        let horizon_state = ConformalTwoFieldPerturbationState {
+            background: ConformalBackgroundState::from_cosmic(trajectory.state_at(horizon_e_folds)),
+            modes: state.0,
+        };
+        let (horizon_projected, horizon_kinematics) = self.project_state(
+            &conformal_system,
+            &horizon_state,
+            settings,
+            previous_normal.as_ref(),
+        )?;
+        previous_normal = Some(horizon_kinematics.basis.normal);
+        rows.push(self.mode_record(
+            &initial,
+            &horizon_state,
+            k,
+            k_over_pivot,
+            &horizon_projected,
+            &horizon_kinematics,
+        ));
+        let horizon_exit_record = self.spectrum_record(
+            &initial,
+            &horizon_state,
+            k,
+            k_over_pivot,
+            &horizon_projected,
+            settings,
+        )?;
+
+        state = advance_interpolated_modes(
+            &mode_system,
+            state,
+            horizon_e_folds,
+            e_folds_at_output,
+            settings,
+            SpectrumRunStage::ModeEvolution { k: k.into_value() },
+            |modes, e_folds| {
+                accepted += 1;
+                if sample_error.is_some() || !accepted.is_multiple_of(settings.mode_sample_every) {
+                    return;
+                }
+                let combined = ConformalTwoFieldPerturbationState {
+                    background: ConformalBackgroundState::from_cosmic(trajectory.state_at(e_folds)),
+                    modes: modes.0,
+                };
+                match self.project_state(
+                    &conformal_system,
+                    &combined,
+                    settings,
+                    previous_normal.as_ref(),
+                ) {
+                    Ok((projected, kinematics)) => {
+                        previous_normal = Some(kinematics.basis.normal);
+                        rows.push(self.mode_record(
+                            &initial,
+                            &combined,
+                            k,
+                            k_over_pivot,
+                            &projected,
+                            &kinematics,
+                        ));
+                    }
+                    Err(error) => sample_error = Some(error),
+                }
+            },
+        )?;
+        if let Some(error) = sample_error {
+            return Err(error);
+        }
+
+        let final_background = trajectory.state_at(e_folds_at_output);
+        let depth = (k / (final_background.a * self.hubble(&final_background))).into_value();
+        if depth.is_nan() || depth >= 1.0 {
+            return Err(SpectrumRunError::OutputBeforeHorizonExit {
+                k: k.into_value(),
+                k_over_ah: depth,
+            });
+        }
+        let final_state = ConformalTwoFieldPerturbationState {
+            background: ConformalBackgroundState::from_cosmic(final_background),
+            modes: state.0,
+        };
+        let (projected, kinematics) = self.project_state(
+            &conformal_system,
+            &final_state,
+            settings,
+            previous_normal.as_ref(),
+        )?;
+        rows.push(self.mode_record(
+            &initial,
+            &final_state,
+            k,
+            k_over_pivot,
+            &projected,
+            &kinematics,
+        ));
+        let record = self.spectrum_record(
+            &initial,
+            &final_state,
+            k,
+            k_over_pivot,
+            &projected,
+            settings,
+        )?;
+
+        Ok((record, horizon_exit_record, rows))
+    }
+
+    /// Coupled background-plus-mode reference retained for regression tests.
+    #[cfg(test)]
+    fn evolve_one_mode_reference(
         &self,
         initial: MultifieldState<2>,
         settings: &SpectrumRunSettings,
@@ -1620,6 +2194,134 @@ mod tests {
         let last = run.background.last().unwrap();
         assert!((last.epsilon_h - 1.0).abs() < 1.0e-6);
         assert!((last.e_folds - run.pivot.e_folds_at_end).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn interpolation_reproduces_every_background_checkpoint() {
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let (_, trajectory, _) = system
+            .survey_background(initial, &quick_settings())
+            .unwrap();
+
+        for checkpoint in &trajectory.checkpoints {
+            let interpolated = trajectory.state_at(checkpoint.e_folds);
+            for index in 0..2 {
+                let phi_scale = checkpoint.state.phi[index].into_value().abs().max(1.0);
+                let pi_scale = checkpoint.state.pi[index].into_value().abs().max(1.0e-30);
+                assert!(
+                    (interpolated.phi[index] - checkpoint.state.phi[index])
+                        .into_value()
+                        .abs()
+                        <= 1.0e-13 * phi_scale
+                );
+                assert!(
+                    (interpolated.pi[index] - checkpoint.state.pi[index])
+                        .into_value()
+                        .abs()
+                        <= 1.0e-13 * pi_scale
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn interpolation_agrees_with_direct_background_evolution_near_the_sharpest_turn() {
+        let system = system([1.0e-6, 7.0e-6]);
+        let initial = slow_roll_start(&system, [14.0, 12.0]);
+        let settings = SpectrumRunSettings {
+            pivot_e_folds_before_end: 55.0,
+            output_e_folds_before_end: 5.0,
+            ..quick_settings()
+        };
+        let (_, trajectory, _) = system.survey_background(initial, &settings).unwrap();
+        let turn_index = trajectory
+            .checkpoints
+            .iter()
+            .take(trajectory.checkpoints.len() - 1)
+            .enumerate()
+            .max_by(|(_, left), (_, right)| {
+                system
+                    .kinematics(&left.state, None)
+                    .unwrap()
+                    .eta_perp
+                    .into_value()
+                    .abs()
+                    .total_cmp(
+                        &system
+                            .kinematics(&right.state, None)
+                            .unwrap()
+                            .eta_perp
+                            .into_value()
+                            .abs(),
+                    )
+            })
+            .unwrap()
+            .0;
+        let target = 0.5
+            * (trajectory.checkpoints[turn_index].e_folds
+                + trajectory.checkpoints[turn_index + 1].e_folds);
+        let (direct, _) = advance_until(
+            &system,
+            initial,
+            Time::new(0.0),
+            AdvanceControl {
+                settings: &settings,
+                tolerances: &background_tolerances(&settings),
+                stage: SpectrumRunStage::BackgroundSurvey,
+            },
+            |state| target - state.e_folds(&initial),
+            |_, _| {},
+        )
+        .unwrap();
+        let interpolated = trajectory.state_at(target);
+
+        for index in 0..2 {
+            let phi_relative = ((interpolated.phi[index] - direct.phi[index]) / direct.phi[index])
+                .into_value()
+                .abs();
+            let pi_relative = ((interpolated.pi[index] - direct.pi[index]) / direct.pi[index])
+                .into_value()
+                .abs();
+            assert!(
+                phi_relative < 1.0e-8,
+                "phi relative error = {phi_relative:e}"
+            );
+            assert!(pi_relative < 1.0e-8, "pi relative error = {pi_relative:e}");
+        }
+    }
+
+    #[test]
+    fn interpolated_and_coupled_mode_drivers_agree() {
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let settings = quick_settings();
+        let (_, trajectory, e_folds_at_end) = system.survey_background(initial, &settings).unwrap();
+        let pivot_n = e_folds_at_end - settings.pivot_e_folds_before_end;
+        let pivot_state = trajectory.state_at(pivot_n);
+        let k = pivot_state.a * system.hubble(&pivot_state);
+        let output_n = e_folds_at_end - settings.output_e_folds_before_end;
+        let (optimized, optimized_exit, _) = system
+            .evolve_one_mode(initial, &settings, &trajectory, k, 1.0, output_n)
+            .unwrap();
+        let (reference, reference_exit, _) = system
+            .evolve_one_mode_reference(initial, &settings, k, 1.0, output_n)
+            .unwrap();
+
+        for (optimized, reference) in [
+            (optimized.p_r, reference.p_r),
+            (optimized.p_s, reference.p_s),
+            (optimized_exit.p_r, reference_exit.p_r),
+            (optimized_exit.p_s, reference_exit.p_s),
+        ] {
+            let relative = (optimized - reference).abs() / reference.abs().max(1.0e-300);
+            assert!(
+                relative < 1.0e-8,
+                "relative spectrum difference = {relative:e}"
+            );
+        }
+        assert!((optimized.c_rs - reference.c_rs).abs() < 1.0e-8);
+        assert!((optimized_exit.c_rs - reference_exit.c_rs).abs() < 1.0e-8);
     }
 
     #[test]
@@ -2347,6 +3049,7 @@ mod tests {
         let text = String::from_utf8(buffer).unwrap();
 
         assert!(text.contains("# revision: abc123"));
+        assert!(text.contains("# background_strategy: shared_cubic_hermite_in_e_folds"));
         assert!(text.contains("# e_folds_before_exit: 2e0"));
         assert!(text.contains("# k_pivot_internal_over_m_pl: 1.5e-5"));
         assert!(text.lines().all(|line| line.starts_with('#')));
