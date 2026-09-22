@@ -22,10 +22,11 @@ use crate::spectra::{
     project,
 };
 use crate::{
-    ContravariantField, CovariantMultifieldSystem, CurvedFieldSpaceGeometry, KinematicBasisError,
-    M0, Mass, ModeInitializationError, MultifieldState, MultifieldStateDelta, Time,
-    TwiceDifferentiableMultifieldPotential, TwoFieldKinematics, TwoFieldPerturbationState,
-    TwoFieldPerturbationSystem, TwoFieldPerturbationTolerance,
+    ConformalTime, ConformalTwoFieldPerturbationState, ConformalTwoFieldPerturbationSystem,
+    ConformalTwoFieldPerturbationTolerance, ContravariantField, CovariantMultifieldSystem,
+    CurvedFieldSpaceGeometry, KinematicBasisError, M0, Mass, ModeInitializationError,
+    MultifieldState, MultifieldStateDelta, ScaleFactor, Time,
+    TwiceDifferentiableMultifieldPotential, TwoFieldKinematics,
 };
 
 /// Everything the run needs beyond the physical model and its initial state.
@@ -43,7 +44,7 @@ pub struct SpectrumRunSettings {
     /// in that group's own dimension. The background gets a floor in Planck
     /// units; the modes get none, because their norm is a modulus that does
     /// not vanish and any floor there would become their accuracy ceiling.
-    pub tolerances: ErrorTolerances<TwoFieldPerturbationTolerance>,
+    pub tolerances: ErrorTolerances<ConformalTwoFieldPerturbationTolerance>,
     /// A safety limit on attempted steps in any one stage.
     pub max_steps: usize,
     /// Give up on inflation ending after this many e-folds.
@@ -81,7 +82,7 @@ impl Default for SpectrumRunSettings {
             min_dt: Time::new(1.0e-6),
             max_dt: Time::new(1.0e5),
             tolerances: ErrorTolerances::new(
-                TwoFieldPerturbationTolerance::background_in_planck_units(1.0e-20),
+                ConformalTwoFieldPerturbationTolerance::background_in_planck_units(1.0e-20),
                 1.0e-10,
             ),
             max_steps: 1_000_000,
@@ -489,8 +490,8 @@ pub fn write_metadata<W: Write>(
     )?;
     writeln!(
         writer,
-        "# absolute_tolerance_a: {:e}",
-        absolute.background.a.into_value()
+        "# absolute_tolerance_log_a: {:e}",
+        absolute.background.log_scale_factor.into_value()
     )?;
     writeln!(
         writer,
@@ -639,6 +640,105 @@ where
     }
 
     (best, dt * best_fraction)
+}
+
+/// Conformal-time counterpart of [`advance_until`].
+///
+/// Public settings remain expressed as local cosmic-time scales.  At every
+/// attempt the proposed interval is converted with `d eta = dt / a`.  This
+/// keeps the existing, physically readable controller limits while the ODE
+/// itself sees a distinct conformal-time coordinate.
+fn advance_conformal_until<S, Event, Observe, Scale>(
+    system: &S,
+    initial_state: S::State,
+    control: AdvanceControl<'_, S::AbsoluteTolerance>,
+    mut event: Event,
+    mut on_accepted: Observe,
+    scale_factor: Scale,
+) -> Result<(S::State, ConformalTime), SpectrumRunError>
+where
+    S: AdaptiveSystem<IndependentVariable = ConformalTime>,
+    S::State: Clone,
+    Event: FnMut(&S::State) -> f64,
+    Observe: FnMut(&S::State, ConformalTime),
+    Scale: Fn(&S::State) -> ScaleFactor,
+{
+    let settings = control.settings;
+    let tolerances = control.tolerances;
+    let stage = control.stage;
+    let limits = StepSizeLimits {
+        min: settings.min_dt,
+        max: settings.max_dt,
+    };
+    let mut state = initial_state;
+    let mut conformal_time = ConformalTime::new(0.0);
+    let mut dt = settings.initial_dt;
+
+    if event(&state) <= 0.0 {
+        return Ok((state, conformal_time));
+    }
+
+    for _ in 0..settings.max_steps {
+        let a = scale_factor(&state).into_value();
+        let deta = ConformalTime::new(dt.into_value() / a);
+        let attempt = adaptive_step(system, conformal_time, &state, deta, tolerances);
+
+        if attempt.accepted {
+            if event(&attempt.state) <= 0.0 {
+                let (refined, refined_deta) =
+                    refine_conformal_crossing(system, conformal_time, &state, deta, &mut event);
+                let refined_time = conformal_time + refined_deta;
+                on_accepted(&refined, refined_time);
+                return Ok((refined, refined_time));
+            }
+
+            state = attempt.state;
+            conformal_time = conformal_time + deta;
+            on_accepted(&state, conformal_time);
+        } else if dt <= settings.min_dt {
+            return Err(SpectrumRunError::MinimumStepReached { stage });
+        }
+
+        dt = next_step_size(dt, attempt.error_ratio, &limits);
+    }
+
+    Err(SpectrumRunError::StepLimitReached { stage })
+}
+
+fn refine_conformal_crossing<S, Event>(
+    system: &S,
+    conformal_time: ConformalTime,
+    state: &S::State,
+    deta: ConformalTime,
+    event: &mut Event,
+) -> (S::State, ConformalTime)
+where
+    S: AdaptiveSystem<IndependentVariable = ConformalTime>,
+    S::State: Clone,
+    Event: FnMut(&S::State) -> f64,
+{
+    let mut low = 0.0;
+    let mut high = 1.0;
+    let mut best = state.clone();
+    let mut best_fraction = 0.0;
+
+    for _ in 0..60 {
+        let middle = 0.5 * (low + high);
+        let trial = rk45_step(system, conformal_time, state, deta * middle).state;
+
+        if event(&trial) > 0.0 {
+            low = middle;
+            best = trial;
+            best_fraction = middle;
+        } else {
+            high = middle;
+        }
+        if high - low < 1.0e-14 {
+            break;
+        }
+    }
+
+    (best, deta * best_fraction)
 }
 
 impl<P, G> CovariantMultifieldSystem<P, G, 2>
@@ -818,10 +918,10 @@ where
         k_over_pivot: f64,
         e_folds_at_output: f64,
     ) -> Result<(SpectrumRecord, Vec<ModeEvolutionRecord>), SpectrumRunError> {
-        let system = TwoFieldPerturbationSystem::new(self.clone(), k);
+        let system = ConformalTwoFieldPerturbationSystem::new(self.clone(), k);
 
         // Carry the background forward until this mode sits at x_init.
-        let (start, start_time) = advance_until(
+        let (start, _start_time) = advance_until(
             self,
             initial,
             Time::new(0.0),
@@ -854,10 +954,9 @@ where
         let mut sample_error = None;
         let mut accepted = 0_usize;
 
-        let (final_state, _) = advance_until(
+        let (final_state, _) = advance_conformal_until(
             &system,
             mode_state,
-            start_time,
             AdvanceControl {
                 settings,
                 tolerances: &settings.tolerances,
@@ -884,6 +983,7 @@ where
                     Err(error) => sample_error = Some(error),
                 }
             },
+            |state| state.background.cosmic().a,
         )?;
 
         if let Some(error) = sample_error {
@@ -893,8 +993,8 @@ where
         // A mode that has not left the horizon by the output time still holds
         // its vacuum, which would be reported as a spectrum. The driver
         // refuses rather than returning a number that looks physical.
-        let depth =
-            (k / (final_state.background.a * self.hubble(&final_state.background))).into_value();
+        let final_background = final_state.background.cosmic();
+        let depth = (k / (final_background.a * self.hubble(&final_background))).into_value();
         // Written without a negated comparison so a NaN depth is refused
         // explicitly rather than by falling through a flipped inequality.
         if depth.is_nan() || depth >= 1.0 {
@@ -915,7 +1015,7 @@ where
             &kinematics,
         ));
 
-        let matrix = field_power_spectrum(k, &mode_covariance(&final_state));
+        let matrix = field_power_spectrum(k, &mode_covariance(&final_state.cosmic()));
         let components = matrix.components();
         let squared = (self.m_pl * self.m_pl).into_value();
 
@@ -956,18 +1056,19 @@ where
     fn mode_record(
         &self,
         initial: &MultifieldState<2>,
-        state: &TwoFieldPerturbationState,
+        state: &ConformalTwoFieldPerturbationState,
         k: Mass,
         k_over_pivot: f64,
         projected: &ProjectedSpectra,
         kinematics: &TwoFieldKinematics,
     ) -> ModeEvolutionRecord {
-        let hubble = self.hubble(&state.background);
+        let background = state.background.cosmic();
+        let hubble = self.hubble(&background);
 
         ModeEvolutionRecord {
             k_over_pivot,
             e_folds: state.background.e_folds(initial),
-            k_over_ah: (k / (state.background.a * hubble)).into_value(),
+            k_over_ah: (k / (background.a * hubble)).into_value(),
             p_r: projected.curvature.into_value(),
             p_s: projected.entropy.into_value(),
             c_rs: projected.cross.into_value(),
@@ -979,17 +1080,18 @@ where
     /// entropy orientation carries into the next sample.
     fn project_state(
         &self,
-        system: &TwoFieldPerturbationSystem<P, G>,
-        state: &TwoFieldPerturbationState,
+        system: &ConformalTwoFieldPerturbationSystem<P, G>,
+        state: &ConformalTwoFieldPerturbationState,
         settings: &SpectrumRunSettings,
         previous_normal: Option<&ContravariantField<M0, f64, 2>>,
     ) -> Result<(ProjectedSpectra, TwoFieldKinematics), SpectrumRunError> {
+        let cosmic = state.cosmic();
         let kinematics = self
-            .kinematics(&state.background, previous_normal)
+            .kinematics(&cosmic.background, previous_normal)
             .map_err(SpectrumRunError::KinematicBasis)?;
-        let metric = self.geometry.metric(&state.background.phi);
-        let hubble = self.hubble(&state.background);
-        let matrix = field_power_spectrum(system.k, &mode_covariance(state));
+        let metric = self.geometry.metric(&cosmic.background.phi);
+        let hubble = self.hubble(&cosmic.background);
+        let matrix = field_power_spectrum(system.k, &mode_covariance(&cosmic));
         let projected = project(
             &matrix,
             &metric,
@@ -1016,8 +1118,17 @@ fn component_pair(vector: &ContravariantField<M0, f64, 2>) -> [f64; 2] {
 fn background_tolerances(
     settings: &SpectrumRunSettings,
 ) -> ErrorTolerances<MultifieldStateDelta<2>> {
+    let absolute = settings.tolerances.absolute.background;
     ErrorTolerances::new(
-        settings.tolerances.absolute.background,
+        MultifieldStateDelta {
+            phi: absolute.phi,
+            pi: absolute.pi,
+            // The survey still uses the legacy cosmic-time background.  Its
+            // scale factor is dimensionless like ln(a); the relative term
+            // controls it away from zero, while this shared floor only guards
+            // the initial endpoint.
+            a: ScaleFactor::new(absolute.log_scale_factor.into_value()),
+        },
         settings.tolerances.relative,
     )
 }
@@ -1109,8 +1220,12 @@ fn validate(settings: &SpectrumRunSettings) -> Result<(), SpectrumRunError> {
             .pi
             .iter()
             .all(|value| value.into_value().is_finite() && value.into_value() >= 0.0)
-        && absolute.background.a.into_value().is_finite()
-        && absolute.background.a.into_value() >= 0.0
+        && absolute
+            .background
+            .log_scale_factor
+            .into_value()
+            .is_finite()
+        && absolute.background.log_scale_factor.into_value() >= 0.0
         && absolute.rescaled_amplitude.into_value().is_finite()
         && absolute.rescaled_amplitude.into_value() >= 0.0
         && absolute.rescaled_velocity.into_value().is_finite()
@@ -1151,7 +1266,8 @@ mod tests {
     use super::*;
     use crate::{
         Field, FieldVelocity, FlatFieldSpace, HyperbolicFieldSpace, QuadraticMultifieldPotential,
-        ScaleFactor, multifield::MultifieldState,
+        ScaleFactor, TwoFieldPerturbationState, TwoFieldPerturbationSystem,
+        TwoFieldPerturbationTolerance, multifield::MultifieldState,
     };
 
     type TestSystem = CovariantMultifieldSystem<QuadraticMultifieldPotential<2>, FlatFieldSpace, 2>;
@@ -1285,7 +1401,7 @@ mod tests {
             },
             SpectrumRunSettings {
                 tolerances: ErrorTolerances::new(
-                    TwoFieldPerturbationTolerance::background_in_planck_units(1.0e-20),
+                    ConformalTwoFieldPerturbationTolerance::background_in_planck_units(1.0e-20),
                     f64::NAN,
                 ),
                 ..SpectrumRunSettings::default()
@@ -1543,7 +1659,9 @@ mod tests {
                     initial,
                     &SpectrumRunSettings {
                         tolerances: ErrorTolerances::new(
-                            TwoFieldPerturbationTolerance::background_in_planck_units(absolute),
+                            ConformalTwoFieldPerturbationTolerance::background_in_planck_units(
+                                absolute,
+                            ),
                             1.0e-10,
                         ),
                         ..quick_settings()
@@ -1593,13 +1711,26 @@ mod tests {
         P: TwiceDifferentiableMultifieldPotential<2> + Clone,
         G: CurvedFieldSpaceGeometry<2> + Clone,
     {
+        let absolute = settings.tolerances.absolute;
+        let cosmic_tolerances = ErrorTolerances::new(
+            TwoFieldPerturbationTolerance {
+                background: MultifieldStateDelta {
+                    phi: absolute.background.phi,
+                    pi: absolute.background.pi,
+                    a: ScaleFactor::new(absolute.background.log_scale_factor.into_value()),
+                },
+                rescaled_amplitude: absolute.rescaled_amplitude,
+                rescaled_velocity: absolute.rescaled_velocity,
+            },
+            settings.tolerances.relative,
+        );
         advance_until(
             system,
             state,
             time,
             AdvanceControl {
                 settings,
-                tolerances: &settings.tolerances,
+                tolerances: &cosmic_tolerances,
                 stage: SpectrumRunStage::ModeEvolution {
                     k: system.k.into_value(),
                 },
@@ -1795,7 +1926,9 @@ mod tests {
                     initial,
                     &SpectrumRunSettings {
                         tolerances: ErrorTolerances::new(
-                            TwoFieldPerturbationTolerance::background_in_planck_units(1.0e-20),
+                            ConformalTwoFieldPerturbationTolerance::background_in_planck_units(
+                                1.0e-20,
+                            ),
                             relative,
                         ),
                         ..quick_settings()

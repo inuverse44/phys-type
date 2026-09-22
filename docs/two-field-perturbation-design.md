@@ -487,8 +487,8 @@ eliminating it. What removes the hazard outright is giving each group of
 components its own absolute tolerance, in that group's own dimension:
 
 ```rust,ignore
-pub struct TwoFieldPerturbationTolerance {
-    pub background: MultifieldStateDelta<2>,
+pub struct ConformalTwoFieldPerturbationTolerance {
+    pub background: ConformalBackgroundTolerance,
     pub rescaled_amplitude: ModeAmplitude<f64>,
     pub rescaled_velocity: ModeVelocity<f64>,
 }
@@ -511,13 +511,37 @@ in `x_init` without anything failing. The background components are real and
 can pass through zero, so they keep a floor, and one raw Planck-unit number
 is honest for them because they stay within a few orders of each other.
 
-One thing is deliberately left undone. The independent variable is still
-cosmic time: conformal time would additionally make the sub-horizon frequency
-constant at `k`, but `Time` and a conformal time would share the dimension
-`M^-1` and so would be the same type, which needs its own marker to stay
-safe.
+The spectrum driver now evolves initialized modes in conformal time.  A
+`ConformalTime` newtype retains mass dimension `M^-1` internally but is not
+interchangeable with cosmic `Time`; a compile-fail test fixes that semantic
+boundary.  The integrated mode velocity is `D_eta v = a D_t v`, and the
+equation becomes
 
-Relatedly, normalizing `a = 1` at the initial state rather than at the end of
+```math
+D_\eta^2 v
++ \left(k^2 + a^2 M - \frac{a''}{a}\right)v = 0.
+```
+
+There is no Hubble-drag term and the sub-horizon frequency is the constant
+comoving wavenumber `k`.  The accompanying background keeps the cosmic field
+velocity `pi = d phi/dt`, but evolves `ln a` rather than `a`:
+
+```math
+\frac{d\phi}{d\eta}=a\pi,
+\qquad
+\frac{d\pi}{d\eta}=a\frac{d\pi}{dt},
+\qquad
+\frac{d\ln a}{d\eta}=aH.
+```
+
+This removes the exponentially large scale factor from the adaptive state.
+Run settings remain expressed as local cosmic-time step sizes; the driver
+converts each attempt through `d eta = dt/a`, so existing settings retain
+their physical interpretation.  The cosmic-time perturbation system remains
+available as an independent formulation and the derivative-level coordinate
+transformation, Bunch-Davies state, and Wronskian are tested against it.
+
+Normalizing `a = 1` at the initial state rather than at the end of
 inflation is what makes `k_pivot` print as `5.5e14 M_pl`. The number is
 correct but unreadable, and an end-of-inflation normalization would keep
 reported wavenumbers close to unity.

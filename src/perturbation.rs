@@ -4,11 +4,12 @@ use core::ops::{Add, Mul};
 
 use num_complex::Complex64;
 
-use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
+use crate::integrate::{AdaptiveSystem, ErrorTolerances, System, component_error_ratio};
 use crate::{
-    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, KinematicBasisError, M1,
-    M3Over2, MHalf, MMinusHalf, Mass, MultifieldState, MultifieldStateDelta,
-    MultifieldStateDerivative, Quantity, Time, TwiceDifferentiableMultifieldPotential,
+    ConformalTime, CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless,
+    KinematicBasisError, M0, M1, M2, M3, M3Over2, MHalf, MMinusHalf, Mass, MultifieldState,
+    MultifieldStateDelta, MultifieldStateDerivative, Quantity, ScaleFactor, Time,
+    TwiceDifferentiableMultifieldPotential,
 };
 
 /// Rescaled Fourier mode amplitude `v^I_A = a U^I_A`, with dimension fixed by
@@ -139,6 +140,167 @@ pub struct TwoFieldPerturbationDelta {
     pub amplitude: [[ModeAmplitude; 2]; 2],
     /// Change in covariant mode velocities.
     pub velocity: [[ModeVelocity; 2]; 2],
+}
+
+/// Two-field background variables evolved in conformal time.
+///
+/// The scale factor is stored as `ln a`.  This removes the exponentially large
+/// component from the adaptive state while still allowing an ordinary
+/// [`MultifieldState`] snapshot to be reconstructed wherever physical
+/// diagnostics need `a`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ConformalBackgroundState {
+    /// Scalar field values `phi^I`.
+    pub phi: [crate::Field; 2],
+    /// Cosmic-time field velocities `d phi^I / dt`.
+    pub pi: [crate::FieldVelocity; 2],
+    /// Natural logarithm of the scale factor.
+    pub log_scale_factor: Quantity<M0, f64>,
+}
+
+impl ConformalBackgroundState {
+    /// Converts an ordinary background snapshot to the conformal state.
+    pub fn from_cosmic(state: MultifieldState<2>) -> Self {
+        Self {
+            phi: state.phi,
+            pi: state.pi,
+            log_scale_factor: Quantity::new(state.a.into_value().ln()),
+        }
+    }
+
+    /// Reconstructs an ordinary background snapshot.
+    pub fn cosmic(self) -> MultifieldState<2> {
+        MultifieldState::new(
+            self.phi,
+            self.pi,
+            ScaleFactor::new(self.log_scale_factor.into_value().exp()),
+        )
+    }
+
+    /// E-folds elapsed from an ordinary initial background.
+    pub fn e_folds(&self, initial: &MultifieldState<2>) -> f64 {
+        self.log_scale_factor.into_value() - initial.a.into_value().ln()
+    }
+}
+
+/// Background and rescaled modes evolved with conformal time.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ConformalTwoFieldPerturbationState {
+    /// Background with `ln a` as its expansion variable.
+    pub background: ConformalBackgroundState,
+    /// `v = a U` and its covariant conformal-time derivative `D_eta v`.
+    pub modes: TwoFieldModes,
+}
+
+impl ConformalTwoFieldPerturbationState {
+    /// Returns the equivalent cosmic-time state for spectra and diagnostics.
+    pub fn cosmic(self) -> TwoFieldPerturbationState {
+        let background = self.background.cosmic();
+        let inverse_scale_factor = 1.0 / background.a.into_value();
+
+        TwoFieldPerturbationState {
+            background,
+            modes: TwoFieldModes {
+                rescaled_amplitude: self.modes.rescaled_amplitude,
+                // D_eta v = a D_t v.
+                rescaled_velocity: self
+                    .modes
+                    .rescaled_velocity
+                    .map(|row| row.map(|entry| entry * inverse_scale_factor)),
+            },
+        }
+    }
+}
+
+/// Conformal-time derivative of a background-plus-modes state.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ConformalTwoFieldPerturbationDerivative {
+    /// `d phi / d eta`.
+    pub phi: [Quantity<M2, f64>; 2],
+    /// `d pi / d eta`.
+    pub pi: [Quantity<M3, f64>; 2],
+    /// `d ln(a) / d eta = a H`.
+    pub log_scale_factor: Quantity<M1, f64>,
+    /// Coordinate derivative of `v`.
+    pub amplitude: [[ModeVelocity; 2]; 2],
+    /// Coordinate derivative of `D_eta v`.
+    pub velocity: [[ModeAcceleration; 2]; 2],
+}
+
+/// Finite conformal-time change of a background-plus-modes state.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ConformalTwoFieldPerturbationDelta {
+    /// Changes in the scalar fields.
+    pub phi: [crate::Field; 2],
+    /// Changes in the cosmic-time field velocities.
+    pub pi: [crate::FieldVelocity; 2],
+    /// Change in `ln a`.
+    pub log_scale_factor: Quantity<M0, f64>,
+    /// Change in `v`.
+    pub amplitude: [[ModeAmplitude; 2]; 2],
+    /// Change in `D_eta v`.
+    pub velocity: [[ModeVelocity; 2]; 2],
+}
+
+impl Add<ConformalTwoFieldPerturbationDelta> for ConformalTwoFieldPerturbationState {
+    type Output = Self;
+
+    fn add(self, rhs: ConformalTwoFieldPerturbationDelta) -> Self::Output {
+        Self {
+            background: ConformalBackgroundState {
+                phi: core::array::from_fn(|index| self.background.phi[index] + rhs.phi[index]),
+                pi: core::array::from_fn(|index| self.background.pi[index] + rhs.pi[index]),
+                log_scale_factor: self.background.log_scale_factor + rhs.log_scale_factor,
+            },
+            modes: TwoFieldModes {
+                rescaled_amplitude: add_matrices(self.modes.rescaled_amplitude, rhs.amplitude),
+                rescaled_velocity: add_matrices(self.modes.rescaled_velocity, rhs.velocity),
+            },
+        }
+    }
+}
+
+impl Add for ConformalTwoFieldPerturbationDerivative {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            phi: core::array::from_fn(|index| self.phi[index] + rhs.phi[index]),
+            pi: core::array::from_fn(|index| self.pi[index] + rhs.pi[index]),
+            log_scale_factor: self.log_scale_factor + rhs.log_scale_factor,
+            amplitude: add_matrices(self.amplitude, rhs.amplitude),
+            velocity: add_matrices(self.velocity, rhs.velocity),
+        }
+    }
+}
+
+impl Mul<f64> for ConformalTwoFieldPerturbationDerivative {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self {
+            phi: self.phi.map(|entry| entry * rhs),
+            pi: self.pi.map(|entry| entry * rhs),
+            log_scale_factor: self.log_scale_factor * rhs,
+            amplitude: scale_matrix(self.amplitude, rhs),
+            velocity: scale_matrix(self.velocity, rhs),
+        }
+    }
+}
+
+impl Mul<ConformalTime> for ConformalTwoFieldPerturbationDerivative {
+    type Output = ConformalTwoFieldPerturbationDelta;
+
+    fn mul(self, rhs: ConformalTime) -> Self::Output {
+        let interval = rhs.as_time();
+        ConformalTwoFieldPerturbationDelta {
+            phi: self.phi.map(|entry| entry * interval),
+            pi: self.pi.map(|entry| entry * interval),
+            log_scale_factor: self.log_scale_factor * interval,
+            amplitude: self.amplitude.map(|row| row.map(|entry| entry * interval)),
+            velocity: self.velocity.map(|row| row.map(|entry| entry * interval)),
+        }
+    }
 }
 
 impl Add<TwoFieldPerturbationDelta> for TwoFieldPerturbationState {
@@ -389,6 +551,244 @@ where
             amplitude,
             velocity,
         }
+    }
+}
+
+/// A two-field perturbation system written in conformal time.
+///
+/// It evolves `ln a` rather than `a`, and stores `D_eta v`.  The mode equation
+/// is therefore
+/// `D_eta^2 v + [k^2 + a^2 C - a''/a] v = 0`, with no Hubble-drag term.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ConformalTwoFieldPerturbationSystem<P, G> {
+    /// Background dynamics and geometric data.
+    pub background: CovariantMultifieldSystem<P, G, 2>,
+    /// Positive comoving wavenumber.
+    pub k: Mass,
+}
+
+impl<P, G> ConformalTwoFieldPerturbationSystem<P, G>
+where
+    P: TwiceDifferentiableMultifieldPotential<2> + Clone,
+    G: CurvedFieldSpaceGeometry<2> + Clone,
+{
+    /// Builds a one-wavenumber conformal-time system.
+    pub const fn new(background: CovariantMultifieldSystem<P, G, 2>, k: Mass) -> Self {
+        Self { background, k }
+    }
+
+    /// Constructs the same Bunch-Davies vacuum as the cosmic-time system,
+    /// converting `D_t v` to `D_eta v = a D_t v` at the boundary.
+    pub fn bunch_davies_state(
+        &self,
+        background: MultifieldState<2>,
+        minimum_depth: f64,
+    ) -> Result<ConformalTwoFieldPerturbationState, ModeInitializationError> {
+        let cosmic = TwoFieldPerturbationSystem::new(self.background.clone(), self.k)
+            .bunch_davies_state(background, minimum_depth)?;
+        let scale_factor = cosmic.background.a.into_value();
+
+        Ok(ConformalTwoFieldPerturbationState {
+            background: ConformalBackgroundState::from_cosmic(cosmic.background),
+            modes: TwoFieldModes {
+                rescaled_amplitude: cosmic.modes.rescaled_amplitude,
+                rescaled_velocity: cosmic
+                    .modes
+                    .rescaled_velocity
+                    .map(|row| row.map(|entry| entry * scale_factor)),
+            },
+        })
+    }
+
+    /// Canonical Wronskian, expressed directly with `D_eta v`.
+    pub fn wronskian(&self, state: &ConformalTwoFieldPerturbationState) -> ComplexMatrix2 {
+        TwoFieldPerturbationSystem::new(self.background.clone(), self.k).wronskian(&state.cosmic())
+    }
+}
+
+impl<P, G> System for ConformalTwoFieldPerturbationSystem<P, G>
+where
+    P: TwiceDifferentiableMultifieldPotential<2>,
+    G: CurvedFieldSpaceGeometry<2>,
+{
+    type IndependentVariable = ConformalTime;
+    type State = ConformalTwoFieldPerturbationState;
+    type Delta = ConformalTwoFieldPerturbationDelta;
+    type Derivative = ConformalTwoFieldPerturbationDerivative;
+
+    fn derivative(&self, _conformal_time: ConformalTime, state: &Self::State) -> Self::Derivative {
+        let background = state.background.cosmic();
+        let scale_factor = background.a;
+        let cosmic_derivative = self.background.derivative(Time::new(0.0), &background);
+        let hubble = self.background.hubble(&background);
+        let epsilon_h = self.background.epsilon_h(&background);
+        let connection = self.background.geometry.christoffel(&background.phi);
+        let mass = self.background.perturbation_mass_matrix(&background);
+        let conformal_field_velocity = background.pi.map(|entry| entry * scale_factor);
+        let scale_factor_squared = scale_factor * scale_factor;
+        let expansion = hubble * hubble * scale_factor_squared * (2.0 - epsilon_h);
+        let wave_number_squared = self.k * self.k;
+
+        let amplitude = core::array::from_fn(|upper| {
+            core::array::from_fn(|mode| {
+                let connection_term = (0..2)
+                    .flat_map(|first| (0..2).map(move |second| (first, second)))
+                    .fold(
+                        ModeVelocity::new(Complex64::new(0.0, 0.0)),
+                        |sum, (first, second)| {
+                            sum + connection.components()[upper][first][second]
+                                * conformal_field_velocity[first]
+                                * state.modes.rescaled_amplitude[second][mode]
+                        },
+                    );
+                state.modes.rescaled_velocity[upper][mode] - connection_term
+            })
+        });
+        let velocity = core::array::from_fn(|upper| {
+            core::array::from_fn(|mode| {
+                let restoring = (0..2).fold(
+                    ModeAcceleration::new(Complex64::new(0.0, 0.0)),
+                    |sum, lower| {
+                        let entry = if upper == lower {
+                            mass.components()[upper][lower] * scale_factor_squared
+                                + wave_number_squared
+                                - expansion
+                        } else {
+                            mass.components()[upper][lower] * scale_factor_squared
+                        };
+                        sum + entry * state.modes.rescaled_amplitude[lower][mode]
+                    },
+                );
+                let connection_term = (0..2)
+                    .flat_map(|first| (0..2).map(move |second| (first, second)))
+                    .fold(
+                        ModeAcceleration::new(Complex64::new(0.0, 0.0)),
+                        |sum, (first, second)| {
+                            sum + connection.components()[upper][first][second]
+                                * conformal_field_velocity[first]
+                                * state.modes.rescaled_velocity[second][mode]
+                        },
+                    );
+
+                -restoring - connection_term
+            })
+        });
+
+        ConformalTwoFieldPerturbationDerivative {
+            phi: cosmic_derivative.dphi_dt.map(|entry| entry * scale_factor),
+            pi: cosmic_derivative.dpi_dt.map(|entry| entry * scale_factor),
+            log_scale_factor: scale_factor * hubble,
+            amplitude,
+            velocity,
+        }
+    }
+}
+
+/// Absolute tolerances for the conformal-time state.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ConformalBackgroundTolerance {
+    /// Absolute field tolerances.
+    pub phi: [crate::Field<f64>; 2],
+    /// Absolute cosmic-velocity tolerances.
+    pub pi: [crate::FieldVelocity<f64>; 2],
+    /// Absolute tolerance for `ln a`.
+    pub log_scale_factor: Quantity<M0, f64>,
+}
+
+/// Absolute tolerances for the conformal-time state.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ConformalTwoFieldPerturbationTolerance {
+    /// Tolerances for `phi`, cosmic `pi`, and `ln a`.
+    pub background: ConformalBackgroundTolerance,
+    /// Absolute tolerance for `v`.
+    pub rescaled_amplitude: ModeAmplitude<f64>,
+    /// Absolute tolerance for `D_eta v`.
+    pub rescaled_velocity: ModeVelocity<f64>,
+}
+
+impl ConformalTwoFieldPerturbationTolerance {
+    /// Bounds the real background components and leaves modes under pure
+    /// relative control.
+    pub fn background_in_planck_units(value: f64) -> Self {
+        Self {
+            background: ConformalBackgroundTolerance {
+                phi: [crate::Field::new(value); 2],
+                pi: [crate::FieldVelocity::new(value); 2],
+                log_scale_factor: Quantity::new(value),
+            },
+            ..Self::default()
+        }
+    }
+}
+
+impl<P, G> AdaptiveSystem for ConformalTwoFieldPerturbationSystem<P, G>
+where
+    P: TwiceDifferentiableMultifieldPotential<2>,
+    G: CurvedFieldSpaceGeometry<2>,
+{
+    type AbsoluteTolerance = ConformalTwoFieldPerturbationTolerance;
+
+    fn error_ratio(
+        &self,
+        current: &Self::State,
+        next: &Self::State,
+        error: &Self::Delta,
+        tolerances: &ErrorTolerances<Self::AbsoluteTolerance>,
+    ) -> f64 {
+        let absolute = tolerances.absolute;
+        let relative = tolerances.relative;
+        let fields = (0..2).map(|index| {
+            component_error_ratio(
+                error.phi[index],
+                current.background.phi[index],
+                next.background.phi[index],
+                absolute.background.phi[index],
+                relative,
+            )
+        });
+        let velocities = (0..2).map(|index| {
+            component_error_ratio(
+                error.pi[index],
+                current.background.pi[index],
+                next.background.pi[index],
+                absolute.background.pi[index],
+                relative,
+            )
+        });
+        let log_scale_factor = component_error_ratio(
+            error.log_scale_factor,
+            current.background.log_scale_factor,
+            next.background.log_scale_factor,
+            absolute.background.log_scale_factor,
+            relative,
+        );
+        let background = fields.chain(velocities).fold(log_scale_factor, f64::max);
+        let amplitude_scale = mode_matrix_scale(
+            &current.modes.rescaled_amplitude,
+            &next.modes.rescaled_amplitude,
+        );
+        let velocity_scale = mode_matrix_scale(
+            &current.modes.rescaled_velocity,
+            &next.modes.rescaled_velocity,
+        );
+
+        (0..2)
+            .flat_map(|field| (0..2).map(move |mode| (field, mode)))
+            .map(|(field, mode)| {
+                normalized_mode_error(
+                    error.amplitude[field][mode],
+                    amplitude_scale,
+                    absolute.rescaled_amplitude,
+                    relative,
+                )
+                .max(normalized_mode_error(
+                    error.velocity[field][mode],
+                    velocity_scale,
+                    absolute.rescaled_velocity,
+                    relative,
+                ))
+            })
+            .fold(background, f64::max)
     }
 }
 
@@ -689,5 +1089,86 @@ mod tests {
                 assert!(value.im.abs() < 1.0e-12);
             }
         }
+    }
+
+    #[test]
+    fn conformal_state_round_trips_the_background_and_wronskian() {
+        let cosmic_system = system();
+        let conformal_system =
+            ConformalTwoFieldPerturbationSystem::new(cosmic_system.background, cosmic_system.k);
+        let cosmic = cosmic_system
+            .bunch_davies_state(background(), 100.0)
+            .unwrap();
+        let conformal = conformal_system
+            .bunch_davies_state(cosmic.background, 100.0)
+            .unwrap();
+
+        assert_eq!(conformal.cosmic(), cosmic);
+        assert_eq!(
+            conformal_system.wronskian(&conformal),
+            cosmic_system.wronskian(&cosmic)
+        );
+    }
+
+    #[test]
+    fn conformal_derivative_is_the_coordinate_transform_of_cosmic_time() {
+        let cosmic_system = system();
+        let conformal_system =
+            ConformalTwoFieldPerturbationSystem::new(cosmic_system.background, cosmic_system.k);
+        let cosmic_state = cosmic_system
+            .bunch_davies_state(background(), 100.0)
+            .unwrap();
+        let conformal_state = conformal_system
+            .bunch_davies_state(cosmic_state.background, 100.0)
+            .unwrap();
+        let cosmic = cosmic_system.derivative(Time::new(0.0), &cosmic_state);
+        let conformal = conformal_system.derivative(ConformalTime::new(0.0), &conformal_state);
+        let a = cosmic_state.background.a.into_value();
+        let hubble = cosmic_system.background.hubble(&cosmic_state.background);
+
+        for field in 0..2 {
+            assert_close(
+                conformal.phi[field].into_value(),
+                cosmic.background.dphi_dt[field].into_value() * a,
+            );
+            assert_close(
+                conformal.pi[field].into_value(),
+                cosmic.background.dpi_dt[field].into_value() * a,
+            );
+            for mode in 0..2 {
+                assert_complex_close(
+                    conformal.amplitude[field][mode].into_value(),
+                    cosmic.amplitude[field][mode].into_value() * a,
+                );
+                // q = a p, hence dq/deta = a^2 (dp/dt + H p).
+                assert_complex_close(
+                    conformal.velocity[field][mode].into_value(),
+                    (cosmic.velocity[field][mode]
+                        + cosmic_state.modes.rescaled_velocity[field][mode] * hubble)
+                        .into_value()
+                        * (a * a),
+                );
+            }
+        }
+        assert_close(
+            conformal.log_scale_factor.into_value(),
+            a * hubble.into_value(),
+        );
+    }
+
+    fn assert_close(actual: f64, expected: f64) {
+        let scale = actual.abs().max(expected.abs()).max(1.0e-30);
+        assert!(
+            (actual - expected).abs() / scale < 1.0e-12,
+            "actual={actual:e}, expected={expected:e}"
+        );
+    }
+
+    fn assert_complex_close(actual: Complex64, expected: Complex64) {
+        let scale = actual.norm().max(expected.norm()).max(1.0e-30);
+        assert!(
+            (actual - expected).norm() / scale < 1.0e-12,
+            "actual={actual:e}, expected={expected:e}"
+        );
     }
 }

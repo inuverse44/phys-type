@@ -113,9 +113,10 @@ checks are documented in
 | `dimension` | `MassPower<E>` and the type-level `DimMul`, `DimDiv`, `DimSqrt` |
 | `field_space` | Typed rank-one through rank-four tensors, geometry, and bases |
 | `quantity` | `Quantity<D, V>` and its arithmetic |
+| `time` | Semantically distinct conformal time for coordinate-safe integration |
 | `state` | `State`, `StateDerivative`, `StateDelta` |
 | `potential` | Automatically differentiated potentials and `QuadraticPotential` |
-| `perturbation` | Covariant two-field mode matrices and Bunch-Davies evolution |
+| `perturbation` | Cosmic/conformal two-field mode systems and Bunch-Davies evolution |
 | `spectra` | Mode covariance, Hermiticity checks, and adiabatic/entropy projections |
 | `spectrum_run` | The background survey, pivot convention, `k` grid driver, and CSV rows |
 | `integrate` | The `System` and `AdaptiveSystem` traits, fixed RK4, embedded Dormand-Prince 5(4), and the shared step-size controller |
@@ -149,10 +150,12 @@ Canonical multifield systems use fixed-size arrays and the same generic
 integrators. `QuadraticMultifieldPotential<N>` supplies one mass per field and
 obtains every gradient component through automatic differentiation.
 
-The current multifield solver is a flat, canonical background implementation.
-It does not yet evolve quantum perturbations or power spectra. Those stages,
-including typed upper/lower field-space indices, are tracked in the two-field
-perturbation design.
+The multifield layer includes canonical and covariant backgrounds, complex
+two-field perturbations, and projected curvature/entropy spectra. Spectrum
+runs initialize each mode in the Bunch-Davies vacuum and evolve `v = a U` in
+conformal time. `ConformalTime` is a distinct semantic type from cosmic
+`Time`, while the conformal background evolves `ln a` to keep the expanding
+scale factor out of the numerical dynamic range.
 
 Field-space variance is already available independently of physical
 dimension. `FieldMetric<N>::lower` maps an upper-index vector to a lower-index

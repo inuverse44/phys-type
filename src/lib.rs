@@ -17,6 +17,7 @@ pub mod scalar_field;
 pub mod spectra;
 pub mod spectrum_run;
 pub mod state;
+pub mod time;
 
 pub use autodiff::{Dual, Jet, Transcendental};
 pub use background::{
@@ -44,10 +45,13 @@ pub use multifield::{
 };
 pub use num_complex::Complex64;
 pub use perturbation::{
-    ComplexMagnitude, ComplexMatrix2, ModeAcceleration, ModeAmplitude, ModeInitializationError,
-    ModeVelocity, TwoFieldModes, TwoFieldPerturbationDelta, TwoFieldPerturbationDerivative,
-    TwoFieldPerturbationState, TwoFieldPerturbationSystem, TwoFieldPerturbationTolerance,
-    normalized_mode_error,
+    ComplexMagnitude, ComplexMatrix2, ConformalBackgroundState, ConformalBackgroundTolerance,
+    ConformalTwoFieldPerturbationDelta, ConformalTwoFieldPerturbationDerivative,
+    ConformalTwoFieldPerturbationState, ConformalTwoFieldPerturbationSystem,
+    ConformalTwoFieldPerturbationTolerance, ModeAcceleration, ModeAmplitude,
+    ModeInitializationError, ModeVelocity, TwoFieldModes, TwoFieldPerturbationDelta,
+    TwoFieldPerturbationDerivative, TwoFieldPerturbationState, TwoFieldPerturbationSystem,
+    TwoFieldPerturbationTolerance, normalized_mode_error,
 };
 pub use potential::{
     MultifieldPotential, MultifieldPotentialValue, Potential, PotentialDerivatives, PotentialValue,
@@ -65,6 +69,7 @@ pub use spectrum_run::{
     SpectrumRunSettings, SpectrumRunStage, write_metadata,
 };
 pub use state::{State, StateDelta, StateDerivative};
+pub use time::ConformalTime;
 
 /// A dimensionless quantity, such as the scale factor.
 pub type Dimensionless<V = f64> = Quantity<M0, V>;

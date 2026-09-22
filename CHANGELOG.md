@@ -55,6 +55,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `HyperbolicFieldSpace`, a constant-negative-curvature two-field geometry, so
   that the covariant machinery is exercised with a non-vanishing connection and
   Riemann tensor rather than only through `FlatFieldSpace`.
+- A semantically distinct `ConformalTime`, conformal background state storing
+  `ln a`, and the drag-free `D_eta^2 v` two-field mode system, with
+  compile-fail coverage preventing cosmic and conformal time from being mixed.
 
 ### Changed
 
@@ -72,6 +75,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   floor, because their error is normalized by a modulus that does not vanish.
 - `Im_P_12` is emitted alongside `Re_P_12`, so both columns of a complex
   quantity cross the CSV boundary.
+- Spectrum mode evolution now uses conformal time and stores `D_eta v`; local
+  cosmic-time step settings are converted with `d eta = dt/a` at each
+  attempt. The background survey remains in cosmic time.
 
 ### Fixed
 
