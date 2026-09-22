@@ -19,6 +19,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A non-Gaussianity architecture selecting tree-level phase-space transport,
   with momentum-triangle, tensor, two-point-oracle, three-point, and nonlinear
   curvature-projection milestones.
+- Validated, canonical momentum triangles with reversible caller-leg
+  permutations, typed field/momentum phase-space indices, and dimensioned
+  two-/three-point correlator blocks whose permutations preserve slot types.
 
 ### Changed
 

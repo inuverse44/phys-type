@@ -190,6 +190,25 @@ Third derivative order and tensor rank remain separate concepts in the API.
 Each milestone has its own public types and tests.  A later milestone cannot
 hide an unverified approximation made in an earlier one.
 
+### P3a implementation status
+
+P3a is complete.  The `transport` module provides:
+
+- `MomentumTriangle`, which validates positive finite legs and relative
+  closure tolerance, stores perimeter and canonical shape coordinates, and
+  retains both directions of the caller/canonical leg permutation;
+- compile-time `FieldPerturbation` and `MomentumPerturbation` slot markers,
+  bounded `PhaseSpaceIndex<S, N>`, and an explicitly tagged erased index;
+- dimension-carrying `TwoPointBlock` and `ThreePointBlock` containers;
+- transpose and Fourier-leg permutation operations whose return types move
+  the phase-space slot markers together with their component axes.
+
+Unit tests cover equilateral/general, folded-boundary, squeezed, invalid, and
+tolerance-assisted triangles, index bounds, and component permutations.  A
+compile-fail case proves that a `QP` block cannot be assigned to a `QQ` block.
+No transport dynamics or momentum normalization is implied by these types;
+that enters through P3b/P3c.
+
 ## Acceptance boundary
 
 The non-Gaussianity milestone is complete only when:

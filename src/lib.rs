@@ -19,6 +19,7 @@ pub mod spectra;
 pub mod spectrum_run;
 pub mod state;
 pub mod time;
+pub mod transport;
 
 pub use autodiff::{Dual, Jet, Transcendental};
 pub use background::{
@@ -76,6 +77,11 @@ pub use spectrum_run::{
 };
 pub use state::{State, StateDelta, StateDerivative};
 pub use time::ConformalTime;
+pub use transport::{
+    AnyPhaseSpaceIndex, DEFAULT_TRIANGLE_CLOSURE_TOLERANCE, FieldPerturbation, FourierLeg,
+    MomentumPerturbation, MomentumTriangle, MomentumTriangleError, PhaseSpaceIndex,
+    PhaseSpaceIndexError, PhaseSpaceSlot, PhaseSpaceSlotKind, ThreePointBlock, TwoPointBlock,
+};
 
 /// A dimensionless quantity, such as the scale factor.
 pub type Dimensionless<V = f64> = Quantity<M0, V>;

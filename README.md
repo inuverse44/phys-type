@@ -132,6 +132,7 @@ checks are documented in
 | `perturbation` | Cosmic/conformal two-field mode systems and Bunch-Davies evolution |
 | `spectra` | Mode covariance, Hermiticity checks, and adiabatic/entropy projections |
 | `spectrum_run` | The background survey, pivot convention, `k` grid driver, and CSV rows |
+| `transport` | Validated momentum triangles and typed phase-space correlator blocks |
 | `integrate` | The `System` and `AdaptiveSystem` traits, fixed RK4, embedded Dormand-Prince 5(4), and the shared step-size controller |
 | `scalar_field` | `ScalarFieldSystem`, including the Friedmann constraint |
 | `multifield` | Const-generic canonical multifield states and dynamics |

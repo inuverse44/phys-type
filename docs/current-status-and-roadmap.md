@@ -106,7 +106,11 @@ turn and the complete 41-point benchmark.
   sector against the existing mode solver, then add triangle-dependent
   three-point evolution and nonlinear curvature projection.  The ordered
   P3a--P3e milestones are specified in
-  [`non-gaussianity-architecture.md`](non-gaussianity-architecture.md);
+  [`non-gaussianity-architecture.md`](non-gaussianity-architecture.md).
+  **P3a is completed:** validated canonical momentum triangles, bounded tagged
+  phase-space indices, and dimensioned two-/three-point blocks are implemented.
+  P3b third-order automatic differentiation and covariant model geometry is
+  next;
 - reheating and post-inflationary transfer;
 - dynamically sized field spaces if a concrete model requires more than the
   current const-generic representation.
