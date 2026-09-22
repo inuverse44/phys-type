@@ -1,10 +1,10 @@
 [package]
 name = "phys-type"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.88"
 authors = ["Tatsuki Kodama"]
-description = "Dimension-aware physical quantities and cosmological background integration"
+description = "Dimension-aware covariant inflationary backgrounds and two-field spectra"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/inuverse44/phys-type"
 readme = "README.md"

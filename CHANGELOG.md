@@ -6,6 +6,8 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-22
+
 ### Added
 
 - Fixed-size field-space vectors and rank-two tensors with compile-time upper
@@ -120,5 +122,6 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Compile-fail tests for dimensionally invalid expressions.
 - CSV diagnostics and reproducible Matplotlib visualization workflow.
 
-[Unreleased]: https://github.com/inuverse44/phys-type/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/inuverse44/phys-type/releases/tag/v0.1.0
+[Unreleased]: https://github.com/inuverse44/phys-type/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/inuverse44/phys-type/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/inuverse44/phys-type/tree/v0.1.0

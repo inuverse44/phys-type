@@ -38,19 +38,18 @@ curvature spectrum to a maximum relative difference of `3.1e-10` over the
 
 ## Release state
 
-The code is scientifically usable as a reference implementation, but the
-repository is not yet in a coherent release state:
+The release history is now explicit and internally consistent:
 
-- `Cargo.toml` still declares version `0.1.0`;
-- the completed two-field work remains under `Unreleased` in the changelog;
-- neither the local repository nor GitHub has a release tag;
-- GitHub Actions now watches pushes to `main`; this was corrected after the
-  default branch rename exposed that the workflow still named `master`.
+- `v0.1.0` points to commit `1caa3a8`, the original explicit release-preparation
+  commit whose contents match the `0.1.0` changelog;
+- the completed two-field milestone is versioned as `0.2.0` and has its own
+  dated changelog section;
+- GitHub Actions watches pushes to `main` and the first corrected run passed;
+- formatting, Clippy, all tests, all-target release build, and
+  `cargo package --locked` pass for the release contents.
 
-The absence of a tag matters because the changelog currently presents
-`0.1.0` as released even though there is no corresponding Git reference.
-Release preparation must resolve that history explicitly instead of silently
-inventing a tag.
+The repository tags the verified source state, but does not publish the crate
+to crates.io automatically.  Publishing remains a separate explicit action.
 
 ## Priorities
 
@@ -61,14 +60,13 @@ one has an unmet acceptance condition.
 
 1. **Completed:** change the CI push branch from `master` to `main` and verify
    a run on the default branch.
-2. Run the complete release checks: formatting, Clippy, tests, release build,
-   and `cargo package --locked`.
-3. Prepare the next release version and changelog.  Before publishing or
-   pushing a tag, explicitly decide whether `v0.1.0` is a historical release
-   to backfill or whether the next version is the first tagged release.
+2. **Completed:** run formatting, Clippy, tests, release build, and
+   `cargo package --locked`.
+3. **Completed:** restore `v0.1.0` at its documented release-preparation
+   commit and version the two-field milestone as `v0.2.0`.
 
-Acceptance: `main` triggers green CI, the package contents are verified, and
-the version/tag history is internally consistent.
+Acceptance met: `main` triggers green CI, the package contents are verified,
+and the version/tag history is internally consistent.
 
 ### P1: make the scientific output self-explanatory
 
