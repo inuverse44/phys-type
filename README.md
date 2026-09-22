@@ -14,6 +14,9 @@ normalization are specified in
 Higher-rank tensors, field-space Riemann curvature, and the extension boundary
 toward non-Gaussianity are specified in
 [`docs/field-space-curvature-design.md`](docs/field-space-curvature-design.md).
+The implemented milestone, known limitations, release state, and ordered next
+steps are summarized in
+[`docs/current-status-and-roadmap.md`](docs/current-status-and-roadmap.md).
 
 ## Running it
 
