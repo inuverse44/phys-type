@@ -30,8 +30,9 @@ The implemented path includes:
 
 The implementation sequence 1--15 in
 [`two-field-perturbation-design.md`](two-field-perturbation-design.md) is
-complete.  The current `main` reference is commit `041f2bf`.  At that commit,
-133 unit tests and 17 compile-fail cases pass, as do formatting and Clippy.
+complete.  Its conformal-time reference implementation is commit `041f2bf`.
+At that commit, 133 unit tests and 17 compile-fail cases pass, as do formatting
+and Clippy.
 The conformal-time and former cosmic-time formulations agree in the final
 curvature spectrum to a maximum relative difference of `3.1e-10` over the
 41-point benchmark grid.
@@ -74,11 +75,13 @@ and the version/tag history is internally consistent.
    `N`, `k/(aH)`, and explicit evaluation-epoch metadata.
 2. **Completed:** make `k/k_pivot` the canonical exported coordinate and label
    the normalization-dependent raw value as `k_internal_over_m_pl`.
-3. Add an observational/likelihood boundary that names the pivot convention
-   and data release.  The current `A_s = 2.1e-9` remains a benchmark target,
-   not a fit.
+3. **Completed:** add a typed observational/likelihood boundary naming Planck
+   2018 legacy PR3, the baseline `TT,TE,EE+lowE` components, likelihood release
+   R3.00, and the physical `0.05 Mpc^-1` pivot.  The current `A_s = 2.1e-9` is
+   explicitly labeled as a benchmark target, not a fit.  See
+   [`planck-2018-likelihood-boundary.md`](planck-2018-likelihood-boundary.md).
 
-Acceptance: a spectrum row states its evaluation epoch, horizon-exit to final
+Acceptance met: a spectrum row states its evaluation epoch, horizon-exit to final
 transfer is directly inspectable, and observational assumptions are explicit.
 
 ### P2: remove avoidable repeated work
@@ -105,5 +108,6 @@ two-field solver.
 
 The current benchmark demonstrates numerical and physical consistency.  It is
 not a parameter inference, a claim that double-quadratic inflation is favored
-by data, or a general reheating prediction.  Those statements require the P1
-likelihood boundary and later physics extensions.
+by data, or a general reheating prediction.  The P1 boundary makes that scope
+machine-readable; those statements still require a Boltzmann/likelihood layer
+and later physics extensions.

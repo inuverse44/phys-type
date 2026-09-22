@@ -11,6 +11,11 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Separate horizon-exit spectrum rows refined at each mode's `k = aH`
   crossing. Both horizon-exit and requested-output CSVs carry `N`, `k/(aH)`,
   and explicit evaluation-epoch metadata.
+- A typed Planck 2018 PR3 observational reference naming the baseline
+  `TT,TE,EE+lowE` components, R3.00 likelihood release, and `0.05 Mpc^-1`
+  scalar pivot independently of internal Planck-unit wavenumbers.
+- CSV provenance that labels `A_s = 2.1e-9` as a benchmark target rather than
+  a likelihood fit.
 
 ### Changed
 

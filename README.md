@@ -11,6 +11,10 @@ covariant two-field adiabatic/isocurvature spectrum, specified in
 The runnable double-quadratic reference model and its scalar-amplitude
 normalization are specified in
 [`docs/two-field-observational-benchmark.md`](docs/two-field-observational-benchmark.md).
+Its Planck 2018 data-release, likelihood-component, and physical-pivot
+conventions—and the boundary between a benchmark target and an actual fit—are
+fixed in
+[`docs/planck-2018-likelihood-boundary.md`](docs/planck-2018-likelihood-boundary.md).
 Higher-rank tensors, field-space Riemann curvature, and the extension boundary
 toward non-Gaussianity are specified in
 [`docs/field-space-curvature-design.md`](docs/field-space-curvature-design.md).

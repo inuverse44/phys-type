@@ -19,8 +19,9 @@ use std::path::Path;
 use std::process::Command;
 
 use phys_type::{
-    CovariantMultifieldSystem, Field, FieldVelocity, FlatFieldSpace, Mass, MultifieldState,
-    QuadraticMultifieldPotential, ScaleFactor, SpectrumRun, SpectrumRunSettings, write_metadata,
+    AmplitudeRole, CovariantMultifieldSystem, Field, FieldVelocity, FlatFieldSpace, Mass,
+    MultifieldState, PLANCK_2018_TT_TE_EE_LOW_E, QuadraticMultifieldPotential, ScaleFactor,
+    SpectrumRun, SpectrumRunSettings, write_metadata, write_observational_metadata,
 };
 
 /// Shape parameters for the observationally normalized double-quadratic
@@ -117,6 +118,11 @@ fn write_file(
         calibration.mass_rescaling
     )?;
     writeln!(file, "# evaluation_epoch: {epoch}")?;
+    write_observational_metadata(
+        &mut file,
+        &PLANCK_2018_TT_TE_EE_LOW_E,
+        AmplitudeRole::BenchmarkTargetNotLikelihoodFit,
+    )?;
     write_metadata(&mut file, settings, &run.pivot, revision)?;
 
     rows(run, &mut file)

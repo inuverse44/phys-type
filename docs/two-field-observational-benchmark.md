@@ -82,10 +82,11 @@ value, target, scale factor, and calibrated masses are written into every CSV
 metadata block.  The final pivot amplitude is reported separately; the target
 is never substituted for a calculated spectrum value.
 
-`A_s` here is a declared benchmark target.  A future likelihood layer should
-make the pivot convention and observational data release explicit and should
-fit the background parameters instead of treating this normalization as a
-fit.
+`A_s` here is a declared benchmark target, not a fit.  The CSV metadata names
+the Planck 2018 legacy PR3 `TT,TE,EE+lowE` reference and its physical
+`0.05 Mpc^-1` pivot according to
+[`planck-2018-likelihood-boundary.md`](planck-2018-likelihood-boundary.md).
+Actually fitting the background parameters remains outside this benchmark.
 
 ## Interpretation of the outputs
 
@@ -112,6 +113,8 @@ The tracked reference run must satisfy all of the following:
 - all spectrum rows pass the existing Hermiticity, reality, positivity, and
   correlation-range checks;
 - the CSV records the shape parameters and amplitude calibration inputs;
+- the CSV identifies the observational release, likelihood components,
+  physical pivot, and benchmark-only amplitude role;
 - PNG and PDF figures are regenerated from the same CSV.
 
 ## Branch

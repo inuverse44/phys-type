@@ -10,6 +10,7 @@ pub mod dimension;
 pub mod field_space;
 pub mod integrate;
 pub mod multifield;
+pub mod observation;
 pub mod perturbation;
 pub mod potential;
 pub mod quantity;
@@ -44,6 +45,11 @@ pub use multifield::{
     MultifieldSystem, TwoFieldKinematics,
 };
 pub use num_complex::Complex64;
+pub use observation::{
+    AmplitudeRole, ComovingWavenumberMpcInverse, InvalidObservationalWavenumber,
+    LikelihoodComponent, ObservationDataRelease, ObservationalReference,
+    PLANCK_2018_TT_TE_EE_LOW_E, write_observational_metadata,
+};
 pub use perturbation::{
     ComplexMagnitude, ComplexMatrix2, ConformalBackgroundState, ConformalBackgroundTolerance,
     ConformalTwoFieldPerturbationDelta, ConformalTwoFieldPerturbationDerivative,
