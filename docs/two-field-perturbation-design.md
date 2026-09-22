@@ -343,13 +343,18 @@ background.csv:
 N, phi_1, phi_2, pi_1, pi_2, H, epsilon_H,
 e_sigma_1, e_sigma_2, e_s_1, e_s_2, eta_perp
 
-spectra.csv:
-k_over_pivot, k, P_11, P_22, Re_P_12, Im_P_12,
+horizon_exit_spectra.csv and spectra.csv:
+k_over_pivot, k, N, k_over_aH, P_11, P_22, Re_P_12, Im_P_12,
 P_Qsigma, P_Qs, C_Qsigma_Qs, P_R, P_S, C_RS, r_C
 
 mode_evolution.csv:
 k_over_pivot, N, k_over_aH, P_R, P_S, C_RS, eta_perp
 ```
+
+The first spectrum file is refined at each mode's own `k = aH` crossing.  The
+second is evaluated at the requested common output epoch.  Both carry `N` and
+`k/(aH)`, and their metadata names the evaluation epoch, so transfer is
+inspectable without inferring it from sampled mode-evolution rows.
 
 The principal two-field figure has four panels:
 

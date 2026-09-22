@@ -44,8 +44,8 @@ cargo run --release --example diagnostics
 ```
 
 For a complete two-field adiabatic and entropy spectrum run, writing the
-background, spectra, and mode-evolution CSV files with reproducibility
-metadata:
+background, horizon-exit spectra, requested-output spectra, and mode-evolution
+CSV files with reproducibility metadata:
 
 ```sh
 cargo run --release --example two_field_spectra

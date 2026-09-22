@@ -166,6 +166,11 @@ pub enum SpectrumRunStage {
         /// Comoving wavenumber in Planck units.
         k: f64,
     },
+    /// Evolving one initialized mode to its `k = aH` crossing.
+    HorizonExit {
+        /// Comoving wavenumber in Planck units.
+        k: f64,
+    },
     /// Evolving one initialized mode to the requested output time.
     ModeEvolution {
         /// Comoving wavenumber in Planck units.
@@ -179,6 +184,7 @@ impl fmt::Display for SpectrumRunStage {
             Self::BackgroundSurvey => formatter.write_str("background survey"),
             Self::Pivot => formatter.write_str("pivot search"),
             Self::ModeStart { k } => write!(formatter, "mode-start search for k={k:e} M_pl"),
+            Self::HorizonExit { k } => write!(formatter, "horizon-exit search for k={k:e} M_pl"),
             Self::ModeEvolution { k } => write!(formatter, "mode evolution for k={k:e} M_pl"),
         }
     }
@@ -302,6 +308,10 @@ pub struct SpectrumRecord {
     pub k_over_pivot: f64,
     /// `k / M_pl`.
     pub k: f64,
+    /// `N = ln(a / a_initial)` at this evaluation epoch.
+    pub e_folds: f64,
+    /// `k / (a H)` at this evaluation epoch.
+    pub k_over_ah: f64,
     /// `P^{11} / M_pl^2`.
     pub p_11: f64,
     /// `P^{22} / M_pl^2`.
@@ -333,16 +343,17 @@ pub struct SpectrumRecord {
 
 impl SpectrumRecord {
     /// The CSV header matching [`SpectrumRecord::to_csv_row`].
-    pub const CSV_HEADER: &'static str =
-        "k_over_pivot,k,P_11,P_22,Re_P_12,Im_P_12,P_Qsigma,P_Qs,C_Qsigma_Qs,P_R,P_S,C_RS,r_C";
+    pub const CSV_HEADER: &'static str = "k_over_pivot,k,N,k_over_aH,P_11,P_22,Re_P_12,Im_P_12,P_Qsigma,P_Qs,C_Qsigma_Qs,P_R,P_S,C_RS,r_C";
 
     /// Formats the row as comma-separated values.
     pub fn to_csv_row(&self) -> String {
         format!(
             "{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},{:.9e},\
-             {:.9e}",
+             {:.9e},{:.9e},{:.9e}",
             self.k_over_pivot,
             self.k,
+            self.e_folds,
+            self.k_over_ah,
             self.p_11,
             self.p_22,
             self.re_p_12,
@@ -405,6 +416,8 @@ pub struct SpectrumRun {
     pub background: Vec<BackgroundRecord>,
     /// One spectrum row per requested wavenumber.
     pub spectra: Vec<SpectrumRecord>,
+    /// One spectrum row per wavenumber, evaluated at `k = a H`.
+    pub horizon_exit_spectra: Vec<SpectrumRecord>,
     /// Sampled mode evolution for every wavenumber.
     pub mode_evolution: Vec<ModeEvolutionRecord>,
 }
@@ -425,6 +438,16 @@ impl SpectrumRun {
         write_rows(writer, SpectrumRecord::CSV_HEADER, &self.spectra, |row| {
             row.to_csv_row()
         })
+    }
+
+    /// Writes the horizon-exit spectrum rows as CSV.
+    pub fn write_horizon_exit_spectra_csv<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+        write_rows(
+            writer,
+            SpectrumRecord::CSV_HEADER,
+            &self.horizon_exit_spectra,
+            |row| row.to_csv_row(),
+        )
     }
 
     /// Writes the mode-evolution rows as CSV.
@@ -778,10 +801,11 @@ where
         };
 
         let mut spectra = Vec::with_capacity(settings.k_count);
+        let mut horizon_exit_spectra = Vec::with_capacity(settings.k_count);
         let mut mode_evolution = Vec::new();
         for index in 0..settings.k_count {
             let k_over_pivot = grid_point(settings, index);
-            let (record, rows) = self.evolve_one_mode(
+            let (record, horizon_exit_record, rows) = self.evolve_one_mode(
                 initial,
                 settings,
                 pivot.k * k_over_pivot,
@@ -790,6 +814,7 @@ where
             )?;
 
             spectra.push(record);
+            horizon_exit_spectra.push(horizon_exit_record);
             mode_evolution.extend(rows);
         }
 
@@ -797,6 +822,7 @@ where
             pivot,
             background,
             spectra,
+            horizon_exit_spectra,
             mode_evolution,
         })
     }
@@ -917,7 +943,7 @@ where
         k: Mass,
         k_over_pivot: f64,
         e_folds_at_output: f64,
-    ) -> Result<(SpectrumRecord, Vec<ModeEvolutionRecord>), SpectrumRunError> {
+    ) -> Result<(SpectrumRecord, SpectrumRecord, Vec<ModeEvolutionRecord>), SpectrumRunError> {
         let system = ConformalTwoFieldPerturbationSystem::new(self.clone(), k);
 
         // Carry the background forward until this mode sits at x_init.
@@ -954,9 +980,76 @@ where
         let mut sample_error = None;
         let mut accepted = 0_usize;
 
-        let (final_state, _) = advance_conformal_until(
+        // Stop at this mode's own horizon exit first.  Keeping this as an
+        // explicit refined event makes the exit and final spectra independent
+        // products rather than asking callers to reconstruct one from sampled
+        // evolution rows.
+        let (horizon_exit_state, _) = advance_conformal_until(
             &system,
             mode_state,
+            AdvanceControl {
+                settings,
+                tolerances: &settings.tolerances,
+                stage: SpectrumRunStage::HorizonExit { k: k.into_value() },
+            },
+            |state| {
+                let background = state.background.cosmic();
+                (k / (background.a * self.hubble(&background))).into_value() - 1.0
+            },
+            |state, _| {
+                accepted += 1;
+                if sample_error.is_some() || !accepted.is_multiple_of(settings.mode_sample_every) {
+                    return;
+                }
+                match self.project_state(&system, state, settings, previous_normal.as_ref()) {
+                    Ok((projected, kinematics)) => {
+                        previous_normal = Some(kinematics.basis.normal);
+                        rows.push(self.mode_record(
+                            &initial,
+                            state,
+                            k,
+                            k_over_pivot,
+                            &projected,
+                            &kinematics,
+                        ));
+                    }
+                    Err(error) => sample_error = Some(error),
+                }
+            },
+            |state| state.background.cosmic().a,
+        )?;
+
+        if let Some(error) = sample_error {
+            return Err(error);
+        }
+
+        let (horizon_projected, horizon_kinematics) = self.project_state(
+            &system,
+            &horizon_exit_state,
+            settings,
+            previous_normal.as_ref(),
+        )?;
+        previous_normal = Some(horizon_kinematics.basis.normal);
+        rows.push(self.mode_record(
+            &initial,
+            &horizon_exit_state,
+            k,
+            k_over_pivot,
+            &horizon_projected,
+            &horizon_kinematics,
+        ));
+        let horizon_exit_record = self.spectrum_record(
+            &initial,
+            &horizon_exit_state,
+            k,
+            k_over_pivot,
+            &horizon_projected,
+            settings,
+        )?;
+
+        let (final_state, _) = advance_conformal_until(
+            &system,
+            horizon_exit_state,
             AdvanceControl {
                 settings,
                 tolerances: &settings.tolerances,
@@ -1015,42 +1108,16 @@ where
             &kinematics,
         ));
 
-        let matrix = field_power_spectrum(k, &mode_covariance(&final_state.cosmic()));
-        let components = matrix.components();
-        let squared = (self.m_pl * self.m_pl).into_value();
-
-        // The diagonal entries are real by construction, being sums of squared
-        // moduli. The off-diagonal one is not, so its imaginary part is
-        // checked against the same tolerance as a projected spectrum before
-        // the two columns are written out.
-        let cross = components[0][1];
-        crate::spectra::discard_imaginary(
-            cross,
-            crate::spectra::spectrum_scale(&matrix),
-            settings.spectrum_tolerances.imaginary_residual,
-        )
-        .map_err(|source| SpectrumRunError::Spectrum {
-            k: k.into_value(),
-            source,
-        })?;
-
-        let record = SpectrumRecord {
+        let record = self.spectrum_record(
+            &initial,
+            &final_state,
+            k,
             k_over_pivot,
-            k: (k / self.m_pl).into_value(),
-            p_11: components[0][0].value().re / squared,
-            p_22: components[1][1].value().re / squared,
-            re_p_12: cross.value().re / squared,
-            im_p_12: cross.value().im / squared,
-            p_q_sigma: projected.field_adiabatic.into_value() / squared,
-            p_q_s: projected.field_entropy.into_value() / squared,
-            c_q_sigma_s: projected.field_cross.into_value() / squared,
-            p_r: projected.curvature.into_value(),
-            p_s: projected.entropy.into_value(),
-            c_rs: projected.cross.into_value(),
-            r_c: projected.correlation,
-        };
+            &projected,
+            settings,
+        )?;
 
-        Ok((record, rows))
+        Ok((record, horizon_exit_record, rows))
     }
 
     fn mode_record(
@@ -1074,6 +1141,53 @@ where
             c_rs: projected.cross.into_value(),
             eta_perp: kinematics.eta_perp.into_value(),
         }
+    }
+
+    fn spectrum_record(
+        &self,
+        initial: &MultifieldState<2>,
+        state: &ConformalTwoFieldPerturbationState,
+        k: Mass,
+        k_over_pivot: f64,
+        projected: &ProjectedSpectra,
+        settings: &SpectrumRunSettings,
+    ) -> Result<SpectrumRecord, SpectrumRunError> {
+        let matrix = field_power_spectrum(k, &mode_covariance(&state.cosmic()));
+        let components = matrix.components();
+        let squared = (self.m_pl * self.m_pl).into_value();
+        let cross = components[0][1];
+        let background = state.background.cosmic();
+
+        // The diagonal entries are real by construction.  Validate the
+        // off-diagonal imaginary residual at every exported epoch before
+        // splitting it into CSV columns.
+        crate::spectra::discard_imaginary(
+            cross,
+            crate::spectra::spectrum_scale(&matrix),
+            settings.spectrum_tolerances.imaginary_residual,
+        )
+        .map_err(|source| SpectrumRunError::Spectrum {
+            k: k.into_value(),
+            source,
+        })?;
+
+        Ok(SpectrumRecord {
+            k_over_pivot,
+            k: (k / self.m_pl).into_value(),
+            e_folds: state.background.e_folds(initial),
+            k_over_ah: (k / (background.a * self.hubble(&background))).into_value(),
+            p_11: components[0][0].value().re / squared,
+            p_22: components[1][1].value().re / squared,
+            re_p_12: cross.value().re / squared,
+            im_p_12: cross.value().im / squared,
+            p_q_sigma: projected.field_adiabatic.into_value() / squared,
+            p_q_s: projected.field_entropy.into_value() / squared,
+            c_q_sigma_s: projected.field_cross.into_value() / squared,
+            p_r: projected.curvature.into_value(),
+            p_s: projected.entropy.into_value(),
+            c_rs: projected.cross.into_value(),
+            r_c: projected.correlation,
+        })
     }
 
     /// Projects one evolved state, also returning the kinematics so that the
@@ -1475,6 +1589,7 @@ mod tests {
         assert!(run.pivot.e_folds_at_end > run.pivot.e_folds_at_pivot);
         assert!(!run.background.is_empty());
         assert_eq!(run.spectra.len(), 1);
+        assert_eq!(run.horizon_exit_spectra.len(), 1);
         assert!(!run.mode_evolution.is_empty());
 
         let spectrum = run.spectra[0];
@@ -1482,6 +1597,11 @@ mod tests {
         assert!(spectrum.p_s > 0.0);
         assert!(spectrum.r_c.abs() <= 1.0);
         assert!(spectrum.p_11 > 0.0 && spectrum.p_22 > 0.0);
+
+        let exit = run.horizon_exit_spectra[0];
+        assert!((exit.k_over_ah - 1.0).abs() < 1.0e-12);
+        assert!(exit.e_folds < spectrum.e_folds);
+        assert!(exit.p_r > 0.0 && exit.p_s > 0.0);
     }
 
     #[test]
@@ -2195,6 +2315,15 @@ mod tests {
         for line in lines {
             assert_eq!(line.split(',').count(), columns);
         }
+
+        let mut horizon_buffer = Vec::new();
+        run.write_horizon_exit_spectra_csv(&mut horizon_buffer)
+            .unwrap();
+        let horizon_text = String::from_utf8(horizon_buffer).unwrap();
+        assert_eq!(
+            horizon_text.lines().count(),
+            run.horizon_exit_spectra.len() + 1
+        );
     }
 
     #[test]

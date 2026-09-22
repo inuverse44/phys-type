@@ -6,6 +6,12 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Separate horizon-exit spectrum rows refined at each mode's `k = aH`
+  crossing. Both horizon-exit and requested-output CSVs carry `N`, `k/(aH)`,
+  and explicit evaluation-epoch metadata.
+
 ## [0.2.0] - 2026-09-22
 
 ### Added

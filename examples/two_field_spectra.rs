@@ -1,11 +1,12 @@
 //! A complete two-field adiabatic and entropy spectrum run.
 //!
-//! Writes three CSV files into the directory given as the first argument
+//! Writes four CSV files into the directory given as the first argument
 //! (default `diagnostics/`):
 //!
 //! - `two_field_background.csv` the background trajectory and its
 //!   adiabatic/entropy frame
 //! - `two_field_spectra.csv`    one row per wavenumber
+//! - `two_field_horizon_exit_spectra.csv` one row per wavenumber at `k = aH`
 //! - `two_field_modes.csv`      sampled evolution of every mode
 //!
 //! Each file opens with a metadata comment block recording the model, the
@@ -87,6 +88,7 @@ fn write_file(
     run: &SpectrumRun,
     calibration: &Calibration,
     revision: Option<&str>,
+    epoch: &str,
     rows: impl Fn(&SpectrumRun, &mut fs::File) -> io::Result<()>,
 ) -> io::Result<()> {
     let mut file = fs::File::create(path)?;
@@ -114,6 +116,7 @@ fn write_file(
         "# common_mass_rescaling: {:e}",
         calibration.mass_rescaling
     )?;
+    writeln!(file, "# evaluation_epoch: {epoch}")?;
     write_metadata(&mut file, settings, &run.pivot, revision)?;
 
     rows(run, &mut file)
@@ -196,6 +199,7 @@ fn main() -> io::Result<()> {
         &run,
         &calibration,
         revision,
+        "background_survey",
         |run, file| run.write_background_csv(file),
     )?;
     write_file(
@@ -204,7 +208,17 @@ fn main() -> io::Result<()> {
         &run,
         &calibration,
         revision,
+        "requested_output",
         |run, file| run.write_spectra_csv(file),
+    )?;
+    write_file(
+        &directory.join("two_field_horizon_exit_spectra.csv"),
+        &settings,
+        &run,
+        &calibration,
+        revision,
+        "horizon_exit_k_equals_aH",
+        |run, file| run.write_horizon_exit_spectra_csv(file),
     )?;
     write_file(
         &directory.join("two_field_modes.csv"),
@@ -212,6 +226,7 @@ fn main() -> io::Result<()> {
         &run,
         &calibration,
         revision,
+        "mode_evolution",
         |run, file| run.write_mode_evolution_csv(file),
     )?;
 
@@ -233,6 +248,7 @@ fn main() -> io::Result<()> {
     );
     eprintln!("background rows        {}", run.background.len());
     eprintln!("mode evolution rows    {}", run.mode_evolution.len());
+    eprintln!("horizon-exit rows     {}", run.horizon_exit_spectra.len());
     eprintln!();
     eprintln!("k/k_pivot        P_R           P_S           r_C");
     for record in &run.spectra {

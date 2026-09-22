@@ -70,8 +70,8 @@ and the version/tag history is internally consistent.
 
 ### P1: make the scientific output self-explanatory
 
-1. Export both horizon-exit and final spectra instead of requiring transfer
-   to be reconstructed from mode-evolution rows.
+1. **Completed:** export both horizon-exit and requested-output spectra, with
+   `N`, `k/(aH)`, and explicit evaluation-epoch metadata.
 2. Normalize the scale factor at the end of inflation, or export normalized
    wavenumbers as the canonical values, so a pivot is not presented as an
    unreadable raw value near `1e9 M_pl`.

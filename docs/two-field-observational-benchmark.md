@@ -97,10 +97,10 @@ adding `P_R` and `P_S`.  The useful comparison is instead
 P_R at horizon exit -> transfer during the turn -> final P_R
 ```
 
-with `P_S`, `C_RS`, and `eta_perp` diagnosing the transfer.  A later output
-extension should retain both horizon-exit and final spectra explicitly so that
-the origin of a dip or enhancement can be read without reconstructing it from
-the mode-evolution rows.
+with `P_S`, `C_RS`, and `eta_perp` diagnosing the transfer.  The example emits
+separate horizon-exit and requested-output spectrum CSVs, including `N` and
+`k/(aH)`, so the origin of a dip or enhancement can be read directly without
+reconstructing it from the mode-evolution rows.
 
 ## Acceptance checks
 
