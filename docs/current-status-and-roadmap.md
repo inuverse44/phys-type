@@ -44,8 +44,8 @@ repository is not yet in a coherent release state:
 - `Cargo.toml` still declares version `0.1.0`;
 - the completed two-field work remains under `Unreleased` in the changelog;
 - neither the local repository nor GitHub has a release tag;
-- GitHub Actions watches pushes to the former `master` branch, so pushes to
-  `main` do not currently run CI.
+- GitHub Actions now watches pushes to `main`; this was corrected after the
+  default branch rename exposed that the workflow still named `master`.
 
 The absence of a tag matters because the changelog currently presents
 `0.1.0` as released even though there is no corresponding Git reference.
@@ -59,8 +59,8 @@ one has an unmet acceptance condition.
 
 ### P0: restore repository integrity
 
-1. Change the CI push branch from `master` to `main` and verify a run on the
-   default branch.
+1. **Completed:** change the CI push branch from `master` to `main` and verify
+   a run on the default branch.
 2. Run the complete release checks: formatting, Clippy, tests, release build,
    and `cargo package --locked`.
 3. Prepare the next release version and changelog.  Before publishing or
@@ -110,4 +110,3 @@ The current benchmark demonstrates numerical and physical consistency.  It is
 not a parameter inference, a claim that double-quadratic inflation is favored
 by data, or a general reheating prediction.  Those statements require the P1
 likelihood boundary and later physics extensions.
-
