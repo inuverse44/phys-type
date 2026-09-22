@@ -209,6 +209,25 @@ compile-fail case proves that a `QP` block cannot be assigned to a `QQ` block.
 No transport dynamics or momentum normalization is implied by these types;
 that enters through P3b/P3c.
 
+### P3b implementation status
+
+P3b is in progress.  Its first independently testable slice is complete:
+
+- `ThirdOrderJet<N>` carries a value, gradient, Hessian, and fully symmetric
+  third derivative without changing the established `Jet<N>` representation;
+- arithmetic, reciprocal, square root, `exp`, `ln`, `cos`, and `tanh` propagate
+  derivatives through third order;
+- `ThriceDifferentiableMultifieldPotential` evaluates a generic potential once
+  to return dimensioned `V`, `V_,I`, `V_,IJ`, and coordinate `V_,IJK`;
+- analytic tests cover mixed-index permutations, rational and radical chain
+  rules, transcendental functions, a mixed cubic, and a vanishing quadratic
+  third derivative.
+
+This slice deliberately exposes `V_,IJK`, not `V_;IJK`.  The next P3b slice
+must add the field-space covariantization and only the derivative of curvature
+required by the selected transport kernel, with flat and curved analytic
+tests, before P3b can be marked complete.
+
 ## Acceptance boundary
 
 The non-Gaussianity milestone is complete only when:

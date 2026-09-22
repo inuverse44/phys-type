@@ -122,7 +122,7 @@ checks are documented in
 
 | Module | Contents |
 | --- | --- |
-| `autodiff` | First-order `Dual` and value/gradient/Hessian `Jet<N>` autodiff |
+| `autodiff` | Forward autodiff through third order with `Dual`, `Jet<N>`, and `ThirdOrderJet<N>` |
 | `dimension` | `MassPower<E>` and the type-level `DimMul`, `DimDiv`, `DimSqrt` |
 | `field_space` | Typed rank-one through rank-four tensors, geometry, and bases |
 | `quantity` | `Quantity<D, V>` and its arithmetic |

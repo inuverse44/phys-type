@@ -21,7 +21,7 @@ pub mod state;
 pub mod time;
 pub mod transport;
 
-pub use autodiff::{Dual, Jet, Transcendental};
+pub use autodiff::{Dual, Jet, ThirdOrderJet, Transcendental};
 pub use background::{
     AdaptiveRunSettings, AdaptiveStep, BackgroundRun, Record, RunSettings, Termination,
 };
@@ -61,8 +61,10 @@ pub use perturbation::{
     TwoFieldPerturbationTolerance, normalized_mode_error,
 };
 pub use potential::{
-    MultifieldPotential, MultifieldPotentialValue, Potential, PotentialDerivatives, PotentialValue,
-    QuadraticMultifieldPotential, QuadraticPotential, TwiceDifferentiableMultifieldPotential,
+    MultifieldPotential, MultifieldPotentialValue, Potential, PotentialDerivatives,
+    PotentialDerivativesThroughThird, PotentialValue, QuadraticMultifieldPotential,
+    QuadraticPotential, ThriceDifferentiableMultifieldPotential,
+    TwiceDifferentiableMultifieldPotential,
 };
 pub use quantity::{Quantity, Sqrt};
 pub use scalar_field::ScalarFieldSystem;
@@ -99,6 +101,8 @@ pub type EnergyDensity<V = f64> = Quantity<M4, V>;
 pub type PotentialGradient<V = f64> = Quantity<M3, V>;
 /// An entry in the coordinate or covariant Hessian of a potential.
 pub type PotentialHessian<V = f64> = Quantity<M2, V>;
+/// An entry in the third coordinate derivative of a potential.
+pub type PotentialThirdDerivative<V = f64> = Quantity<M1, V>;
 /// A mass, such as the reduced Planck mass.
 pub type Mass<V = f64> = Quantity<M1, V>;
 /// Cosmic time `t`.
