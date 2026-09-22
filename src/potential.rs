@@ -2,7 +2,10 @@
 
 use core::ops::{Add, Mul};
 
-use crate::{Dual, EnergyDensity, Field, Jet, Mass, PotentialGradient, PotentialHessian};
+use crate::{
+    Dual, EnergyDensity, Field, Jet, Mass, PotentialGradient, PotentialHessian,
+    PotentialThirdDerivative, ThirdOrderJet,
+};
 
 /// A scalar field potential formula evaluated with numerical value type `V`.
 ///
@@ -100,6 +103,56 @@ pub trait TwiceDifferentiableMultifieldPotential<const N: usize>:
 
 impl<T, const N: usize> TwiceDifferentiableMultifieldPotential<N> for T where
     T: MultifieldPotential<N> + MultifieldPotentialValue<Jet<N>, N>
+{
+}
+
+/// Value and every coordinate derivative through third order from one pass.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PotentialDerivativesThroughThird<const N: usize> {
+    /// Potential energy density.
+    pub value: EnergyDensity,
+    /// Coordinate gradient `V_,I`.
+    pub gradient: [PotentialGradient; N],
+    /// Coordinate Hessian `V_,IJ`.
+    pub hessian: [[PotentialHessian; N]; N],
+    /// Coordinate third derivative `V_,IJK`.
+    pub third: [[[PotentialThirdDerivative; N]; N]; N],
+}
+
+/// A multifield potential supporting third-order automatic differentiation.
+///
+/// This returns coordinate partial derivatives. Converting `V_,IJK` to the
+/// covariant `V_;IJK` required by transport is a field-space geometry step.
+pub trait ThriceDifferentiableMultifieldPotential<const N: usize>:
+    TwiceDifferentiableMultifieldPotential<N> + MultifieldPotentialValue<ThirdOrderJet<N>, N>
+{
+    /// Evaluates the value and every derivative through third order in one
+    /// forward-mode pass.
+    fn derivatives_through_third(&self, phi: [Field; N]) -> PotentialDerivativesThroughThird<N> {
+        let fields = core::array::from_fn(|index| {
+            Field::new(ThirdOrderJet::variable(phi[index].into_value(), index))
+        });
+        let result = <Self as MultifieldPotentialValue<ThirdOrderJet<N>, N>>::value(self, fields)
+            .into_value();
+
+        PotentialDerivativesThroughThird {
+            value: EnergyDensity::new(result.value),
+            gradient: result.gradient.map(PotentialGradient::new),
+            hessian: result.hessian.map(|row| row.map(PotentialHessian::new)),
+            third: result
+                .third
+                .map(|matrix| matrix.map(|row| row.map(PotentialThirdDerivative::new))),
+        }
+    }
+
+    /// Computes the coordinate third derivative `V_,IJK`.
+    fn third_derivative(&self, phi: [Field; N]) -> [[[PotentialThirdDerivative; N]; N]; N] {
+        self.derivatives_through_third(phi).third
+    }
+}
+
+impl<T, const N: usize> ThriceDifferentiableMultifieldPotential<N> for T where
+    T: TwiceDifferentiableMultifieldPotential<N> + MultifieldPotentialValue<ThirdOrderJet<N>, N>
 {
 }
 
@@ -324,5 +377,73 @@ mod tests {
         assert!((derivatives.value.into_value() - expected_value).abs() < 1.0e-15);
         assert!((derivatives.gradient[0].into_value() - expected_gradient).abs() < 1.0e-15);
         assert!((derivatives.hessian[0][0].into_value() - expected_hessian).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn third_derivative_preserves_dimension_and_mixed_symmetry() {
+        struct MixedCubicPotential;
+
+        impl<V> MultifieldPotentialValue<V, 3> for MixedCubicPotential
+        where
+            V: Clone + Mul<V, Output = V>,
+        {
+            fn value(&self, phi: [Field<V>; 3]) -> EnergyDensity<V> {
+                let [x, y, z] = phi.map(Field::into_value);
+                EnergyDensity::new(x * y * z)
+            }
+        }
+
+        let derivatives = MixedCubicPotential.derivatives_through_third([
+            Field::new(2.0),
+            Field::new(3.0),
+            Field::new(5.0),
+        ]);
+
+        assert_eq!(derivatives.value.into_value(), 30.0);
+        assert_eq!(
+            derivatives.gradient.map(PotentialGradient::into_value),
+            [15.0, 10.0, 6.0]
+        );
+        for permutation in [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ] {
+            assert_eq!(
+                derivatives.third[permutation[0]][permutation[1]][permutation[2]].into_value(),
+                1.0
+            );
+        }
+    }
+
+    #[test]
+    fn quadratic_third_derivative_is_zero() {
+        let potential = QuadraticMultifieldPotential::new([Mass::new(2.0), Mass::new(3.0)]);
+        let third = potential.third_derivative([Field::new(3.0), Field::new(4.0)]);
+
+        assert_eq!(
+            third.map(|matrix| matrix.map(|row| row.map(PotentialThirdDerivative::into_value))),
+            [[[0.0; 2]; 2]; 2]
+        );
+    }
+
+    #[test]
+    fn transcendental_potential_gets_third_derivative_from_one_formula() {
+        let potential = StarobinskyTestPotential {
+            scale: 2.0,
+            alpha: 0.7,
+        };
+        let phi = 1.3;
+        let exponential = (-potential.alpha * phi).exp();
+        let derivatives = potential.derivatives_through_third([Field::new(phi)]);
+        let expected = 2.0
+            * potential.scale
+            * potential.alpha.powi(3)
+            * (exponential - 4.0 * exponential * exponential);
+
+        assert!((derivatives.third[0][0][0].into_value() - expected).abs() < 1.0e-15);
     }
 }

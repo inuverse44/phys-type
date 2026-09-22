@@ -7,8 +7,9 @@ use crate::Sqrt;
 /// Elementary transcendental functions supported by potential value types.
 ///
 /// A potential written generically over this trait can be evaluated with
-/// ordinary `f64`, first-order [`Dual`], or second-order [`Jet`] values without
-/// maintaining separate analytic derivative formulas.
+/// ordinary `f64`, first-order [`Dual`], second-order [`Jet`], or
+/// [`ThirdOrderJet`] values without maintaining separate analytic derivative
+/// formulas.
 pub trait Transcendental: Sized {
     /// Natural exponential.
     fn exp(self) -> Self;
@@ -412,6 +413,266 @@ impl<const N: usize> Sqrt for Jet<N> {
     }
 }
 
+/// A value and every derivative through third order for `N` active variables.
+///
+/// This is separate from [`Jet`] so adding cubic transport support does not
+/// enlarge or change the established value/gradient/Hessian representation.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ThirdOrderJet<const N: usize> {
+    /// Ordinary numerical value.
+    pub value: f64,
+    /// First partial derivatives.
+    pub gradient: [f64; N],
+    /// Symmetric second partial derivatives.
+    pub hessian: [[f64; N]; N],
+    /// Fully symmetric third partial derivatives.
+    pub third: [[[f64; N]; N]; N],
+}
+
+impl<const N: usize> ThirdOrderJet<N> {
+    /// Creates a constant with every derivative set to zero.
+    pub const fn constant(value: f64) -> Self {
+        Self {
+            value,
+            gradient: [0.0; N],
+            hessian: [[0.0; N]; N],
+            third: [[[0.0; N]; N]; N],
+        }
+    }
+
+    /// Creates active variable `index` with a unit gradient seed.
+    pub fn variable(value: f64, index: usize) -> Self {
+        assert!(index < N, "active variable index is out of bounds");
+        let mut result = Self::constant(value);
+        result.gradient[index] = 1.0;
+        result
+    }
+
+    fn map_unary(
+        self,
+        value: f64,
+        first_derivative: f64,
+        second_derivative: f64,
+        third_derivative: f64,
+    ) -> Self {
+        Self {
+            value,
+            gradient: self.gradient.map(|entry| first_derivative * entry),
+            hessian: core::array::from_fn(|first| {
+                core::array::from_fn(|second| {
+                    second_derivative * self.gradient[first] * self.gradient[second]
+                        + first_derivative * self.hessian[first][second]
+                })
+            }),
+            third: core::array::from_fn(|first| {
+                core::array::from_fn(|second| {
+                    core::array::from_fn(|third| {
+                        third_derivative
+                            * self.gradient[first]
+                            * self.gradient[second]
+                            * self.gradient[third]
+                            + second_derivative
+                                * (self.hessian[first][second] * self.gradient[third]
+                                    + self.hessian[first][third] * self.gradient[second]
+                                    + self.hessian[second][third] * self.gradient[first])
+                            + first_derivative * self.third[first][second][third]
+                    })
+                })
+            }),
+        }
+    }
+
+    fn reciprocal(self) -> Self {
+        let inverse = 1.0 / self.value;
+        self.map_unary(
+            inverse,
+            -inverse.powi(2),
+            2.0 * inverse.powi(3),
+            -6.0 * inverse.powi(4),
+        )
+    }
+}
+
+impl<const N: usize> Default for ThirdOrderJet<N> {
+    fn default() -> Self {
+        Self::constant(0.0)
+    }
+}
+
+impl<const N: usize> From<f64> for ThirdOrderJet<N> {
+    fn from(value: f64) -> Self {
+        Self::constant(value)
+    }
+}
+
+impl<const N: usize> Transcendental for ThirdOrderJet<N> {
+    fn exp(self) -> Self {
+        let value = self.value.exp();
+        self.map_unary(value, value, value, value)
+    }
+
+    fn ln(self) -> Self {
+        let inverse = 1.0 / self.value;
+        self.map_unary(
+            self.value.ln(),
+            inverse,
+            -inverse.powi(2),
+            2.0 * inverse.powi(3),
+        )
+    }
+
+    fn cos(self) -> Self {
+        self.map_unary(
+            self.value.cos(),
+            -self.value.sin(),
+            -self.value.cos(),
+            self.value.sin(),
+        )
+    }
+
+    fn tanh(self) -> Self {
+        let value = self.value.tanh();
+        let first = 1.0 - value * value;
+        let second = -2.0 * value * first;
+        let third = -2.0 * first * first - 2.0 * value * second;
+        self.map_unary(value, first, second, third)
+    }
+}
+
+impl<const N: usize> Add for ThirdOrderJet<N> {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value + rhs.value,
+            gradient: core::array::from_fn(|index| self.gradient[index] + rhs.gradient[index]),
+            hessian: core::array::from_fn(|first| {
+                core::array::from_fn(|second| {
+                    self.hessian[first][second] + rhs.hessian[first][second]
+                })
+            }),
+            third: core::array::from_fn(|first| {
+                core::array::from_fn(|second| {
+                    core::array::from_fn(|third| {
+                        self.third[first][second][third] + rhs.third[first][second][third]
+                    })
+                })
+            }),
+        }
+    }
+}
+
+impl<const N: usize> Sub for ThirdOrderJet<N> {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self + -rhs
+    }
+}
+
+impl<const N: usize> Neg for ThirdOrderJet<N> {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self {
+            value: -self.value,
+            gradient: self.gradient.map(|entry| -entry),
+            hessian: self.hessian.map(|row| row.map(|entry| -entry)),
+            third: self
+                .third
+                .map(|matrix| matrix.map(|row| row.map(|entry| -entry))),
+        }
+    }
+}
+
+#[allow(clippy::suspicious_arithmetic_impl)]
+impl<const N: usize> Mul for ThirdOrderJet<N> {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value * rhs.value,
+            gradient: core::array::from_fn(|index| {
+                self.gradient[index] * rhs.value + self.value * rhs.gradient[index]
+            }),
+            hessian: core::array::from_fn(|first| {
+                core::array::from_fn(|second| {
+                    self.hessian[first][second] * rhs.value
+                        + self.gradient[first] * rhs.gradient[second]
+                        + self.gradient[second] * rhs.gradient[first]
+                        + self.value * rhs.hessian[first][second]
+                })
+            }),
+            third: core::array::from_fn(|first| {
+                core::array::from_fn(|second| {
+                    core::array::from_fn(|third| {
+                        self.third[first][second][third] * rhs.value
+                            + self.hessian[first][second] * rhs.gradient[third]
+                            + self.hessian[first][third] * rhs.gradient[second]
+                            + self.gradient[first] * rhs.hessian[second][third]
+                            + self.hessian[second][third] * rhs.gradient[first]
+                            + self.gradient[second] * rhs.hessian[first][third]
+                            + self.gradient[third] * rhs.hessian[first][second]
+                            + self.value * rhs.third[first][second][third]
+                    })
+                })
+            }),
+        }
+    }
+}
+
+#[allow(clippy::suspicious_arithmetic_impl)]
+impl<const N: usize> Div for ThirdOrderJet<N> {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        self * rhs.reciprocal()
+    }
+}
+
+impl<const N: usize> Mul<f64> for ThirdOrderJet<N> {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self {
+            value: self.value * rhs,
+            gradient: self.gradient.map(|entry| entry * rhs),
+            hessian: self.hessian.map(|row| row.map(|entry| entry * rhs)),
+            third: self
+                .third
+                .map(|matrix| matrix.map(|row| row.map(|entry| entry * rhs))),
+        }
+    }
+}
+
+impl<const N: usize> Mul<ThirdOrderJet<N>> for f64 {
+    type Output = ThirdOrderJet<N>;
+
+    fn mul(self, rhs: ThirdOrderJet<N>) -> Self::Output {
+        rhs * self
+    }
+}
+
+impl<const N: usize> Div<f64> for ThirdOrderJet<N> {
+    type Output = Self;
+
+    fn div(self, rhs: f64) -> Self::Output {
+        self * (1.0 / rhs)
+    }
+}
+
+impl<const N: usize> Sqrt for ThirdOrderJet<N> {
+    fn sqrt_value(self) -> Self {
+        let root = self.value.sqrt();
+        self.map_unary(
+            root,
+            1.0 / (2.0 * root),
+            -1.0 / (4.0 * root.powi(3)),
+            3.0 / (8.0 * root.powi(5)),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -531,5 +792,69 @@ mod tests {
         }
         assert!((result.hessian[0][1] - mixed).abs() < 1.0e-7);
         assert_eq!(result.hessian[0][1], result.hessian[1][0]);
+    }
+
+    #[test]
+    fn third_order_jet_computes_all_mixed_permutations() {
+        let x = ThirdOrderJet::<3>::variable(2.0, 0);
+        let y = ThirdOrderJet::<3>::variable(3.0, 1);
+        let z = ThirdOrderJet::<3>::variable(5.0, 2);
+        let result = x * x * y + x * y * z;
+
+        assert_eq!(result.value, 42.0);
+        assert_eq!(result.gradient, [27.0, 14.0, 6.0]);
+        assert_eq!(
+            result.hessian,
+            [[6.0, 9.0, 3.0], [9.0, 0.0, 2.0], [3.0, 2.0, 0.0]]
+        );
+
+        for permutation in [[0, 0, 1], [0, 1, 0], [1, 0, 0]] {
+            assert_eq!(
+                result.third[permutation[0]][permutation[1]][permutation[2]],
+                2.0
+            );
+        }
+        for permutation in [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ] {
+            assert_eq!(
+                result.third[permutation[0]][permutation[1]][permutation[2]],
+                1.0
+            );
+        }
+    }
+
+    #[test]
+    fn third_order_jet_propagates_quotients_and_square_roots() {
+        let x = ThirdOrderJet::<1>::variable(4.0, 0);
+        let reciprocal = ThirdOrderJet::constant(1.0) / x;
+        let root = x.sqrt_value();
+
+        assert_eq!(reciprocal.third[0][0][0], -6.0 / 4.0_f64.powi(4));
+        assert_eq!(root.third[0][0][0], 3.0 / (8.0 * 2.0_f64.powi(5)));
+    }
+
+    #[test]
+    fn third_order_jet_transcendental_derivatives_match_closed_forms() {
+        let point = 0.4_f64;
+        let x = ThirdOrderJet::<1>::variable(point, 0);
+        let exponential = x.exp();
+        let logarithm = x.ln();
+        let cosine = x.cos();
+        let hyperbolic_tangent = x.tanh();
+        let tangent = point.tanh();
+        let first = 1.0 - tangent * tangent;
+        let second = -2.0 * tangent * first;
+        let expected_tanh_third = -2.0 * first * first - 2.0 * tangent * second;
+
+        assert!((exponential.third[0][0][0] - point.exp()).abs() < 1.0e-15);
+        assert!((logarithm.third[0][0][0] - 2.0 / point.powi(3)).abs() < 1.0e-14);
+        assert!((cosine.third[0][0][0] - point.sin()).abs() < 1.0e-15);
+        assert!((hyperbolic_tangent.third[0][0][0] - expected_tanh_third).abs() < 1.0e-15);
     }
 }

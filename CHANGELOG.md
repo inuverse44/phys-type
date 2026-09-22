@@ -22,6 +22,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Validated, canonical momentum triangles with reversible caller-leg
   permutations, typed field/momentum phase-space indices, and dimensioned
   two-/three-point correlator blocks whose permutations preserve slot types.
+- `ThirdOrderJet<N>` forward automatic differentiation, including third-order
+  product and chain rules, and a dimensioned one-pass multifield potential API
+  for the coordinate derivative `V_,IJK`.
 
 ### Changed
 
