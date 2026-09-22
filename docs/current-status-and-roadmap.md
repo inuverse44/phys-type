@@ -101,8 +101,12 @@ turn and the complete 41-point benchmark.
 
 ### P3: extend the physics
 
-- cubic interactions and non-Gaussianity, following the extension boundary in
-  [`field-space-curvature-design.md`](field-space-curvature-design.md);
+- cubic interactions and non-Gaussianity.  The architecture decision is
+  complete: use full tree-level phase-space transport, validate its two-point
+  sector against the existing mode solver, then add triangle-dependent
+  three-point evolution and nonlinear curvature projection.  The ordered
+  P3a--P3e milestones are specified in
+  [`non-gaussianity-architecture.md`](non-gaussianity-architecture.md);
 - reheating and post-inflationary transfer;
 - dynamically sized field spaces if a concrete model requires more than the
   current const-generic representation.

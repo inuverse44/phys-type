@@ -18,6 +18,9 @@ fixed in
 Higher-rank tensors, field-space Riemann curvature, and the extension boundary
 toward non-Gaussianity are specified in
 [`docs/field-space-curvature-design.md`](docs/field-space-curvature-design.md).
+The selected tree-level phase-space transport architecture and its ordered
+two-/three-point validation milestones are specified in
+[`docs/non-gaussianity-architecture.md`](docs/non-gaussianity-architecture.md).
 The implemented milestone, known limitations, release state, and ordered next
 steps are summarized in
 [`docs/current-status-and-roadmap.md`](docs/current-status-and-roadmap.md).

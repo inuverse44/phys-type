@@ -16,6 +16,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   scalar pivot independently of internal Planck-unit wavenumbers.
 - CSV provenance that labels `A_s = 2.1e-9` as a benchmark target rather than
   a likelihood fit.
+- A non-Gaussianity architecture selecting tree-level phase-space transport,
+  with momentum-triangle, tensor, two-point-oracle, three-point, and nonlinear
+  curvature-projection milestones.
 
 ### Changed
 
