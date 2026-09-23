@@ -439,6 +439,26 @@ impl<const N: usize> Add for TwoPointPhaseSpaceCovariance<N> {
     }
 }
 
+impl<const N: usize> TwoPointPhaseSpaceCovariance<N> {
+    fn component(&self, slots: [PhaseSpaceSlotKind; 2], indices: [usize; 2]) -> Complex64 {
+        let [left, right] = indices;
+        match slots {
+            [PhaseSpaceSlotKind::Field, PhaseSpaceSlotKind::Field] => {
+                self.qq.components[left][right].into_value()
+            }
+            [PhaseSpaceSlotKind::Field, PhaseSpaceSlotKind::Momentum] => {
+                self.qp.components[left][right].into_value()
+            }
+            [PhaseSpaceSlotKind::Momentum, PhaseSpaceSlotKind::Field] => {
+                self.pq.components[left][right].into_value()
+            }
+            [PhaseSpaceSlotKind::Momentum, PhaseSpaceSlotKind::Momentum] => {
+                self.pp.components[left][right].into_value()
+            }
+        }
+    }
+}
+
 impl<const N: usize> Mul<f64> for TwoPointPhaseSpaceCovariance<N> {
     type Output = Self;
 
@@ -962,6 +982,262 @@ pub struct ThreePointPhaseSpaceCorrelation<const N: usize> {
     >,
 }
 
+/// The quadratic phase-space flow `u^a_bc` for one ordered momentum vertex.
+///
+/// The first slot is the output and the last two are ordered inputs. Every
+/// block dimension is `dim(output) - dim(input one) - dim(input two)`, so its
+/// contraction with two covariance blocks has the dimension of the target
+/// three-point block.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct QuadraticPhaseSpaceKernel<const N: usize> {
+    /// `u^Q_QQ`, dimension `M^(1/2)`.
+    pub q_qq:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MHalf, f64, N>,
+    /// `u^Q_QP`, dimension `M^(-1/2)`.
+    pub q_qp: ThreePointBlock<
+        FieldPerturbation,
+        FieldPerturbation,
+        MomentumPerturbation,
+        MMinusHalf,
+        f64,
+        N,
+    >,
+    /// `u^Q_PQ`, dimension `M^(-1/2)`.
+    pub q_pq: ThreePointBlock<
+        FieldPerturbation,
+        MomentumPerturbation,
+        FieldPerturbation,
+        MMinusHalf,
+        f64,
+        N,
+    >,
+    /// `u^Q_PP`, dimension `M^(-3/2)`.
+    pub q_pp: ThreePointBlock<
+        FieldPerturbation,
+        MomentumPerturbation,
+        MomentumPerturbation,
+        MMinus3Over2,
+        f64,
+        N,
+    >,
+    /// `u^P_QQ`, dimension `M^(3/2)`.
+    pub p_qq: ThreePointBlock<
+        MomentumPerturbation,
+        FieldPerturbation,
+        FieldPerturbation,
+        M3Over2,
+        f64,
+        N,
+    >,
+    /// `u^P_QP`, dimension `M^(1/2)`.
+    pub p_qp: ThreePointBlock<
+        MomentumPerturbation,
+        FieldPerturbation,
+        MomentumPerturbation,
+        MHalf,
+        f64,
+        N,
+    >,
+    /// `u^P_PQ`, dimension `M^(1/2)`.
+    pub p_pq: ThreePointBlock<
+        MomentumPerturbation,
+        MomentumPerturbation,
+        FieldPerturbation,
+        MHalf,
+        f64,
+        N,
+    >,
+    /// `u^P_PP`, dimension `M^(-1/2)`.
+    pub p_pp: ThreePointBlock<
+        MomentumPerturbation,
+        MomentumPerturbation,
+        MomentumPerturbation,
+        MMinusHalf,
+        f64,
+        N,
+    >,
+}
+
+impl<const N: usize> QuadraticPhaseSpaceKernel<N> {
+    /// Returns a kernel whose eight blocks vanish.
+    pub fn zero() -> Self {
+        Self {
+            q_qq: zero_real_three_point_block(),
+            q_qp: zero_real_three_point_block(),
+            q_pq: zero_real_three_point_block(),
+            q_pp: zero_real_three_point_block(),
+            p_qq: zero_real_three_point_block(),
+            p_qp: zero_real_three_point_block(),
+            p_pq: zero_real_three_point_block(),
+            p_pp: zero_real_three_point_block(),
+        }
+    }
+
+    fn component(&self, slots: [PhaseSpaceSlotKind; 3], indices: [usize; 3]) -> f64 {
+        let [output, first, second] = indices;
+        match slots {
+            [
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Field,
+            ] => self.q_qq.components[output][first][second].into_value(),
+            [
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Momentum,
+            ] => self.q_qp.components[output][first][second].into_value(),
+            [
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Field,
+            ] => self.q_pq.components[output][first][second].into_value(),
+            [
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Momentum,
+            ] => self.q_pp.components[output][first][second].into_value(),
+            [
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Field,
+            ] => self.p_qq.components[output][first][second].into_value(),
+            [
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Momentum,
+            ] => self.p_qp.components[output][first][second].into_value(),
+            [
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Field,
+            ] => self.p_pq.components[output][first][second].into_value(),
+            [
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Momentum,
+            ] => self.p_pp.components[output][first][second].into_value(),
+        }
+    }
+}
+
+/// Contracts three ordered quadratic kernels with the three leg covariances.
+///
+/// `kernels[a]` has output leg `a`. Its two input slots follow the remaining
+/// legs in ascending order: `[1, 2]`, `[0, 2]`, and `[0, 1]`. The returned
+/// value is exactly the three cyclic `u Sigma Sigma` terms in `D_N Alpha`; it
+/// does not include homogeneous propagation or an initial condition.
+pub fn three_point_source_from_kernels<const N: usize>(
+    kernels: [&QuadraticPhaseSpaceKernel<N>; 3],
+    covariances: [&TwoPointPhaseSpaceCovariance<N>; 3],
+) -> ThreePointPhaseSpaceCorrelation<N> {
+    let source_block = |output_slots: [PhaseSpaceSlotKind; 3]| {
+        core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|third| {
+                    let output_indices = [first, second, third];
+                    (0..3)
+                        .map(|output_leg| {
+                            let input_legs = match output_leg {
+                                0 => [1, 2],
+                                1 => [0, 2],
+                                2 => [0, 1],
+                                _ => unreachable!(),
+                            };
+                            [PhaseSpaceSlotKind::Field, PhaseSpaceSlotKind::Momentum]
+                                .into_iter()
+                                .flat_map(|first_input_slot| {
+                                    [PhaseSpaceSlotKind::Field, PhaseSpaceSlotKind::Momentum]
+                                        .into_iter()
+                                        .flat_map(move |second_input_slot| {
+                                            (0..N).flat_map(move |first_input_index| {
+                                                (0..N).map(move |second_input_index| {
+                                                    (
+                                                        first_input_slot,
+                                                        second_input_slot,
+                                                        first_input_index,
+                                                        second_input_index,
+                                                    )
+                                                })
+                                            })
+                                        })
+                                })
+                                .map(
+                                    |(
+                                        first_input_slot,
+                                        second_input_slot,
+                                        first_input_index,
+                                        second_input_index,
+                                    )| {
+                                        kernels[output_leg].component(
+                                            [
+                                                output_slots[output_leg],
+                                                first_input_slot,
+                                                second_input_slot,
+                                            ],
+                                            [
+                                                output_indices[output_leg],
+                                                first_input_index,
+                                                second_input_index,
+                                            ],
+                                        ) * covariances[input_legs[0]].component(
+                                            [first_input_slot, output_slots[input_legs[0]]],
+                                            [first_input_index, output_indices[input_legs[0]]],
+                                        ) * covariances[input_legs[1]].component(
+                                            [second_input_slot, output_slots[input_legs[1]]],
+                                            [second_input_index, output_indices[input_legs[1]]],
+                                        )
+                                    },
+                                )
+                                .sum::<Complex64>()
+                        })
+                        .sum()
+                })
+            })
+        })
+    };
+
+    ThreePointPhaseSpaceCorrelation {
+        qqq: complex_three_point_block(source_block([PhaseSpaceSlotKind::Field; 3])),
+        qqp: complex_three_point_block(source_block([
+            PhaseSpaceSlotKind::Field,
+            PhaseSpaceSlotKind::Field,
+            PhaseSpaceSlotKind::Momentum,
+        ])),
+        qpq: complex_three_point_block(source_block([
+            PhaseSpaceSlotKind::Field,
+            PhaseSpaceSlotKind::Momentum,
+            PhaseSpaceSlotKind::Field,
+        ])),
+        pqq: complex_three_point_block(source_block([
+            PhaseSpaceSlotKind::Momentum,
+            PhaseSpaceSlotKind::Field,
+            PhaseSpaceSlotKind::Field,
+        ])),
+        qpp: complex_three_point_block(source_block([
+            PhaseSpaceSlotKind::Field,
+            PhaseSpaceSlotKind::Momentum,
+            PhaseSpaceSlotKind::Momentum,
+        ])),
+        pqp: complex_three_point_block(source_block([
+            PhaseSpaceSlotKind::Momentum,
+            PhaseSpaceSlotKind::Field,
+            PhaseSpaceSlotKind::Momentum,
+        ])),
+        ppq: complex_three_point_block(source_block([
+            PhaseSpaceSlotKind::Momentum,
+            PhaseSpaceSlotKind::Momentum,
+            PhaseSpaceSlotKind::Field,
+        ])),
+        ppp: complex_three_point_block(source_block([PhaseSpaceSlotKind::Momentum; 3])),
+    }
+}
+
+fn complex_three_point_block<A, B, C, D, const N: usize>(
+    components: [[[Complex64; N]; N]; N],
+) -> ThreePointBlock<A, B, C, D, Complex64, N> {
+    ThreePointBlock::new(components.map(|matrix| matrix.map(|row| row.map(Quantity::new))))
+}
+
 impl<const N: usize> ThreePointPhaseSpaceCorrelation<N> {
     /// Returns the additive identity in every phase-space block.
     pub fn zero() -> Self {
@@ -1135,6 +1411,11 @@ fn scale_three_point_block<A, B, C, D: Copy, const N: usize>(
 fn zero_three_point_block<A, B, C, D: Copy, const N: usize>()
 -> ThreePointBlock<A, B, C, D, Complex64, N> {
     ThreePointBlock::new([[[Quantity::new(Complex64::new(0.0, 0.0)); N]; N]; N])
+}
+
+fn zero_real_three_point_block<A, B, C, D: Copy, const N: usize>()
+-> ThreePointBlock<A, B, C, D, f64, N> {
+    ThreePointBlock::new([[[Quantity::new(0.0); N]; N]; N])
 }
 
 /// Homogeneous three-point evolution under the linear flow `u^a_b`.
@@ -1693,5 +1974,49 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn quadratic_kernel_source_sums_the_three_ordered_uss_terms() {
+        fn covariance(qq: Complex64) -> TwoPointPhaseSpaceCovariance<1> {
+            TwoPointPhaseSpaceCovariance {
+                qq: TwoPointBlock::new([[Quantity::new(qq)]]),
+                qp: TwoPointBlock::new([[Quantity::new(Complex64::new(0.0, 0.0))]]),
+                pq: TwoPointBlock::new([[Quantity::new(Complex64::new(0.0, 0.0))]]),
+                pp: TwoPointBlock::new([[Quantity::new(Complex64::new(0.0, 0.0))]]),
+            }
+        }
+        fn kernel(q_qq: f64) -> QuadraticPhaseSpaceKernel<1> {
+            QuadraticPhaseSpaceKernel {
+                q_qq: ThreePointBlock::new([[[Quantity::new(q_qq)]]]),
+                ..QuadraticPhaseSpaceKernel::zero()
+            }
+        }
+
+        let kernels = [kernel(2.0), kernel(3.0), kernel(5.0)];
+        let covariances = [
+            covariance(Complex64::new(7.0, 1.0)),
+            covariance(Complex64::new(11.0, -2.0)),
+            covariance(Complex64::new(13.0, 3.0)),
+        ];
+        let source = three_point_source_from_kernels(
+            [&kernels[0], &kernels[1], &kernels[2]],
+            [&covariances[0], &covariances[1], &covariances[2]],
+        );
+        let expected = 2.0
+            * covariances[1].qq.components()[0][0].into_value()
+            * covariances[2].qq.components()[0][0].into_value()
+            + 3.0
+                * covariances[0].qq.components()[0][0].into_value()
+                * covariances[2].qq.components()[0][0].into_value()
+            + 5.0
+                * covariances[0].qq.components()[0][0].into_value()
+                * covariances[1].qq.components()[0][0].into_value();
+
+        assert_eq!(source.qqq.components()[0][0][0].into_value(), expected);
+        assert_eq!(
+            source.ppp.components()[0][0][0].into_value(),
+            Complex64::new(0.0, 0.0)
+        );
     }
 }
