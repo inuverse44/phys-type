@@ -177,16 +177,19 @@ vector, `InverseFieldMetric<N>::raise` performs the inverse operation, and
 only opposite-variance vectors expose contraction. Invalid index operations
 are covered by compile-fail tests.
 
-`FieldTensor3` and `FieldTensor4` extend the same typed-index model to higher
-rank. Metrics implement slot-specific `LowerFirst` and inverse metrics
+`FieldTensor3`, `FieldTensor4`, and `FieldTensor5` extend the same typed-index
+model to higher rank. Metrics implement slot-specific `LowerFirst` and inverse metrics
 implement `RaiseFirst`; already-lower indices are rejected at compile time.
-`ChristoffelSymbols` deliberately remains a distinct non-tensor type.
+`ChristoffelSymbols` and `ChristoffelDerivatives` deliberately remain distinct
+non-tensor types.
 
 `RiemannTensor<N>` fixes the convention `R^I_JKL` and dimension `M^-2`.
 `CurvedFieldSpaceGeometry<N>` supplies it analytically, while
 `contract_velocities` produces the mixed `M^2` curvature contribution needed
 by the perturbation mass matrix. All-lower curvature can be checked for pair
 symmetries and the first Bianchi identity with structured validation errors.
+Third-order geometry supplies the symmetrized `V_;(IJK)` and the typed
+rank-five `nabla_M R^I_JKL` capability needed by cubic transport.
 
 `CovariantMultifieldSystem<P, G, N>` accepts a `FieldSpaceGeometry<N>` that
 supplies `G_IJ`, `G^IJ`, and `Gamma^I_JK`. `FlatFieldSpace` exactly reproduces

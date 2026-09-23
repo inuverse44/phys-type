@@ -27,15 +27,18 @@ pub use background::{
 };
 pub use dimension::{
     DimDiv, DimMul, DimSqrt, M0, M1, M2, M3, M3Over2, M4, M5Over2, MHalf, MMinus1, MMinus2,
-    MMinusHalf, MassPower,
+    MMinus3, MMinusHalf, MassPower,
 };
 pub use field_space::{
-    ChristoffelSymbols, ContravariantField, CovariantField, CovariantPotentialHessian,
+    ChristoffelDerivativeComponents, ChristoffelDerivatives, ChristoffelSymbols,
+    ContravariantField, CovariantField, CovariantPotentialHessian,
+    CovariantPotentialThirdDerivative, CovariantRiemannDerivative, CurvatureDerivativeGeometry,
     CurvedFieldSpaceGeometry, FieldMetric, FieldSpaceGeometry, FieldTensor2, FieldTensor3,
-    FieldTensor4, FieldVector, FlatFieldSpace, GeometryValidationError, HyperbolicFieldSpace,
-    InvalidCurvatureRadius, InverseFieldMetric, KinematicBasis2, KinematicBasisError, Lower,
-    LowerFirst, LoweredRiemannTensor, RaiseFirst, RiemannIdentity, RiemannTensor,
-    Tensor3Components, Tensor4Components, Upper, validate_riemann_symmetries,
+    FieldTensor4, FieldTensor5, FieldVector, FlatFieldSpace, GeometryValidationError,
+    HyperbolicFieldSpace, InvalidCurvatureRadius, InverseFieldMetric, KinematicBasis2,
+    KinematicBasisError, Lower, LowerFirst, LoweredRiemannTensor, RaiseFirst, RiemannIdentity,
+    RiemannTensor, Tensor3Components, Tensor4Components, Tensor5Components,
+    ThirdOrderFieldSpaceGeometry, Upper, validate_riemann_symmetries,
 };
 pub use integrate::{
     AdaptiveAttempt, AdaptiveSystem, EmbeddedStep, ErrorTolerances, StepSizeLimits, System,

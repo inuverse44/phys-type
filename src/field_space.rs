@@ -9,13 +9,19 @@ use core::marker::PhantomData;
 use core::ops::{Add, Mul, Neg, Sub};
 
 use crate::dimension::DimMul;
-use crate::{Field, FieldVelocity, M0, M2, M3, MMinus1, MMinus2, Quantity};
+use crate::{Field, FieldVelocity, M0, M1, M2, M3, MMinus1, MMinus2, MMinus3, Quantity};
 
 /// Dense components of a rank-three field-space tensor.
 pub type Tensor3Components<D, V, const N: usize> = [[[Quantity<D, V>; N]; N]; N];
 
 /// Dense components of a rank-four field-space tensor.
 pub type Tensor4Components<D, V, const N: usize> = [[[[Quantity<D, V>; N]; N]; N]; N];
+
+/// Dense components of a rank-five field-space tensor.
+pub type Tensor5Components<D, V, const N: usize> = [[[[[Quantity<D, V>; N]; N]; N]; N]; N];
+
+/// Coordinate components of `partial_M Gamma^I_JK`.
+pub type ChristoffelDerivativeComponents<const N: usize> = Tensor4Components<MMinus2, f64, N>;
 
 /// Marker for a contravariant (upper) field-space index.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -221,6 +227,33 @@ impl<I, J, K, D, const N: usize> Mul<f64> for FieldTensor3<I, J, K, D, f64, N> {
 pub struct FieldTensor4<I, J, K, L, D, V, const N: usize> {
     components: Tensor4Components<D, V, N>,
     variance: PhantomData<(I, J, K, L)>,
+}
+
+/// A fixed-size rank-five field-space tensor.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FieldTensor5<I, J, K, L, M, D, V, const N: usize> {
+    components: Tensor5Components<D, V, N>,
+    variance: PhantomData<(I, J, K, L, M)>,
+}
+
+impl<I, J, K, L, M, D, V, const N: usize> FieldTensor5<I, J, K, L, M, D, V, N> {
+    /// Builds a rank-five tensor in first-through-fifth index order.
+    pub const fn new(components: Tensor5Components<D, V, N>) -> Self {
+        Self {
+            components,
+            variance: PhantomData,
+        }
+    }
+
+    /// Borrows all components.
+    pub const fn components(&self) -> &Tensor5Components<D, V, N> {
+        &self.components
+    }
+
+    /// Removes the variance wrapper and returns all components.
+    pub fn into_components(self) -> Tensor5Components<D, V, N> {
+        self.components
+    }
 }
 
 impl<I, J, K, L, D, V, const N: usize> FieldTensor4<I, J, K, L, D, V, N> {
@@ -443,12 +476,27 @@ pub type InverseFieldMetric<const N: usize> = FieldTensor2<Upper, Upper, M0, f64
 /// A covariant potential Hessian `V_;IJ`.
 pub type CovariantPotentialHessian<const N: usize> = FieldTensor2<Lower, Lower, M2, f64, N>;
 
+/// The fully symmetrized covariant third potential derivative `V_;(IJK)`.
+pub type CovariantPotentialThirdDerivative<const N: usize> =
+    FieldTensor3<Lower, Lower, Lower, M1, f64, N>;
+
 /// Field-space Riemann curvature in the convention `R^I_JKL`.
 pub type RiemannTensor<const N: usize> = FieldTensor4<Upper, Lower, Lower, Lower, MMinus2, f64, N>;
 
 /// Field-space Riemann curvature with all four indices lowered.
 pub type LoweredRiemannTensor<const N: usize> =
     FieldTensor4<Lower, Lower, Lower, Lower, MMinus2, f64, N>;
+
+/// The covariant curvature derivative `nabla_M R^I_JKL`.
+pub type CovariantRiemannDerivative<const N: usize> =
+    FieldTensor5<Upper, Lower, Lower, Lower, Lower, MMinus3, f64, N>;
+
+impl<const N: usize> FieldTensor5<Upper, Lower, Lower, Lower, Lower, MMinus3, f64, N> {
+    /// Returns an identically zero covariant curvature derivative.
+    pub fn zero() -> Self {
+        Self::new([[[[[Quantity::new(0.0); N]; N]; N]; N]; N])
+    }
+}
 
 impl<const N: usize> FieldTensor4<Upper, Lower, Lower, Lower, MMinus2, f64, N> {
     /// Returns identically zero curvature.
@@ -488,6 +536,33 @@ impl<const N: usize> FieldTensor4<Upper, Lower, Lower, Lower, MMinus2, f64, N> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ChristoffelSymbols<const N: usize> {
     components: [[[Quantity<MMinus1, f64>; N]; N]; N],
+}
+
+/// Coordinate derivatives `partial_M Gamma^I_JK` of Christoffel symbols.
+///
+/// Like [`ChristoffelSymbols`], this is intentionally not represented as a
+/// tensor. Components use upper, first lower, second lower, derivative-index
+/// order and carry mass dimension `M^-2`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ChristoffelDerivatives<const N: usize> {
+    components: ChristoffelDerivativeComponents<N>,
+}
+
+impl<const N: usize> ChristoffelDerivatives<N> {
+    /// Builds coordinate connection derivatives.
+    pub const fn new(components: ChristoffelDerivativeComponents<N>) -> Self {
+        Self { components }
+    }
+
+    /// Returns identically zero coordinate connection derivatives.
+    pub fn zero() -> Self {
+        Self::new([[[[Quantity::new(0.0); N]; N]; N]; N])
+    }
+
+    /// Borrows components in upper, lower, lower, derivative order.
+    pub const fn components(&self) -> &ChristoffelDerivativeComponents<N> {
+        &self.components
+    }
 }
 
 impl<const N: usize> ChristoffelSymbols<N> {
@@ -548,6 +623,20 @@ pub trait CurvedFieldSpaceGeometry<const N: usize>: FieldSpaceGeometry<N> {
     fn riemann(&self, position: &[Field; N]) -> RiemannTensor<N>;
 }
 
+/// A geometry supplying the coordinate connection derivatives needed to
+/// covariantize third derivatives of scalar potentials.
+pub trait ThirdOrderFieldSpaceGeometry<const N: usize>: FieldSpaceGeometry<N> {
+    /// Returns `partial_M Gamma^I_JK` at the supplied position.
+    fn christoffel_derivative(&self, position: &[Field; N]) -> ChristoffelDerivatives<N>;
+}
+
+/// A curved geometry supplying the rank-five derivative needed by the cubic
+/// transport kernel.
+pub trait CurvatureDerivativeGeometry<const N: usize>: CurvedFieldSpaceGeometry<N> {
+    /// Returns `nabla_M R^I_JKL` at the supplied position.
+    fn covariant_riemann_derivative(&self, position: &[Field; N]) -> CovariantRiemannDerivative<N>;
+}
+
 /// Euclidean field space in Cartesian coordinates.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FlatFieldSpace;
@@ -569,6 +658,21 @@ impl<const N: usize> FieldSpaceGeometry<N> for FlatFieldSpace {
 impl<const N: usize> CurvedFieldSpaceGeometry<N> for FlatFieldSpace {
     fn riemann(&self, _position: &[Field; N]) -> RiemannTensor<N> {
         RiemannTensor::zero()
+    }
+}
+
+impl<const N: usize> ThirdOrderFieldSpaceGeometry<N> for FlatFieldSpace {
+    fn christoffel_derivative(&self, _position: &[Field; N]) -> ChristoffelDerivatives<N> {
+        ChristoffelDerivatives::zero()
+    }
+}
+
+impl<const N: usize> CurvatureDerivativeGeometry<N> for FlatFieldSpace {
+    fn covariant_riemann_derivative(
+        &self,
+        _position: &[Field; N],
+    ) -> CovariantRiemannDerivative<N> {
+        CovariantRiemannDerivative::zero()
     }
 }
 
@@ -689,6 +793,34 @@ impl CurvedFieldSpaceGeometry<2> for HyperbolicFieldSpace {
                 })
             })
         }))
+    }
+}
+
+impl ThirdOrderFieldSpaceGeometry<2> for HyperbolicFieldSpace {
+    fn christoffel_derivative(&self, position: &[Field; 2]) -> ChristoffelDerivatives<2> {
+        let (sinh, cosh) = self.hyperbolics(position);
+        let radius_squared = self.curvature_radius.into_value().powi(2);
+        let mut components = [[[[Quantity::<MMinus2, f64>::new(0.0); 2]; 2]; 2]; 2];
+
+        // partial_1 Gamma^1_22 = -(cosh^2 + sinh^2) / L^2
+        components[0][1][1][0] = Quantity::new(-(cosh * cosh + sinh * sinh) / radius_squared);
+        // partial_1 Gamma^2_12 = partial_1 Gamma^2_21 = -csch^2 / L^2
+        let angular = Quantity::new(-1.0 / (sinh * sinh * radius_squared));
+        components[1][0][1][0] = angular;
+        components[1][1][0][0] = angular;
+
+        ChristoffelDerivatives::new(components)
+    }
+}
+
+impl CurvatureDerivativeGeometry<2> for HyperbolicFieldSpace {
+    fn covariant_riemann_derivative(
+        &self,
+        _position: &[Field; 2],
+    ) -> CovariantRiemannDerivative<2> {
+        // The hyperbolic metric is maximally symmetric with constant
+        // sectional curvature, so metric compatibility gives nabla R = 0.
+        CovariantRiemannDerivative::zero()
     }
 }
 
@@ -1139,6 +1271,33 @@ mod tests {
     }
 
     #[test]
+    fn flat_geometry_supplies_zero_third_order_geometry() {
+        let position = [Field::new(1.0), Field::new(2.0)];
+        let connection_derivative = FlatFieldSpace.christoffel_derivative(&position);
+        let curvature_derivative = FlatFieldSpace.covariant_riemann_derivative(&position);
+
+        assert!(
+            connection_derivative
+                .components()
+                .iter()
+                .flatten()
+                .flatten()
+                .flatten()
+                .all(|component| component.into_value() == 0.0)
+        );
+        assert!(
+            curvature_derivative
+                .components()
+                .iter()
+                .flatten()
+                .flatten()
+                .flatten()
+                .flatten()
+                .all(|component| component.into_value() == 0.0)
+        );
+    }
+
+    #[test]
     fn the_hyperbolic_geometry_satisfies_the_riemann_identities() {
         let geometry = HyperbolicFieldSpace::new(Field::new(7.0)).unwrap();
         let position = [Field::new(3.0), Field::new(1.0)];
@@ -1147,6 +1306,55 @@ mod tests {
             .lower_first(&geometry.riemann(&position));
 
         validate_riemann_symmetries(&lowered, 1.0e-12).unwrap();
+    }
+
+    #[test]
+    fn hyperbolic_connection_derivative_matches_finite_differences() {
+        let geometry = HyperbolicFieldSpace::new(Field::new(7.0)).unwrap();
+        let position = [Field::new(3.0), Field::new(1.0)];
+        let analytic = geometry.christoffel_derivative(&position);
+        let step = 1.0e-5;
+
+        for derivative in 0..2 {
+            let mut forward = position;
+            let mut backward = position;
+            forward[derivative] = Field::new(position[derivative].value() + step);
+            backward[derivative] = Field::new(position[derivative].value() - step);
+            let forward_connection = geometry.christoffel(&forward);
+            let backward_connection = geometry.christoffel(&backward);
+
+            for upper in 0..2 {
+                for first in 0..2 {
+                    for second in 0..2 {
+                        let numerical = (forward_connection.components()[upper][first][second]
+                            .value()
+                            - backward_connection.components()[upper][first][second].value())
+                            / (2.0 * step);
+                        let expected =
+                            analytic.components()[upper][first][second][derivative].value();
+
+                        assert!((numerical - expected).abs() < 1.0e-10);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn hyperbolic_covariant_curvature_derivative_is_zero() {
+        let geometry = HyperbolicFieldSpace::new(Field::new(7.0)).unwrap();
+        let derivative = geometry.covariant_riemann_derivative(&[Field::new(3.0), Field::new(1.0)]);
+
+        assert!(
+            derivative
+                .components()
+                .iter()
+                .flatten()
+                .flatten()
+                .flatten()
+                .flatten()
+                .all(|component| component.into_value() == 0.0)
+        );
     }
 
     #[test]

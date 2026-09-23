@@ -5,10 +5,12 @@ use core::ops::{Add, Mul};
 use crate::integrate::{AdaptiveSystem, ErrorTolerances, System, component_error_ratio};
 use crate::potential::MultifieldPotential;
 use crate::{
-    ContravariantField, CovariantPotentialHessian, CurvedFieldSpaceGeometry, EnergyDensity, Field,
-    FieldSpaceGeometry, FieldTensor2, FieldVelocity, Hubble, KinematicBasis2, KinematicBasisError,
-    Lower, M0, M1, M2, M3, Mass, PotentialDerivatives, PotentialGradient, PotentialHessian,
-    Quantity, ScaleFactor, Time, TwiceDifferentiableMultifieldPotential, Upper,
+    ContravariantField, CovariantPotentialHessian, CovariantPotentialThirdDerivative,
+    CurvedFieldSpaceGeometry, EnergyDensity, Field, FieldSpaceGeometry, FieldTensor2,
+    FieldVelocity, Hubble, KinematicBasis2, KinematicBasisError, Lower, M0, M1, M2, M3, Mass,
+    PotentialDerivatives, PotentialDerivativesThroughThird, PotentialGradient, PotentialHessian,
+    PotentialThirdDerivative, Quantity, ScaleFactor, ThirdOrderFieldSpaceGeometry,
+    ThriceDifferentiableMultifieldPotential, Time, TwiceDifferentiableMultifieldPotential, Upper,
 };
 
 /// The values, velocities, and common scale factor of `N` scalar fields.
@@ -205,6 +207,92 @@ where
         raised
             .into_components()
             .map(|component| -(component / (hubble * 3.0)))
+    }
+}
+
+impl<P, G, const N: usize> CovariantMultifieldSystem<P, G, N>
+where
+    P: ThriceDifferentiableMultifieldPotential<N>,
+    G: ThirdOrderFieldSpaceGeometry<N>,
+{
+    /// Computes potential value and coordinate derivatives through third
+    /// order.
+    pub fn potential_derivatives_through_third(
+        &self,
+        state: &MultifieldState<N>,
+    ) -> PotentialDerivativesThroughThird<N> {
+        self.potential.derivatives_through_third(state.phi)
+    }
+
+    /// Computes the fully symmetrized covariant third derivative `V_;(IJK)`.
+    ///
+    /// The implementation first forms `nabla_K (V_;IJ)`. Covariant derivatives
+    /// do not generally commute on the gradient in curved field space, so the
+    /// three index positions are then explicitly symmetrized as required by
+    /// the cubic interaction.
+    pub fn covariant_potential_third_derivative(
+        &self,
+        state: &MultifieldState<N>,
+    ) -> CovariantPotentialThirdDerivative<N> {
+        let derivatives = self.potential.derivatives_through_third(state.phi);
+        let connection = self.geometry.christoffel(&state.phi);
+        let connection_derivative = self.geometry.christoffel_derivative(&state.phi);
+        let covariant_hessian: CovariantPotentialHessian<N> =
+            CovariantPotentialHessian::new(core::array::from_fn(|first| {
+                core::array::from_fn(|second| {
+                    let correction: f64 = (0..N)
+                        .map(|upper| {
+                            connection.components()[upper][first][second].value()
+                                * derivatives.gradient[upper].value()
+                        })
+                        .sum();
+
+                    PotentialHessian::new(derivatives.hessian[first][second].value() - correction)
+                })
+            }));
+
+        let ordered: [[[PotentialThirdDerivative; N]; N]; N] = core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|derivative| {
+                    let differentiated_connection: f64 = (0..N)
+                        .map(|upper| {
+                            connection_derivative.components()[upper][first][second][derivative]
+                                .value()
+                                * derivatives.gradient[upper].value()
+                                + connection.components()[upper][first][second].value()
+                                    * derivatives.hessian[upper][derivative].value()
+                        })
+                        .sum();
+                    let tensor_connections: f64 = (0..N)
+                        .map(|upper| {
+                            connection.components()[upper][derivative][first].value()
+                                * covariant_hessian.components()[upper][second].value()
+                                + connection.components()[upper][derivative][second].value()
+                                    * covariant_hessian.components()[first][upper].value()
+                        })
+                        .sum();
+
+                    PotentialThirdDerivative::new(
+                        derivatives.third[first][second][derivative].value()
+                            - differentiated_connection
+                            - tensor_connections,
+                    )
+                })
+            })
+        });
+
+        CovariantPotentialThirdDerivative::new(core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|third| {
+                    PotentialThirdDerivative::new(
+                        (ordered[first][second][third].value()
+                            + ordered[first][third][second].value()
+                            + ordered[second][third][first].value())
+                            / 3.0,
+                    )
+                })
+            })
+        }))
     }
 }
 
@@ -530,8 +618,8 @@ where
 mod tests {
     use super::*;
     use crate::{
-        ChristoffelSymbols, FieldMetric, FlatFieldSpace, InverseFieldMetric, MMinus1,
-        QuadraticMultifieldPotential, rk4_step, rk45_step,
+        ChristoffelSymbols, FieldMetric, FlatFieldSpace, HyperbolicFieldSpace, InverseFieldMetric,
+        MMinus1, QuadraticMultifieldPotential, rk4_step, rk45_step,
     };
 
     fn two_field_system() -> MultifieldSystem<QuadraticMultifieldPotential<2>, 2> {
@@ -651,6 +739,95 @@ mod tests {
             .map(|row| row.map(Quantity::into_value));
 
         assert_eq!(hessian, [[4.0, 0.0], [0.0, -15.0]]);
+    }
+
+    #[test]
+    fn flat_covariant_third_derivative_matches_coordinate_derivative() {
+        let system = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(2.0), Mass::new(3.0)]),
+            FlatFieldSpace,
+        );
+        let state = MultifieldState::new(
+            [Field::new(3.0), Field::new(4.0)],
+            [FieldVelocity::new(0.0), FieldVelocity::new(0.0)],
+            ScaleFactor::new(1.0),
+        );
+
+        let third = system
+            .covariant_potential_third_derivative(&state)
+            .into_components();
+
+        assert_eq!(
+            third.map(|matrix| matrix.map(|row| row.map(Quantity::into_value))),
+            [[[0.0; 2]; 2]; 2]
+        );
+    }
+
+    #[test]
+    fn hyperbolic_covariant_third_derivative_matches_hessian_finite_difference() {
+        let geometry = HyperbolicFieldSpace::new(Field::new(7.0)).unwrap();
+        let system = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(2.0), Mass::new(3.0)]),
+            geometry,
+        );
+        let state = MultifieldState::new(
+            [Field::new(3.0), Field::new(1.0)],
+            [FieldVelocity::new(0.0), FieldVelocity::new(0.0)],
+            ScaleFactor::new(1.0),
+        );
+        let analytic = system.covariant_potential_third_derivative(&state);
+        let central_hessian = system.covariant_potential_hessian(&state);
+        let connection = geometry.christoffel(&state.phi);
+        let step = 1.0e-5;
+
+        let ordered: [[[f64; 2]; 2]; 2] = core::array::from_fn(|first| {
+            core::array::from_fn(|second| {
+                core::array::from_fn(|derivative| {
+                    let mut forward = state;
+                    let mut backward = state;
+                    forward.phi[derivative] = Field::new(state.phi[derivative].value() + step);
+                    backward.phi[derivative] = Field::new(state.phi[derivative].value() - step);
+                    let forward_hessian = system.covariant_potential_hessian(&forward);
+                    let backward_hessian = system.covariant_potential_hessian(&backward);
+                    let coordinate_derivative = (forward_hessian.components()[first][second]
+                        .value()
+                        - backward_hessian.components()[first][second].value())
+                        / (2.0 * step);
+                    let correction: f64 = (0..2)
+                        .map(|upper| {
+                            connection.components()[upper][derivative][first].value()
+                                * central_hessian.components()[upper][second].value()
+                                + connection.components()[upper][derivative][second].value()
+                                    * central_hessian.components()[first][upper].value()
+                        })
+                        .sum();
+
+                    coordinate_derivative - correction
+                })
+            })
+        });
+
+        for (first, matrix) in ordered.iter().enumerate() {
+            for (second, row) in matrix.iter().enumerate() {
+                for (third, _) in row.iter().enumerate() {
+                    let numerical = (ordered[first][second][third]
+                        + ordered[first][third][second]
+                        + ordered[second][third][first])
+                        / 3.0;
+                    let expected = analytic.components()[first][second][third].value();
+
+                    assert!((numerical - expected).abs() < 1.0e-8);
+                    assert_eq!(
+                        analytic.components()[first][second][third],
+                        analytic.components()[third][second][first]
+                    );
+                    assert_eq!(
+                        analytic.components()[first][second][third],
+                        analytic.components()[first][third][second]
+                    );
+                }
+            }
+        }
     }
 
     #[test]

@@ -109,10 +109,10 @@ turn and the complete 41-point benchmark.
   [`non-gaussianity-architecture.md`](non-gaussianity-architecture.md).
   **P3a is completed:** validated canonical momentum triangles, bounded tagged
   phase-space indices, and dimensioned two-/three-point blocks are implemented.
-  **P3b is in progress:** third-order automatic differentiation and the
-  dimensioned coordinate derivative `V_,IJK` are implemented. Covariantizing
-  this to `V_;IJK` and adding the curvature derivative required by the
-  transport kernel are next;
+  **P3b is completed:** third-order automatic differentiation, dimensioned
+  coordinate `V_,IJK`, symmetrized covariant `V_;(IJK)`, explicit connection
+  derivatives, and typed `nabla_M R^I_JKL` are implemented with flat and
+  hyperbolic analytic tests. P3c, the two-point transport oracle, is next;
 - reheating and post-inflationary transfer;
 - dynamically sized field spaces if a concrete model requires more than the
   current const-generic representation.

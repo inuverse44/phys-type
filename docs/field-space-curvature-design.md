@@ -18,13 +18,13 @@ Two independent ideas must not be conflated:
 
 - **Tensor rank** is the number of field-space indices. Riemann has rank four.
 - **Automatic-differentiation order** is the highest derivative carried by a
-  numerical value. `Jet<N>` currently carries derivatives through second
-  order.
+  numerical value. `Jet<N>` carries derivatives through second order, while
+  `ThirdOrderJet<N>` is the separate cubic-transport representation.
 
 The linear perturbation mass matrix needs a rank-four Riemann tensor but only
-a second derivative of the scalar potential. A future cubic calculation can
-need both third derivatives of the potential and a rank-five covariant
-derivative of Riemann.
+a second derivative of the scalar potential. Cubic transport additionally
+needs third derivatives of the potential and a rank-five covariant derivative
+of Riemann.
 
 ## Conventions
 
@@ -41,7 +41,7 @@ coordinate derivative has dimension `M^-1`. The initial convention table is:
 | Riemann curvature | `R^I_JKL` | `M^-2` | yes |
 | covariant Riemann derivative | `nabla_M R^I_JKL` | `M^-3` | yes |
 | potential Hessian | `V_;IJ` | `M^2` | yes |
-| third potential derivative | `V_;IJK` | `M^1` | yes |
+| symmetrized third potential derivative | `V_;(IJK)` | `M^1` | yes |
 
 The Riemann sign and index order are fixed by
 
@@ -105,9 +105,8 @@ type LoweredRiemannTensor<N> =
     FieldTensor4<Lower, Lower, Lower, Lower, MMinus2, f64, N>;
 ```
 
-`ChristoffelSymbols` remains a dedicated non-tensor type. A future
-`MetricDerivative` will also be a dedicated non-tensor type. Neither may be
-passed to an API that requires a true `FieldTensor3`.
+`ChristoffelSymbols` and `ChristoffelDerivatives` remain dedicated non-tensor
+types. Neither may be passed to an API that requires a true field tensor.
 
 ## Operations and index safety
 
@@ -209,20 +208,18 @@ curvature contributions to the inflationary three-point function, while the
 transport formulation of Dias, Frazer, and Seery provides a practical route
 to evolving observables in curved multifield models.
 
-No bispectrum algorithm is selected by the present branch. The tensor layer
-must nevertheless avoid blocking either an in-in/cubic-action implementation
-or a transport implementation. The anticipated additional objects are:
+The phase-space transport architecture selected later uses these additional
+objects:
 
-- `V_;IJK`, a symmetric rank-three covariant tensor of dimension `M^1`;
+- `V_;(IJK)`, a symmetric rank-three covariant tensor of dimension `M^1`;
 - `nabla_M R^I_JKL`, a rank-five tensor of dimension `M^-3`;
 - a rank-three field covariance/bispectrum object with momentum-triangle
   labels separate from field-space indices;
 - third-order automatic differentiation, separate from tensor rank.
 
-`FieldTensor3` and `FieldTensor4` therefore share component-access and
-slot-naming conventions that a later `FieldTensor5` can follow without
-changing existing APIs. Momentum indices, Fourier labels, and field-space
-indices will remain distinct types.
+`FieldTensor3`, `FieldTensor4`, and `FieldTensor5` share component-access and
+slot-naming conventions. Momentum indices, Fourier labels, and field-space
+indices remain distinct types.
 
 ## Branch sequence
 
