@@ -268,8 +268,11 @@ P3d is in progress. The first slice implements the complete dimensioned
 blocks, complex conjugation, Runge--Kutta arithmetic, and Fourier-leg
 transpositions that move their phase-space slots and component axes together.
 A compile-fail test fixes the distinct `M^(-3/2)`, `M^(-1/2)`, `M^(1/2)`, and
-`M^(3/2)` block dimensions. No cubic kernel or physical bispectrum is claimed
-yet. The staged contract and next homogeneous-transport step are documented in
+`M^(3/2)` block dimensions. `ThreePointHomogeneousTransportSystem` now applies
+the P3c linear flow to all three canonical triangle legs on the shared P2
+background, and is regression-tested for leg-permutation covariance. No cubic
+kernel or physical bispectrum is claimed yet. The staged contract and next
+sourced-transport step are documented in
 [`three-point-transport.md`](three-point-transport.md).
 
 ## Acceptance boundary

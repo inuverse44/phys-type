@@ -1018,6 +1018,52 @@ impl<const N: usize> ThreePointPhaseSpaceCorrelation<N> {
             ppp: self.ppp.conjugate(),
         }
     }
+
+    fn component(&self, slots: [PhaseSpaceSlotKind; 3], indices: [usize; 3]) -> Complex64 {
+        let [first, second, third] = indices;
+        match slots {
+            [
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Field,
+            ] => self.qqq.components[first][second][third].into_value(),
+            [
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Momentum,
+            ] => self.qqp.components[first][second][third].into_value(),
+            [
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Field,
+            ] => self.qpq.components[first][second][third].into_value(),
+            [
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Field,
+            ] => self.pqq.components[first][second][third].into_value(),
+            [
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Momentum,
+            ] => self.qpp.components[first][second][third].into_value(),
+            [
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Momentum,
+            ] => self.pqp.components[first][second][third].into_value(),
+            [
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Field,
+            ] => self.ppq.components[first][second][third].into_value(),
+            [
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Momentum,
+            ] => self.ppp.components[first][second][third].into_value(),
+        }
+    }
 }
 
 impl<const N: usize> Add for ThreePointPhaseSpaceCorrelation<N> {
@@ -1091,6 +1137,211 @@ fn zero_three_point_block<A, B, C, D: Copy, const N: usize>()
     ThreePointBlock::new([[[Quantity::new(Complex64::new(0.0, 0.0)); N]; N]; N])
 }
 
+/// Homogeneous three-point evolution under the linear flow `u^a_b`.
+///
+/// This system applies the already validated P3c linear dynamics to all three
+/// Fourier legs. It intentionally omits the quadratic `u^a_bc Sigma Sigma`
+/// source; that source is the next P3d layer and cannot be confused with this
+/// homogeneous propagation in the public type name.
+pub struct ThreePointHomogeneousTransportSystem<'a, P, G, B> {
+    background: &'a CovariantMultifieldSystem<P, G, 2>,
+    trajectory: &'a B,
+    triangle: MomentumTriangle,
+}
+
+impl<'a, P, G, B> ThreePointHomogeneousTransportSystem<'a, P, G, B> {
+    /// Builds a system whose state legs use the triangle's canonical order.
+    pub const fn new(
+        background: &'a CovariantMultifieldSystem<P, G, 2>,
+        trajectory: &'a B,
+        triangle: MomentumTriangle,
+    ) -> Self {
+        Self {
+            background,
+            trajectory,
+            triangle,
+        }
+    }
+
+    /// Returns the canonically ordered normalized wavenumbers used by the ODE.
+    pub fn wavenumbers(&self) -> [Mass; 3] {
+        self.triangle.canonical_wavenumbers().map(Mass::new)
+    }
+}
+
+impl<P, G, B> System for ThreePointHomogeneousTransportSystem<'_, P, G, B>
+where
+    P: TwiceDifferentiableMultifieldPotential<2>,
+    G: CurvedFieldSpaceGeometry<2>,
+    B: TwoFieldBackgroundProvider,
+{
+    type IndependentVariable = Dimensionless;
+    type State = ThreePointPhaseSpaceCorrelation<2>;
+    type Delta = ThreePointPhaseSpaceCorrelation<2>;
+    type Derivative = ThreePointPhaseSpaceCorrelation<2>;
+
+    fn derivative(&self, e_folds: Dimensionless, state: &Self::State) -> Self::Derivative {
+        let background = self.trajectory.state_at_e_folds(e_folds.into_value());
+        let hubble = self.background.hubble(&background).into_value();
+        let connection = self.background.geometry.christoffel(&background.phi);
+        let mass = self.background.perturbation_mass_matrix(&background);
+        let connection_flow: [[f64; 2]; 2] = core::array::from_fn(|upper| {
+            core::array::from_fn(|lower| {
+                (0..2)
+                    .map(|velocity| {
+                        connection.components()[upper][velocity][lower].value()
+                            * background.pi[velocity].value()
+                            / hubble
+                    })
+                    .sum()
+            })
+        });
+        let flows = self.wavenumbers().map(|wavenumber| {
+            let physical_wavenumber = (wavenumber / background.a).into_value();
+            LinearPhaseSpaceFlow {
+                qq: core::array::from_fn(|upper| {
+                    core::array::from_fn(|lower| -connection_flow[upper][lower])
+                }),
+                qp: core::array::from_fn(|upper| {
+                    core::array::from_fn(|lower| f64::from(upper == lower) / hubble)
+                }),
+                pq: core::array::from_fn(|upper| {
+                    core::array::from_fn(|lower| {
+                        -(mass.components()[upper][lower].value()
+                            + f64::from(upper == lower) * physical_wavenumber.powi(2))
+                            / hubble
+                    })
+                }),
+                pp: core::array::from_fn(|upper| {
+                    core::array::from_fn(|lower| {
+                        -connection_flow[upper][lower] - 3.0 * f64::from(upper == lower)
+                    })
+                }),
+            }
+        });
+
+        ThreePointPhaseSpaceCorrelation {
+            qqq: homogeneous_three_point_block(state, [PhaseSpaceSlotKind::Field; 3], &flows),
+            qqp: homogeneous_three_point_block(
+                state,
+                [
+                    PhaseSpaceSlotKind::Field,
+                    PhaseSpaceSlotKind::Field,
+                    PhaseSpaceSlotKind::Momentum,
+                ],
+                &flows,
+            ),
+            qpq: homogeneous_three_point_block(
+                state,
+                [
+                    PhaseSpaceSlotKind::Field,
+                    PhaseSpaceSlotKind::Momentum,
+                    PhaseSpaceSlotKind::Field,
+                ],
+                &flows,
+            ),
+            pqq: homogeneous_three_point_block(
+                state,
+                [
+                    PhaseSpaceSlotKind::Momentum,
+                    PhaseSpaceSlotKind::Field,
+                    PhaseSpaceSlotKind::Field,
+                ],
+                &flows,
+            ),
+            qpp: homogeneous_three_point_block(
+                state,
+                [
+                    PhaseSpaceSlotKind::Field,
+                    PhaseSpaceSlotKind::Momentum,
+                    PhaseSpaceSlotKind::Momentum,
+                ],
+                &flows,
+            ),
+            pqp: homogeneous_three_point_block(
+                state,
+                [
+                    PhaseSpaceSlotKind::Momentum,
+                    PhaseSpaceSlotKind::Field,
+                    PhaseSpaceSlotKind::Momentum,
+                ],
+                &flows,
+            ),
+            ppq: homogeneous_three_point_block(
+                state,
+                [
+                    PhaseSpaceSlotKind::Momentum,
+                    PhaseSpaceSlotKind::Momentum,
+                    PhaseSpaceSlotKind::Field,
+                ],
+                &flows,
+            ),
+            ppp: homogeneous_three_point_block(state, [PhaseSpaceSlotKind::Momentum; 3], &flows),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct LinearPhaseSpaceFlow {
+    qq: [[f64; 2]; 2],
+    qp: [[f64; 2]; 2],
+    pq: [[f64; 2]; 2],
+    pp: [[f64; 2]; 2],
+}
+
+impl LinearPhaseSpaceFlow {
+    fn component(
+        self,
+        output: PhaseSpaceSlotKind,
+        input: PhaseSpaceSlotKind,
+        upper: usize,
+        lower: usize,
+    ) -> f64 {
+        match (output, input) {
+            (PhaseSpaceSlotKind::Field, PhaseSpaceSlotKind::Field) => self.qq[upper][lower],
+            (PhaseSpaceSlotKind::Field, PhaseSpaceSlotKind::Momentum) => self.qp[upper][lower],
+            (PhaseSpaceSlotKind::Momentum, PhaseSpaceSlotKind::Field) => self.pq[upper][lower],
+            (PhaseSpaceSlotKind::Momentum, PhaseSpaceSlotKind::Momentum) => self.pp[upper][lower],
+        }
+    }
+}
+
+fn homogeneous_three_point_block<A, B, C, D>(
+    state: &ThreePointPhaseSpaceCorrelation<2>,
+    output_slots: [PhaseSpaceSlotKind; 3],
+    flows: &[LinearPhaseSpaceFlow; 3],
+) -> ThreePointBlock<A, B, C, D, Complex64, 2> {
+    ThreePointBlock::new(core::array::from_fn(|first| {
+        core::array::from_fn(|second| {
+            core::array::from_fn(|third| {
+                let output_indices = [first, second, third];
+                let value = (0..3)
+                    .flat_map(|leg| {
+                        [PhaseSpaceSlotKind::Field, PhaseSpaceSlotKind::Momentum]
+                            .into_iter()
+                            .flat_map(move |input_slot| {
+                                (0..2).map(move |input_index| (leg, input_slot, input_index))
+                            })
+                    })
+                    .map(|(leg, input_slot, input_index)| {
+                        let mut input_slots = output_slots;
+                        input_slots[leg] = input_slot;
+                        let mut input_indices = output_indices;
+                        input_indices[leg] = input_index;
+                        flows[leg].component(
+                            output_slots[leg],
+                            input_slot,
+                            output_indices[leg],
+                            input_index,
+                        ) * state.component(input_slots, input_indices)
+                    })
+                    .sum();
+                Quantity::new(value)
+            })
+        })
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1098,6 +1349,41 @@ mod tests {
         Field, FieldVelocity, FlatFieldSpace, M0, Mass, MultifieldState,
         QuadraticMultifieldPotential, ScaleFactor, TwoFieldPerturbationSystem,
     };
+
+    #[derive(Clone, Copy)]
+    struct FixedTrajectory(MultifieldState<2>);
+
+    impl TwoFieldBackgroundProvider for FixedTrajectory {
+        fn state_at_e_folds(&self, _e_folds: f64) -> MultifieldState<2> {
+            self.0
+        }
+    }
+
+    fn sample_three_point_state() -> ThreePointPhaseSpaceCorrelation<2> {
+        fn block<A, B, C, D>(offset: f64) -> ThreePointBlock<A, B, C, D, Complex64, 2> {
+            ThreePointBlock::new(core::array::from_fn(|first| {
+                core::array::from_fn(|second| {
+                    core::array::from_fn(|third| {
+                        Quantity::new(Complex64::new(
+                            offset + (100 * first + 10 * second + third) as f64,
+                            -offset,
+                        ))
+                    })
+                })
+            }))
+        }
+
+        ThreePointPhaseSpaceCorrelation {
+            qqq: block(0.0),
+            qqp: block(1_000.0),
+            qpq: block(2_000.0),
+            pqq: block(3_000.0),
+            qpp: block(4_000.0),
+            pqp: block(5_000.0),
+            ppq: block(6_000.0),
+            ppp: block(7_000.0),
+        }
+    }
 
     #[test]
     fn triangle_canonicalizes_scale_shape_and_leg_data() {
@@ -1265,29 +1551,7 @@ mod tests {
 
     #[test]
     fn complete_three_point_state_permutations_move_blocks_and_axes() {
-        fn block<A, B, C, D>(offset: f64) -> ThreePointBlock<A, B, C, D, Complex64, 2> {
-            ThreePointBlock::new(core::array::from_fn(|first| {
-                core::array::from_fn(|second| {
-                    core::array::from_fn(|third| {
-                        Quantity::new(Complex64::new(
-                            offset + (100 * first + 10 * second + third) as f64,
-                            -offset,
-                        ))
-                    })
-                })
-            }))
-        }
-
-        let alpha = ThreePointPhaseSpaceCorrelation {
-            qqq: block(0.0),
-            qqp: block(1_000.0),
-            qpq: block(2_000.0),
-            pqq: block(3_000.0),
-            qpp: block(4_000.0),
-            pqp: block(5_000.0),
-            ppq: block(6_000.0),
-            ppp: block(7_000.0),
-        };
+        let alpha = sample_three_point_state();
 
         let first_second = alpha.swap_first_second();
         assert_eq!(
@@ -1327,5 +1591,107 @@ mod tests {
             alpha.ppp.components()[1][1][1].into_value(),
             Complex64::new(0.0, 0.0)
         );
+    }
+
+    #[test]
+    fn homogeneous_three_point_flow_applies_the_linear_system_to_each_leg() {
+        let background = MultifieldState::new(
+            [Field::new(12.0), Field::new(8.0)],
+            [FieldVelocity::new(0.0), FieldVelocity::new(0.0)],
+            ScaleFactor::new(1.0),
+        );
+        let model = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0e-6), Mass::new(2.0e-6)]),
+            FlatFieldSpace,
+        );
+        let trajectory = FixedTrajectory(background);
+        let triangle = MomentumTriangle::try_new(3.0e-5, 2.0e-5, 2.0e-5).unwrap();
+        let system = ThreePointHomogeneousTransportSystem::new(&model, &trajectory, triangle);
+        let alpha = sample_three_point_state();
+
+        let derivative = system.derivative(Dimensionless::new(0.0), &alpha);
+        let hubble = model.hubble(&background).into_value();
+        let expected = (alpha.pqq.components()[0][0][0].into_value()
+            + alpha.qpq.components()[0][0][0].into_value()
+            + alpha.qqp.components()[0][0][0].into_value())
+            / hubble;
+        let actual = derivative.qqq.components()[0][0][0].into_value();
+
+        assert!((actual - expected).norm() / expected.norm() < 1.0e-15);
+        assert_eq!(
+            system.wavenumbers().map(Quantity::into_value),
+            [3.0e-5, 2.0e-5, 2.0e-5]
+        );
+    }
+
+    #[test]
+    fn equilateral_homogeneous_flow_commutes_with_fourier_leg_exchange() {
+        let background = MultifieldState::new(
+            [Field::new(12.0), Field::new(8.0)],
+            [FieldVelocity::new(-3.0e-6), FieldVelocity::new(-4.0e-6)],
+            ScaleFactor::new(1.0),
+        );
+        let model = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0e-6), Mass::new(2.0e-6)]),
+            FlatFieldSpace,
+        );
+        let trajectory = FixedTrajectory(background);
+        let triangle = MomentumTriangle::try_new(2.0e-5, 2.0e-5, 2.0e-5).unwrap();
+        let system = ThreePointHomogeneousTransportSystem::new(&model, &trajectory, triangle);
+        let alpha = sample_three_point_state();
+
+        let permuted_then_evolved =
+            system.derivative(Dimensionless::new(0.0), &alpha.swap_first_second());
+        let evolved_then_permuted = system
+            .derivative(Dimensionless::new(0.0), &alpha)
+            .swap_first_second();
+        let slots = [
+            [PhaseSpaceSlotKind::Field; 3],
+            [
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Momentum,
+            ],
+            [
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Field,
+            ],
+            [
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Field,
+            ],
+            [
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Momentum,
+            ],
+            [
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Field,
+                PhaseSpaceSlotKind::Momentum,
+            ],
+            [
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Momentum,
+                PhaseSpaceSlotKind::Field,
+            ],
+            [PhaseSpaceSlotKind::Momentum; 3],
+        ];
+
+        for block_slots in slots {
+            for first in 0..2 {
+                for second in 0..2 {
+                    for third in 0..2 {
+                        let indices = [first, second, third];
+                        let expected = evolved_then_permuted.component(block_slots, indices);
+                        let actual = permuted_then_evolved.component(block_slots, indices);
+                        let scale = expected.norm().max(actual.norm()).max(1.0);
+                        assert!((actual - expected).norm() / scale < 1.0e-15);
+                    }
+                }
+            }
+        }
     }
 }
