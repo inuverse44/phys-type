@@ -32,6 +32,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A documented two-point transport convention `X = (Q, D_t Q)` and a typed
   mode-solver oracle producing complex `QQ`, `QP`, `PQ`, and `PP` covariance
   blocks with their distinct physical dimensions.
+- Direct two-point covariance evolution on the shared cubic-Hermite background,
+  including coordinate-basis connection flow on both tensor indices and
+  all-block comparisons at subhorizon, horizon-exit, maximum-turn, and final
+  epochs.
 
 ### Changed
 

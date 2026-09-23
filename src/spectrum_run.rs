@@ -28,7 +28,8 @@ use crate::{
     ContravariantField, CovariantMultifieldSystem, CurvedFieldSpaceGeometry, KinematicBasisError,
     M0, Mass, ModeAcceleration, ModeAmplitude, ModeInitializationError, ModeVelocity,
     MultifieldState, MultifieldStateDelta, ScaleFactor, Time,
-    TwiceDifferentiableMultifieldPotential, TwoFieldKinematics, TwoFieldModes,
+    TwiceDifferentiableMultifieldPotential, TwoFieldBackgroundProvider, TwoFieldKinematics,
+    TwoFieldModes,
 };
 
 #[cfg(test)]
@@ -862,6 +863,12 @@ impl BackgroundTrajectory {
         }
 
         None
+    }
+}
+
+impl TwoFieldBackgroundProvider for BackgroundTrajectory {
+    fn state_at_e_folds(&self, e_folds: f64) -> MultifieldState<2> {
+        self.state_at(e_folds)
     }
 }
 
@@ -1960,7 +1967,9 @@ mod tests {
     use crate::{
         Field, FieldVelocity, FlatFieldSpace, HyperbolicFieldSpace, QuadraticMultifieldPotential,
         ScaleFactor, TwoFieldPerturbationState, TwoFieldPerturbationSystem,
-        TwoFieldPerturbationTolerance, multifield::MultifieldState,
+        TwoFieldPerturbationTolerance, TwoPointBlock, TwoPointPhaseSpaceCovariance,
+        TwoPointTransportSystem, multifield::MultifieldState, rk4_step,
+        two_point_covariance_from_mode_state,
     };
 
     type TestSystem = CovariantMultifieldSystem<QuadraticMultifieldPotential<2>, FlatFieldSpace, 2>;
@@ -2322,6 +2331,116 @@ mod tests {
         }
         assert!((optimized.c_rs - reference.c_rs).abs() < 1.0e-8);
         assert!((optimized_exit.c_rs - reference_exit.c_rs).abs() < 1.0e-8);
+    }
+
+    fn covariance_block_error<L, R, D: Copy>(
+        transported: &TwoPointBlock<L, R, D, Complex64, 2>,
+        oracle: &TwoPointBlock<L, R, D, Complex64, 2>,
+    ) -> f64 {
+        let scale = oracle
+            .components()
+            .iter()
+            .flatten()
+            .map(|component| component.value().norm())
+            .fold(0.0, f64::max)
+            .max(1.0e-300);
+
+        transported
+            .components()
+            .iter()
+            .flatten()
+            .zip(oracle.components().iter().flatten())
+            .map(|(transported, oracle)| (transported.value() - oracle.value()).norm() / scale)
+            .fold(0.0, f64::max)
+    }
+
+    fn covariance_error(
+        transported: &TwoPointPhaseSpaceCovariance<2>,
+        oracle: &TwoPointPhaseSpaceCovariance<2>,
+    ) -> f64 {
+        covariance_block_error(&transported.qq, &oracle.qq)
+            .max(covariance_block_error(&transported.qp, &oracle.qp))
+            .max(covariance_block_error(&transported.pq, &oracle.pq))
+            .max(covariance_block_error(&transported.pp, &oracle.pp))
+    }
+
+    #[test]
+    fn direct_two_point_transport_matches_every_mode_covariance_block() {
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let settings = quick_settings();
+        let (_, trajectory, e_folds_at_end) = system.survey_background(initial, &settings).unwrap();
+        let horizon = e_folds_at_end - settings.pivot_e_folds_before_end;
+        let output = e_folds_at_end - settings.output_e_folds_before_end;
+        let pivot_state = trajectory.state_at(horizon);
+        let k = pivot_state.a * system.hubble(&pivot_state);
+        let start = trajectory
+            .crossing(|state| {
+                (k / (state.a * system.hubble(state))).into_value() - start_depth(&settings)
+            })
+            .unwrap();
+        let turn = trajectory
+            .checkpoints
+            .iter()
+            .filter(|checkpoint| checkpoint.e_folds >= start && checkpoint.e_folds <= output)
+            .max_by(|left, right| {
+                let left_turn = system
+                    .kinematics(&left.state, None)
+                    .unwrap()
+                    .eta_perp
+                    .into_value()
+                    .abs();
+                let right_turn = system
+                    .kinematics(&right.state, None)
+                    .unwrap()
+                    .eta_perp
+                    .into_value()
+                    .abs();
+                left_turn.total_cmp(&right_turn)
+            })
+            .unwrap()
+            .e_folds;
+        let conformal_system = ConformalTwoFieldPerturbationSystem::new(system, k);
+        let start_background = trajectory.state_at(start);
+        let initialized = conformal_system
+            .bunch_davies_state(start_background, start_depth(&settings))
+            .unwrap();
+        let mode_system = InterpolatedModeSystem {
+            background: &system,
+            trajectory: &trajectory,
+            k,
+        };
+        let transport_system = TwoPointTransportSystem::new(&system, &trajectory, k);
+        let mut modes = ModesInEFolds(initialized.modes);
+        let mut covariance = two_point_covariance_from_mode_state(&system, &initialized.cosmic());
+        let mut e_folds = start;
+        let mut targets = vec![start, horizon, turn, output];
+        targets.sort_by(f64::total_cmp);
+        targets.dedup_by(|left, right| (*left - *right).abs() < 1.0e-12);
+
+        for target in targets {
+            while target - e_folds > 1.0e-13 {
+                let step = (target - e_folds).min(2.0e-3);
+                let dn = crate::Dimensionless::new(step);
+                modes = rk4_step(&mode_system, crate::Dimensionless::new(e_folds), &modes, dn);
+                covariance = rk4_step(
+                    &transport_system,
+                    crate::Dimensionless::new(e_folds),
+                    &covariance,
+                    dn,
+                );
+                e_folds += step;
+            }
+
+            let combined = ConformalTwoFieldPerturbationState {
+                background: ConformalBackgroundState::from_cosmic(trajectory.state_at(target)),
+                modes: modes.0,
+            };
+            let oracle = two_point_covariance_from_mode_state(&system, &combined.cosmic());
+            let error = covariance_error(&covariance, &oracle);
+
+            assert!(error < 2.0e-7, "N={target:e}, all-block error={error:e}");
+        }
     }
 
     #[test]

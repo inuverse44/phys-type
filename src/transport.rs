@@ -1,18 +1,21 @@
 //! Typed kinematics and correlation containers for phase-space transport.
 //!
-//! This module deliberately contains no transport dynamics yet. It separates
-//! Fourier legs, phase-space slots, field coordinates, and physical
-//! dimensions, and provides the linear mode solver's two-point oracle before
-//! nonlinear evolution is introduced.
+//! This module separates Fourier legs, phase-space slots, field coordinates,
+//! and physical dimensions. It provides the linear mode solver's two-point
+//! oracle and direct two-point covariance dynamics; nonlinear three-point
+//! evolution is not implemented yet.
 
 use core::fmt;
 use core::marker::PhantomData;
+use core::ops::{Add, Mul};
 
 use num_complex::Complex64;
 
+use crate::integrate::System;
 use crate::{
-    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Hubble, M0, M1, MMinus1, ModeAmplitude,
-    ModeVelocity, Quantity, TwiceDifferentiableMultifieldPotential, TwoFieldPerturbationState,
+    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, Hubble, M0, M1, MMinus1,
+    Mass, ModeAmplitude, ModeVelocity, MultifieldState, Quantity,
+    TwiceDifferentiableMultifieldPotential, TwoFieldPerturbationState,
 };
 
 /// Default relative tolerance for numerical triangle closure.
@@ -421,6 +424,225 @@ pub struct TwoPointPhaseSpaceCovariance<const N: usize> {
     pub pq: TwoPointBlock<MomentumPerturbation, FieldPerturbation, M0, Complex64, N>,
     /// `Sigma_PP^{IJ} = <P^I P^{J*}>`.
     pub pp: TwoPointBlock<MomentumPerturbation, MomentumPerturbation, M1, Complex64, N>,
+}
+
+impl<const N: usize> Add for TwoPointPhaseSpaceCovariance<N> {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            qq: add_two_point_blocks(self.qq, rhs.qq),
+            qp: add_two_point_blocks(self.qp, rhs.qp),
+            pq: add_two_point_blocks(self.pq, rhs.pq),
+            pp: add_two_point_blocks(self.pp, rhs.pp),
+        }
+    }
+}
+
+impl<const N: usize> Mul<f64> for TwoPointPhaseSpaceCovariance<N> {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self {
+            qq: scale_two_point_block(self.qq, rhs),
+            qp: scale_two_point_block(self.qp, rhs),
+            pq: scale_two_point_block(self.pq, rhs),
+            pp: scale_two_point_block(self.pp, rhs),
+        }
+    }
+}
+
+impl<const N: usize> Mul<Dimensionless> for TwoPointPhaseSpaceCovariance<N> {
+    type Output = Self;
+
+    fn mul(self, rhs: Dimensionless) -> Self::Output {
+        self * rhs.into_value()
+    }
+}
+
+fn add_two_point_blocks<L, R, D: Copy, const N: usize>(
+    lhs: TwoPointBlock<L, R, D, Complex64, N>,
+    rhs: TwoPointBlock<L, R, D, Complex64, N>,
+) -> TwoPointBlock<L, R, D, Complex64, N> {
+    TwoPointBlock::new(core::array::from_fn(|left| {
+        core::array::from_fn(|right| lhs.components[left][right] + rhs.components[left][right])
+    }))
+}
+
+fn scale_two_point_block<L, R, D: Copy, const N: usize>(
+    block: TwoPointBlock<L, R, D, Complex64, N>,
+    scale: f64,
+) -> TwoPointBlock<L, R, D, Complex64, N> {
+    TwoPointBlock::new(
+        block
+            .components
+            .map(|row| row.map(|component| component * scale)),
+    )
+}
+
+/// Supplies the immutable P2 background trajectory to transport systems.
+pub trait TwoFieldBackgroundProvider {
+    /// Interpolates the background at elapsed e-fold `N`.
+    fn state_at_e_folds(&self, e_folds: f64) -> MultifieldState<2>;
+}
+
+/// Direct two-point phase-space transport on an immutable background.
+///
+/// The state is the covariance itself; no linear mode matrix is retained or
+/// consulted after the initial covariance has been constructed.
+pub struct TwoPointTransportSystem<'a, P, G, B> {
+    background: &'a CovariantMultifieldSystem<P, G, 2>,
+    trajectory: &'a B,
+    k: Mass,
+}
+
+impl<'a, P, G, B> TwoPointTransportSystem<'a, P, G, B> {
+    /// Builds a direct covariance system for one comoving wavenumber.
+    pub const fn new(
+        background: &'a CovariantMultifieldSystem<P, G, 2>,
+        trajectory: &'a B,
+        k: Mass,
+    ) -> Self {
+        Self {
+            background,
+            trajectory,
+            k,
+        }
+    }
+}
+
+impl<P, G, B> System for TwoPointTransportSystem<'_, P, G, B>
+where
+    P: TwiceDifferentiableMultifieldPotential<2>,
+    G: CurvedFieldSpaceGeometry<2>,
+    B: TwoFieldBackgroundProvider,
+{
+    type IndependentVariable = Dimensionless;
+    type State = TwoPointPhaseSpaceCovariance<2>;
+    type Delta = TwoPointPhaseSpaceCovariance<2>;
+    type Derivative = TwoPointPhaseSpaceCovariance<2>;
+
+    fn derivative(&self, e_folds: Dimensionless, state: &Self::State) -> Self::Derivative {
+        let background = self.trajectory.state_at_e_folds(e_folds.into_value());
+        let hubble = self.background.hubble(&background).into_value();
+        let connection = self.background.geometry.christoffel(&background.phi);
+        let mass = self.background.perturbation_mass_matrix(&background);
+        let physical_wavenumber = (self.k / background.a).into_value();
+        let restoring: [[f64; 2]; 2] = core::array::from_fn(|upper| {
+            core::array::from_fn(|lower| {
+                mass.components()[upper][lower].value()
+                    + f64::from(upper == lower) * physical_wavenumber.powi(2)
+            })
+        });
+        let connection_flow: [[f64; 2]; 2] = core::array::from_fn(|upper| {
+            core::array::from_fn(|lower| {
+                (0..2)
+                    .map(|velocity| {
+                        connection.components()[upper][velocity][lower].value()
+                            * background.pi[velocity].value()
+                            / hubble
+                    })
+                    .sum()
+            })
+        });
+
+        let qq = TwoPointBlock::new(core::array::from_fn(|left| {
+            core::array::from_fn(|right| {
+                let connection_terms: Complex64 = (0..2)
+                    .map(|contracted| {
+                        connection_flow[left][contracted]
+                            * state.qq.components()[contracted][right].value()
+                            + connection_flow[right][contracted]
+                                * state.qq.components()[left][contracted].value()
+                    })
+                    .sum();
+                Quantity::new(
+                    (state.pq.components()[left][right].value()
+                        + state.qp.components()[left][right].value())
+                        / hubble
+                        - connection_terms,
+                )
+            })
+        }));
+        let qp = TwoPointBlock::new(core::array::from_fn(|left| {
+            core::array::from_fn(|right| {
+                let (restoring_term, connection_term) = (0..2).fold(
+                    (Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)),
+                    |(restoring_term, connection_term), index| {
+                        (
+                            restoring_term
+                                + restoring[right][index]
+                                    * state.qq.components()[left][index].value(),
+                            connection_term
+                                + connection_flow[left][index]
+                                    * state.qp.components()[index][right].value()
+                                + connection_flow[right][index]
+                                    * state.qp.components()[left][index].value(),
+                        )
+                    },
+                );
+                Quantity::new(
+                    state.pp.components()[left][right].value() / hubble
+                        - state.qp.components()[left][right].value() * 3.0
+                        - restoring_term / hubble
+                        - connection_term,
+                )
+            })
+        }));
+        let pq = TwoPointBlock::new(core::array::from_fn(|left| {
+            core::array::from_fn(|right| {
+                let (restoring_term, connection_term) = (0..2).fold(
+                    (Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)),
+                    |(restoring_term, connection_term), index| {
+                        (
+                            restoring_term
+                                + restoring[left][index]
+                                    * state.qq.components()[index][right].value(),
+                            connection_term
+                                + connection_flow[left][index]
+                                    * state.pq.components()[index][right].value()
+                                + connection_flow[right][index]
+                                    * state.pq.components()[left][index].value(),
+                        )
+                    },
+                );
+                Quantity::new(
+                    state.pp.components()[left][right].value() / hubble
+                        - state.pq.components()[left][right].value() * 3.0
+                        - restoring_term / hubble
+                        - connection_term,
+                )
+            })
+        }));
+        let pp = TwoPointBlock::new(core::array::from_fn(|left| {
+            core::array::from_fn(|right| {
+                let (restoring_term, connection_term) = (0..2).fold(
+                    (Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)),
+                    |(restoring_term, connection_term), index| {
+                        (
+                            restoring_term
+                                + restoring[left][index]
+                                    * state.qp.components()[index][right].value()
+                                + restoring[right][index]
+                                    * state.pq.components()[left][index].value(),
+                            connection_term
+                                + connection_flow[left][index]
+                                    * state.pp.components()[index][right].value()
+                                + connection_flow[right][index]
+                                    * state.pp.components()[left][index].value(),
+                        )
+                    },
+                );
+                Quantity::new(
+                    -state.pp.components()[left][right].value() * 6.0
+                        - restoring_term / hubble
+                        - connection_term,
+                )
+            })
+        }));
+
+        TwoPointPhaseSpaceCovariance { qq, qp, pq, pp }
+    }
 }
 
 /// Builds every phase-space covariance block from the existing linear mode

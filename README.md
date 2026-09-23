@@ -193,8 +193,9 @@ rank-five `nabla_M R^I_JKL` capability needed by cubic transport.
 
 The transport layer fixes `X^a = (Q^I, P^I)` with `P^I = D_t Q^I` and can
 convert a complete linear mode-solver state into dimensioned complex `QQ`,
-`QP`, `PQ`, and `PP` oracle blocks. Direct covariance evolution is the next
-P3c step.
+`QP`, `PQ`, and `PP` oracle blocks. `TwoPointTransportSystem` evolves those
+blocks directly on the shared interpolated background and is regression-tested
+against the mode oracle at four physical epochs.
 
 `CovariantMultifieldSystem<P, G, N>` accepts a `FieldSpaceGeometry<N>` that
 supplies `G_IJ`, `G^IJ`, and `Gamma^I_JK`. `FlatFieldSpace` exactly reproduces

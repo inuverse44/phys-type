@@ -250,8 +250,12 @@ mode/background state. Bunch--Davies closed forms and the identities
 `QQ = QQ^dagger`, `PP = PP^dagger`, and `PQ = QP^dagger` are tested.
 
 The detailed conversion and remaining acceptance stages are specified in
-[`two-point-transport-oracle.md`](two-point-transport-oracle.md). Direct
-covariance evolution and multi-epoch agreement remain before P3c is complete.
+[`two-point-transport-oracle.md`](two-point-transport-oracle.md).
+`TwoPointTransportSystem` now evolves the covariance directly on the same P2
+background interpolation used by the mode solver, with no mode matrix in its
+state. All four blocks agree at subhorizon, horizon-exit, maximum-turn, and
+final epochs within the declared `2e-7` regression bound. Adaptive-tolerance
+and initialization-depth convergence remain before P3c is complete.
 
 ## Acceptance boundary
 
