@@ -2,12 +2,18 @@
 //!
 //! This module deliberately contains no transport dynamics yet. It separates
 //! Fourier legs, phase-space slots, field coordinates, and physical
-//! dimensions before nonlinear evolution is introduced.
+//! dimensions, and provides the linear mode solver's two-point oracle before
+//! nonlinear evolution is introduced.
 
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::Quantity;
+use num_complex::Complex64;
+
+use crate::{
+    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Hubble, M0, M1, MMinus1, ModeAmplitude,
+    ModeVelocity, Quantity, TwiceDifferentiableMultifieldPotential, TwoFieldPerturbationState,
+};
 
 /// Default relative tolerance for numerical triangle closure.
 pub const DEFAULT_TRIANGLE_CLOSURE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
@@ -388,6 +394,103 @@ impl<L, R, D, V, const N: usize> TwoPointBlock<L, R, D, V, N> {
     }
 }
 
+impl<L, R, D, const N: usize> TwoPointBlock<L, R, D, Complex64, N> {
+    /// Conjugate-transposes field coordinates and swaps the typed slots.
+    pub fn adjoint(self) -> TwoPointBlock<R, L, D, Complex64, N>
+    where
+        D: Copy,
+    {
+        TwoPointBlock::new(core::array::from_fn(|left| {
+            core::array::from_fn(|right| Quantity::new(self.components[right][left].value().conj()))
+        }))
+    }
+}
+
+/// The complete equal-time covariance for `X^a = (Q^I, P^I)`.
+///
+/// The P3c convention is `Q^I = U^I` and `P^I = D_t U^I`, where the existing
+/// linear solver integrates `v^I = a U^I`. The four blocks therefore have
+/// dimensions `M^-1`, `M^0`, `M^0`, and `M^1`, respectively.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TwoPointPhaseSpaceCovariance<const N: usize> {
+    /// `Sigma_QQ^{IJ} = <Q^I Q^{J*}>`.
+    pub qq: TwoPointBlock<FieldPerturbation, FieldPerturbation, MMinus1, Complex64, N>,
+    /// `Sigma_QP^{IJ} = <Q^I P^{J*}>`.
+    pub qp: TwoPointBlock<FieldPerturbation, MomentumPerturbation, M0, Complex64, N>,
+    /// `Sigma_PQ^{IJ} = <P^I Q^{J*}>`.
+    pub pq: TwoPointBlock<MomentumPerturbation, FieldPerturbation, M0, Complex64, N>,
+    /// `Sigma_PP^{IJ} = <P^I P^{J*}>`.
+    pub pp: TwoPointBlock<MomentumPerturbation, MomentumPerturbation, M1, Complex64, N>,
+}
+
+/// Builds every phase-space covariance block from the existing linear mode
+/// matrix at one background state.
+///
+/// The supplied system computes `H` from the same state, preventing a mode
+/// matrix from being paired with a Hubble value from a different epoch.
+pub fn two_point_covariance_from_mode_state<P, G>(
+    system: &CovariantMultifieldSystem<P, G, 2>,
+    state: &TwoFieldPerturbationState,
+) -> TwoPointPhaseSpaceCovariance<2>
+where
+    P: TwiceDifferentiableMultifieldPotential<2>,
+    G: CurvedFieldSpaceGeometry<2>,
+{
+    let hubble = system.hubble(&state.background);
+    phase_space_covariance(&state.modes, state.background.a.into_value(), hubble)
+}
+
+fn phase_space_covariance(
+    modes: &crate::TwoFieldModes,
+    scale_factor: f64,
+    hubble: Hubble,
+) -> TwoPointPhaseSpaceCovariance<2> {
+    let q: [[ModeAmplitude; 2]; 2] = modes
+        .rescaled_amplitude
+        .map(|row| row.map(|entry| entry / scale_factor));
+    let p: [[ModeVelocity; 2]; 2] = core::array::from_fn(|field| {
+        core::array::from_fn(|mode| {
+            ModeVelocity::new(
+                (modes.rescaled_velocity[field][mode]
+                    - modes.rescaled_amplitude[field][mode] * hubble)
+                    .into_value()
+                    / scale_factor,
+            )
+        })
+    });
+
+    let qq = TwoPointBlock::new(core::array::from_fn(|left| {
+        core::array::from_fn(|right| {
+            (0..2).fold(Quantity::new(Complex64::new(0.0, 0.0)), |sum, mode| {
+                sum + q[left][mode] * ModeAmplitude::new(q[right][mode].value().conj())
+            })
+        })
+    }));
+    let qp = TwoPointBlock::new(core::array::from_fn(|left| {
+        core::array::from_fn(|right| {
+            (0..2).fold(Quantity::new(Complex64::new(0.0, 0.0)), |sum, mode| {
+                sum + q[left][mode] * ModeVelocity::new(p[right][mode].value().conj())
+            })
+        })
+    }));
+    let pq = TwoPointBlock::new(core::array::from_fn(|left| {
+        core::array::from_fn(|right| {
+            (0..2).fold(Quantity::new(Complex64::new(0.0, 0.0)), |sum, mode| {
+                sum + p[left][mode] * ModeAmplitude::new(q[right][mode].value().conj())
+            })
+        })
+    }));
+    let pp = TwoPointBlock::new(core::array::from_fn(|left| {
+        core::array::from_fn(|right| {
+            (0..2).fold(Quantity::new(Complex64::new(0.0, 0.0)), |sum, mode| {
+                sum + p[left][mode] * ModeVelocity::new(p[right][mode].value().conj())
+            })
+        })
+    }));
+
+    TwoPointPhaseSpaceCovariance { qq, qp, pq, pp }
+}
+
 /// A dimensioned three-point block with one typed slot per Fourier leg.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ThreePointBlock<A, B, C, D, V, const N: usize> {
@@ -437,7 +540,10 @@ impl<A, B, C, D, V, const N: usize> ThreePointBlock<A, B, C, D, V, N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::M0;
+    use crate::{
+        Field, FieldVelocity, FlatFieldSpace, M0, Mass, MultifieldState,
+        QuadraticMultifieldPotential, ScaleFactor, TwoFieldPerturbationSystem,
+    };
 
     #[test]
     fn triangle_canonicalizes_scale_shape_and_leg_data() {
@@ -507,6 +613,71 @@ mod tests {
 
         assert_eq!(transposed.components()[0][1].into_value(), 3.0);
         assert_eq!(transposed.components()[1][0].into_value(), 2.0);
+    }
+
+    #[test]
+    fn complex_two_point_adjoint_conjugates_and_swaps_slots() {
+        let block =
+            TwoPointBlock::<FieldPerturbation, MomentumPerturbation, M0, Complex64, 2>::new([
+                [
+                    Quantity::new(Complex64::new(1.0, 2.0)),
+                    Quantity::new(Complex64::new(3.0, 4.0)),
+                ],
+                [
+                    Quantity::new(Complex64::new(5.0, 6.0)),
+                    Quantity::new(Complex64::new(7.0, 8.0)),
+                ],
+            ]);
+        let adjoint: TwoPointBlock<MomentumPerturbation, FieldPerturbation, M0, Complex64, 2> =
+            block.adjoint();
+
+        assert_eq!(
+            adjoint.components()[0][1].into_value(),
+            Complex64::new(5.0, -6.0)
+        );
+        assert_eq!(
+            adjoint.components()[1][0].into_value(),
+            Complex64::new(3.0, -4.0)
+        );
+    }
+
+    #[test]
+    fn mode_oracle_builds_all_bunch_davies_phase_space_blocks() {
+        let background_system = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0e-6), Mass::new(2.0e-6)]),
+            FlatFieldSpace,
+        );
+        let k = Mass::new(1.0e-2);
+        let mode_system = TwoFieldPerturbationSystem::new(background_system, k);
+        let background = MultifieldState::new(
+            [Field::new(12.0), Field::new(8.0)],
+            [FieldVelocity::new(-3.0e-6), FieldVelocity::new(-4.0e-6)],
+            ScaleFactor::new(1.0),
+        );
+        let state = mode_system.bunch_davies_state(background, 10.0).unwrap();
+        let covariance = two_point_covariance_from_mode_state(&mode_system.background, &state);
+        let hubble = mode_system.background.hubble(&background).into_value();
+        let frequency = (k / background.a).into_value();
+        let qq_diagonal = 1.0 / (2.0 * k.into_value() * background.a.into_value().powi(2));
+
+        assert_eq!(covariance.qq, covariance.qq.adjoint());
+        assert_eq!(covariance.pp, covariance.pp.adjoint());
+        assert_eq!(covariance.pq, covariance.qp.adjoint());
+
+        for field in 0..2 {
+            let qq = covariance.qq.components()[field][field].into_value();
+            let qp = covariance.qp.components()[field][field].into_value();
+            let pp = covariance.pp.components()[field][field].into_value();
+
+            assert!((qq.re - qq_diagonal).abs() < 1.0e-12);
+            assert!(qq.im.abs() < 1.0e-12);
+            assert!((qp - Complex64::new(-hubble, frequency) * qq).norm() < 1.0e-12);
+            assert!(
+                (pp.re - (hubble * hubble + frequency * frequency) * qq_diagonal).abs() < 1.0e-12
+            );
+            assert!(pp.im.abs() < 1.0e-12);
+        }
+        assert!(covariance.qq.components()[0][1].value().norm() < 1.0e-12);
     }
 
     #[test]

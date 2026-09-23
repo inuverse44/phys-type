@@ -29,6 +29,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Gamma^I_JK`, fully symmetrized `V_;(IJK)`, and a typed rank-five
   `nabla_M R^I_JKL` capability. Flat and hyperbolic built-in geometries provide
   analytic implementations.
+- A documented two-point transport convention `X = (Q, D_t Q)` and a typed
+  mode-solver oracle producing complex `QQ`, `QP`, `PQ`, and `PP` covariance
+  blocks with their distinct physical dimensions.
 
 ### Changed
 
