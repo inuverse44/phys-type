@@ -241,7 +241,7 @@ tests. P3c is the next milestone.
 
 ### P3c implementation status
 
-P3c is in progress. The convention is fixed to `Q^I = U^I` and
+P3c is complete. The convention is fixed to `Q^I = U^I` and
 `P^I = D_t U^I`; `P` is neither a conformal derivative nor an `a^3`-weighted
 canonical momentum. `TwoPointPhaseSpaceCovariance` carries dimensioned complex
 `QQ`, `QP`, `PQ`, and `PP` blocks, and
@@ -255,7 +255,11 @@ The detailed conversion and remaining acceptance stages are specified in
 background interpolation used by the mode solver, with no mode matrix in its
 state. All four blocks agree at subhorizon, horizon-exit, maximum-turn, and
 final epochs within the declared `2e-7` regression bound. Adaptive-tolerance
-and initialization-depth convergence remain before P3c is complete.
+control preserves the physical dimension of every block; tightening the
+relative tolerance from `1e-7` to `1e-10` changes the final covariance by less
+than `2e-6`. Starts at 3, 4, and 5 e-folds before exit show successively
+smaller differences, with each refinement shrinking by more than a factor of
+two. P3d is the next milestone.
 
 ## Acceptance boundary
 

@@ -87,7 +87,7 @@ pub use transport::{
     MomentumPerturbation, MomentumTriangle, MomentumTriangleError, PhaseSpaceIndex,
     PhaseSpaceIndexError, PhaseSpaceSlot, PhaseSpaceSlotKind, ThreePointBlock,
     TwoFieldBackgroundProvider, TwoPointBlock, TwoPointPhaseSpaceCovariance,
-    TwoPointTransportSystem, two_point_covariance_from_mode_state,
+    TwoPointTransportSystem, TwoPointTransportTolerance, two_point_covariance_from_mode_state,
 };
 
 /// A dimensionless quantity, such as the scale factor.

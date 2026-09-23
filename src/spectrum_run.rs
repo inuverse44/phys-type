@@ -1968,7 +1968,7 @@ mod tests {
         Field, FieldVelocity, FlatFieldSpace, HyperbolicFieldSpace, QuadraticMultifieldPotential,
         ScaleFactor, TwoFieldPerturbationState, TwoFieldPerturbationSystem,
         TwoFieldPerturbationTolerance, TwoPointBlock, TwoPointPhaseSpaceCovariance,
-        TwoPointTransportSystem, multifield::MultifieldState, rk4_step,
+        TwoPointTransportSystem, TwoPointTransportTolerance, multifield::MultifieldState, rk4_step,
         two_point_covariance_from_mode_state,
     };
 
@@ -2364,6 +2364,58 @@ mod tests {
             .max(covariance_block_error(&transported.pp, &oracle.pp))
     }
 
+    fn direct_transport_output(
+        system: &TestSystem,
+        trajectory: &BackgroundTrajectory,
+        k: Mass,
+        output: f64,
+        e_folds_before_exit: f64,
+        relative_tolerance: f64,
+    ) -> TwoPointPhaseSpaceCovariance<2> {
+        let depth = e_folds_before_exit.exp();
+        let start = trajectory
+            .crossing(|state| (k / (state.a * system.hubble(state))).into_value() - depth)
+            .unwrap();
+        let start_background = trajectory.state_at(start);
+        let initialized = ConformalTwoFieldPerturbationSystem::new(*system, k)
+            .bunch_davies_state(start_background, depth)
+            .unwrap();
+        let transport = TwoPointTransportSystem::new(system, trajectory, k);
+        let tolerances = ErrorTolerances::new(
+            TwoPointTransportTolerance::pure_relative(),
+            relative_tolerance,
+        );
+        let limits = StepSizeLimits {
+            min: crate::Dimensionless::new(1.0e-8),
+            max: crate::Dimensionless::new(5.0e-2),
+        };
+        let mut covariance = two_point_covariance_from_mode_state(system, &initialized.cosmic());
+        let mut e_folds = start;
+        let mut step: crate::Dimensionless = crate::Dimensionless::new(1.0e-3);
+
+        for _ in 0..1_000_000 {
+            let remaining = output - e_folds;
+            if remaining <= 1.0e-13 {
+                return covariance;
+            }
+            let attempted = crate::Dimensionless::new(step.into_value().min(remaining));
+            let outcome = adaptive_step(
+                &transport,
+                crate::Dimensionless::new(e_folds),
+                &covariance,
+                attempted,
+                &tolerances,
+            );
+            if outcome.accepted {
+                covariance = outcome.state;
+                e_folds += attempted.into_value();
+            }
+            step = next_step_size(attempted, outcome.error_ratio, &limits);
+        }
+
+        panic!("direct two-point transport exceeded its adaptive step limit")
+    }
+
     #[test]
     fn direct_two_point_transport_matches_every_mode_covariance_block() {
         let system = system([1.0e-6, 1.5e-6]);
@@ -2441,6 +2493,44 @@ mod tests {
 
             assert!(error < 2.0e-7, "N={target:e}, all-block error={error:e}");
         }
+    }
+
+    #[test]
+    fn direct_two_point_transport_converges_with_tighter_tolerance() {
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let settings = quick_settings();
+        let (_, trajectory, e_folds_at_end) = system.survey_background(initial, &settings).unwrap();
+        let horizon = e_folds_at_end - settings.pivot_e_folds_before_end;
+        let output = e_folds_at_end - settings.output_e_folds_before_end;
+        let pivot_state = trajectory.state_at(horizon);
+        let k = pivot_state.a * system.hubble(&pivot_state);
+
+        let loose = direct_transport_output(&system, &trajectory, k, output, 3.0, 1.0e-7);
+        let tight = direct_transport_output(&system, &trajectory, k, output, 3.0, 1.0e-10);
+
+        assert!(covariance_error(&loose, &tight) < 2.0e-6);
+    }
+
+    #[test]
+    fn direct_two_point_transport_converges_from_deeper_bunch_davies_starts() {
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let settings = quick_settings();
+        let (_, trajectory, e_folds_at_end) = system.survey_background(initial, &settings).unwrap();
+        let horizon = e_folds_at_end - settings.pivot_e_folds_before_end;
+        let output = e_folds_at_end - settings.output_e_folds_before_end;
+        let pivot_state = trajectory.state_at(horizon);
+        let k = pivot_state.a * system.hubble(&pivot_state);
+        let run = |depth| direct_transport_output(&system, &trajectory, k, output, depth, 1.0e-10);
+
+        let coarse = run(3.0);
+        let medium = run(4.0);
+        let fine = run(5.0);
+        let first = covariance_error(&coarse, &medium);
+        let second = covariance_error(&medium, &fine);
+
+        assert!(second < 0.5 * first, "{first:e} then {second:e}");
     }
 
     #[test]

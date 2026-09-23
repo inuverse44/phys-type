@@ -11,7 +11,7 @@ use core::ops::{Add, Mul};
 
 use num_complex::Complex64;
 
-use crate::integrate::System;
+use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
 use crate::{
     CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, Hubble, M0, M1, MMinus1,
     Mass, ModeAmplitude, ModeVelocity, MultifieldState, Quantity,
@@ -496,6 +496,35 @@ pub struct TwoPointTransportSystem<'a, P, G, B> {
     k: Mass,
 }
 
+/// Absolute error floors for direct two-point covariance evolution.
+///
+/// Each block retains its own physical dimension. Zero floors select pure
+/// relative control, which is appropriate while the complete block norm is
+/// nonzero.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TwoPointTransportTolerance {
+    /// Absolute tolerance for the `QQ` block.
+    pub qq: Quantity<MMinus1, f64>,
+    /// Absolute tolerance for the `QP` block.
+    pub qp: Quantity<M0, f64>,
+    /// Absolute tolerance for the `PQ` block.
+    pub pq: Quantity<M0, f64>,
+    /// Absolute tolerance for the `PP` block.
+    pub pp: Quantity<M1, f64>,
+}
+
+impl TwoPointTransportTolerance {
+    /// Uses pure relative control for every block.
+    pub const fn pure_relative() -> Self {
+        Self {
+            qq: Quantity::new(0.0),
+            qp: Quantity::new(0.0),
+            pq: Quantity::new(0.0),
+            pp: Quantity::new(0.0),
+        }
+    }
+}
+
 impl<'a, P, G, B> TwoPointTransportSystem<'a, P, G, B> {
     /// Builds a direct covariance system for one comoving wavenumber.
     pub const fn new(
@@ -643,6 +672,89 @@ where
 
         TwoPointPhaseSpaceCovariance { qq, qp, pq, pp }
     }
+}
+
+impl<P, G, B> AdaptiveSystem for TwoPointTransportSystem<'_, P, G, B>
+where
+    P: TwiceDifferentiableMultifieldPotential<2>,
+    G: CurvedFieldSpaceGeometry<2>,
+    B: TwoFieldBackgroundProvider,
+{
+    type AbsoluteTolerance = TwoPointTransportTolerance;
+
+    fn error_ratio(
+        &self,
+        current: &Self::State,
+        next: &Self::State,
+        error: &Self::Delta,
+        tolerances: &ErrorTolerances<Self::AbsoluteTolerance>,
+    ) -> f64 {
+        covariance_block_error_ratio(
+            &current.qq,
+            &next.qq,
+            &error.qq,
+            tolerances.absolute.qq,
+            tolerances.relative,
+        )
+        .max(covariance_block_error_ratio(
+            &current.qp,
+            &next.qp,
+            &error.qp,
+            tolerances.absolute.qp,
+            tolerances.relative,
+        ))
+        .max(covariance_block_error_ratio(
+            &current.pq,
+            &next.pq,
+            &error.pq,
+            tolerances.absolute.pq,
+            tolerances.relative,
+        ))
+        .max(covariance_block_error_ratio(
+            &current.pp,
+            &next.pp,
+            &error.pp,
+            tolerances.absolute.pp,
+            tolerances.relative,
+        ))
+    }
+}
+
+fn covariance_block_error_ratio<L, R, D: Copy>(
+    current: &TwoPointBlock<L, R, D, Complex64, 2>,
+    next: &TwoPointBlock<L, R, D, Complex64, 2>,
+    error: &TwoPointBlock<L, R, D, Complex64, 2>,
+    absolute: Quantity<D, f64>,
+    relative: f64,
+) -> f64 {
+    let reference = current
+        .components()
+        .iter()
+        .chain(next.components().iter())
+        .flatten()
+        .map(|component| component.value().norm())
+        .fold(0.0, f64::max);
+    let scale = absolute.into_value() + relative * reference;
+
+    if scale == 0.0 {
+        return if error
+            .components()
+            .iter()
+            .flatten()
+            .all(|component| component.value().norm() == 0.0)
+        {
+            0.0
+        } else {
+            f64::INFINITY
+        };
+    }
+
+    error
+        .components()
+        .iter()
+        .flatten()
+        .map(|component| component.value().norm() / scale)
+        .fold(0.0, f64::max)
 }
 
 /// Builds every phase-space covariance block from the existing linear mode
