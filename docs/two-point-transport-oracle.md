@@ -62,11 +62,29 @@ the quantum commutator information carried by the mixed blocks.
 1. Convert one complete mode-solver state into all four typed blocks and test
    the Bunch--Davies closed form. **Complete.**
 2. Implement direct covariance evolution on the shared interpolated P2
-   background, without evolving or consulting a mode matrix.
+   background, without evolving or consulting a mode matrix. **Complete.**
 3. Compare every complex component of `QQ`, `QP`, `PQ`, and `PP` against mode
    snapshots in the subhorizon regime, at horizon exit, through the sharpest
-   turn, and on the final slice.
+   turn, and on the final slice. **Complete for the reference benchmark:** a
+   shared fixed-step RK4 comparison bounds the maximum block-normalized error
+   by `2e-7` at all four epochs.
 4. Require convergence under tighter integration tolerance and deeper
    Bunch--Davies initialization before marking P3c complete.
 
 P3d cannot begin until steps 2--4 pass with declared numerical tolerances.
+
+## Direct evolution equation
+
+`TwoPointTransportSystem` evolves the covariance itself in elapsed e-folds.
+For `A^I_J = C^I_J + (k/a)^2 delta^I_J`, the mode-level equations are
+
+```text
+D_N Q^I = P^I / H,
+D_N P^I = -3 P^I - A^I_J Q^J / H.
+```
+
+The implementation expands `D_N` into coordinate derivatives and applies the
+connection flow `Gamma^I_JK pi^J/H` to both field-space indices of every
+covariance block. It receives the background only through
+`TwoFieldBackgroundProvider`; the P2 cubic-Hermite trajectory implements this
+interface and is queried at every Runge--Kutta stage.

@@ -85,8 +85,9 @@ pub use time::ConformalTime;
 pub use transport::{
     AnyPhaseSpaceIndex, DEFAULT_TRIANGLE_CLOSURE_TOLERANCE, FieldPerturbation, FourierLeg,
     MomentumPerturbation, MomentumTriangle, MomentumTriangleError, PhaseSpaceIndex,
-    PhaseSpaceIndexError, PhaseSpaceSlot, PhaseSpaceSlotKind, ThreePointBlock, TwoPointBlock,
-    TwoPointPhaseSpaceCovariance, two_point_covariance_from_mode_state,
+    PhaseSpaceIndexError, PhaseSpaceSlot, PhaseSpaceSlotKind, ThreePointBlock,
+    TwoFieldBackgroundProvider, TwoPointBlock, TwoPointPhaseSpaceCovariance,
+    TwoPointTransportSystem, two_point_covariance_from_mode_state,
 };
 
 /// A dimensionless quantity, such as the scale factor.
