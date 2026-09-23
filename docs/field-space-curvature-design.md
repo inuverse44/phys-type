@@ -28,46 +28,46 @@ of Riemann.
 
 ## Conventions
 
-Scalar coordinates have physical dimension `M^1`. Therefore a field-space
-coordinate derivative has dimension `M^-1`. The initial convention table is:
+Scalar coordinates have physical dimension $M^1$. Therefore a field-space
+coordinate derivative has dimension $M^{-1}$. The convention table is:
 
 | Object | Index form | Physical dimension | Tensor? |
 | --- | --- | --- | --- |
-| field velocity | `dot(phi)^I` | `M^2` | yes |
-| metric | `G_IJ` | `M^0` | yes |
-| inverse metric | `G^IJ` | `M^0` | yes |
-| metric derivative | `partial_K G_IJ` | `M^-1` | no |
-| connection | `Gamma^I_JK` | `M^-1` | no |
-| Riemann curvature | `R^I_JKL` | `M^-2` | yes |
-| covariant Riemann derivative | `nabla_M R^I_JKL` | `M^-3` | yes |
-| potential Hessian | `V_;IJ` | `M^2` | yes |
-| symmetrized third potential derivative | `V_;(IJK)` | `M^1` | yes |
+| field velocity | $\dot\phi^I$ | $M^2$ | yes |
+| metric | $G_{IJ}$ | $M^0$ | yes |
+| inverse metric | $G^{IJ}$ | $M^0$ | yes |
+| metric derivative | $\partial_KG_{IJ}$ | $M^{-1}$ | no |
+| connection | $\Gamma^I{}_{JK}$ | $M^{-1}$ | no |
+| Riemann curvature | $R^I{}_{JKL}$ | $M^{-2}$ | yes |
+| covariant Riemann derivative | $\nabla_MR^I{}_{JKL}$ | $M^{-3}$ | yes |
+| potential Hessian | $V_{;IJ}$ | $M^2$ | yes |
+| symmetrized third potential derivative | $V_{;(IJK)}$ | $M^1$ | yes |
 
 The Riemann sign and index order are fixed by
 
-```math
+$$
 [\nabla_K,\nabla_L]A^I = R^I{}_{JKL}A^J
-```
+$$
 
 and
 
-```math
+$$
 R^I{}_{JKL}
 =\partial_K\Gamma^I{}_{LJ}-\partial_L\Gamma^I{}_{KJ}
 +\Gamma^I{}_{KM}\Gamma^M{}_{LJ}
 -\Gamma^I{}_{LM}\Gamma^M{}_{KJ}.
-```
+$$
 
 This convention is used directly in the perturbation mass matrix. A geometry
 implementation using the opposite convention must convert at its boundary.
 
 For the all-lower form, the Levi-Civita symmetries are
 
-```math
+$$
 R_{IJKL}=-R_{JIKL}=-R_{IJLK}=R_{KLIJ},
 \qquad
 R_{I[JKL]}=0.
-```
+$$
 
 ## Public type model
 
@@ -78,19 +78,20 @@ FieldVector<I, D, V, N>
 FieldTensor2<I, J, D, V, N>
 ```
 
-The next implementation adds explicit fixed-rank types:
+The implementation provides explicit fixed-rank types:
 
 ```rust,ignore
 FieldTensor3<I, J, K, D, V, N>
 FieldTensor4<I, J, K, L, D, V, N>
+FieldTensor5<I, J, K, L, M, D, V, N>
 ```
 
-`I` through `L` are `Upper` or `Lower`, `D` is physical dimension, `V` is
+The index markers are `Upper` or `Lower`, `D` is physical dimension, `V` is
 the stored number, and `N` is the field count. Explicit rank types are chosen
 over a recursive type-level index list because they produce substantially
 shorter compiler diagnostics on stable Rust.
 
-Rank-three and rank-four components are initially stored densely. Multifield
+Rank-three through rank-five components are stored densely. Multifield
 inflation normally has small `N`, and dense storage makes index order,
 validation, and interoperability auditable. Symmetry compression can be added
 later behind the same public semantic wrappers if profiling justifies it.
@@ -126,8 +127,9 @@ equivalent to
 riemann.contract_velocities(&velocity)
 ```
 
-to form `R^I_LMJ dot(phi)^L dot(phi)^M`, returning a rank-two mixed tensor of
-dimension `M^2`. It should not reproduce four nested loops at each call site.
+to form $R^I{}_{LMJ}\dot\phi^L\dot\phi^M$, returning a rank-two mixed tensor
+of dimension $M^2$. It should not reproduce four nested loops at each call
+site.
 
 The following must fail to compile:
 
@@ -166,17 +168,17 @@ analytic tests.
 
 Every public geometry implementation is testable through reusable checks:
 
-- `G_IK G^KJ` is the identity;
+- $G_{IK}G^{KJ}=\delta_I{}^J$;
 - the connection is symmetric in its two lower slots for a torsion-free
   Levi-Civita geometry;
-- metric compatibility `nabla_K G_IJ = 0` holds;
+- metric compatibility $\nabla_KG_{IJ}=0$ holds;
 - lowered Riemann satisfies both pair antisymmetries, pair exchange, and the
   first Bianchi identity;
 - flat Cartesian geometry has exactly zero connection and curvature;
 - a known constant-curvature two-dimensional metric reproduces its analytic
   scalar curvature;
 - raising and lowering Riemann round-trips within tolerance;
-- the velocity-contracted curvature has dimension `M^2` and the correct mixed
+- the velocity-contracted curvature has dimension $M^2$ and the correct mixed
   index variance.
 
 Checked validation returns a structured `GeometryValidationError` containing
@@ -211,8 +213,8 @@ to evolving observables in curved multifield models.
 The phase-space transport architecture selected later uses these additional
 objects:
 
-- `V_;(IJK)`, a symmetric rank-three covariant tensor of dimension `M^1`;
-- `nabla_M R^I_JKL`, a rank-five tensor of dimension `M^-3`;
+- $V_{;(IJK)}$, a symmetric rank-three covariant tensor of dimension $M^1$;
+- $\nabla_MR^I{}_{JKL}$, a rank-five tensor of dimension $M^{-3}$;
 - a rank-three field covariance/bispectrum object with momentum-triangle
   labels separate from field-space indices;
 - third-order automatic differentiation, separate from tensor rank.
@@ -221,9 +223,10 @@ objects:
 slot-naming conventions. Momentum indices, Fourier labels, and field-space
 indices remain distinct types.
 
-## Branch sequence
+## Historical implementation sequence
 
-The revised implementation order is:
+The geometry sequence below is complete and is retained to explain why the
+public API is layered as it is:
 
 1. `docs/field-space-curvature-design` -- conventions, API contract, and
    non-Gaussianity extension boundary.
@@ -238,9 +241,12 @@ The revised implementation order is:
    conjugation-aware diagnostics.
 6. `feature/power-spectra` and `feature/two-field-spectrum-plots` -- physical
    spectra and figures already specified in the two-field design.
-7. `docs/non-gaussianity-architecture` -- choose and specify the cubic/in-in,
-   transport, or deliberately hybrid observable pipeline before implementing
-   it.
+7. `docs/non-gaussianity-architecture` -- select tree-level phase-space
+   transport and define the P3a--P3e observable pipeline.
+
+Current three-point work is tracked in
+[`three-point-transport.md`](three-point-transport.md), not in this historical
+sequence.
 
 ## References
 

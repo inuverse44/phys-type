@@ -12,21 +12,27 @@ of slow roll, and sharp turns.  The transport equations are ordinary
 differential equations for equal-time correlation functions and can read the
 same immutable background trajectory introduced by P2.
 
-The first deliverable is not a number called `f_NL`.  It is a phase-space
-two-point transport implementation that reproduces the existing quantum mode
-solver.  Three-point evolution is enabled only after that equivalence is
-verified.
+The first acceptance gate was not a number called $f_{\mathrm{NL}}$. It was a
+phase-space two-point transport implementation that reproduces the existing
+quantum mode solver. That P3c gate is now complete, so P3d can build
+three-point evolution on a validated linear convention.
 
 ## Scope
 
 The target is the connected tree-level primordial three-point function for
 the scalar sector of a two-field sigma model,
 
-```text
-S = integral sqrt(-g) [M_pl^2 R / 2
-                       - G_IJ partial(phi^I) partial(phi^J) / 2
-                       - V(phi)].
-```
+$$
+S=\int d^4x\,\sqrt{-g}\left[
+\frac{M_{\mathrm{Pl}}^2}{2}R
+-\frac12G_{IJ}(\phi)g^{\mu\nu}
+  \partial_\mu\phi^I\partial_\nu\phi^J
+-V(\phi)\right].
+$$
+
+Here $G_{IJ}$ is the field-space metric, $I,J\in\{1,2\}$ label field
+coordinates, and $M_{\mathrm{Pl}}$ is the reduced Planck mass. Natural units
+$c=\hbar=1$ are used throughout the crate.
 
 The complete momentum dependence is retained.  Local, equilateral, and
 squeezed values are derived evaluations of the same triangle-dependent
@@ -40,27 +46,40 @@ milestone.
 
 Three independent notions must never share a raw integer API:
 
-1. field-space indices `I, J, K` transform with `G_IJ`;
-2. phase-space indices `a, b, c` select field or momentum slots and carry a
+1. field-space indices $I,J,K$ transform with $G_{IJ}$;
+2. phase-space indices $a,b,c$ select field or momentum slots and carry a
    field-space index inside that slot;
-3. Fourier-leg labels `1, 2, 3` identify `k_1`, `k_2`, and `k_3`.
+3. Fourier-leg labels $1,2,3$ identify $\mathbf{k}_1$, $\mathbf{k}_2$, and
+   $\mathbf{k}_3$.
 
 The phase-space state is conceptually
 
-```text
-X^a = (Q^I, P^I),
-```
+$$
+X^a=(Q^I,P^I),\qquad Q^I=U^I,\qquad P^I=D_tU^I.
+$$
 
-where the precise momentum normalization is fixed once and used by initial
-conditions, evolution tensors, covariance, and output.  A phase-space index
-is therefore a tagged pair, not a third field-space variance marker.
+Here $U^I$ is the covariant field perturbation and $D_t$ is the field-space
+covariant cosmic-time derivative. Therefore $P^I$ is a velocity perturbation,
+not an $a^3$-weighted canonical momentum. A phase-space index is a tagged pair
+such as $(Q,I)$ or $(P,I)$, not a third field-space variance marker.
 
 The two-point and connected three-point objects are
 
-```text
-Sigma^{ab}(k)                    = <X^a(k) X^b(-k)>,
-Alpha^{abc}(k_1, k_2, k_3)      = <X^a(k_1) X^b(k_2) X^c(k_3)>_connected.
-```
+$$
+\Sigma^{ab}(k)
+=\left\langle X^a(\mathbf{k})X^b(-\mathbf{k})\right\rangle,
+$$
+
+$$
+\alpha^{abc}(k_1,k_2,k_3)
+=\left\langle
+X^a(\mathbf{k}_1)X^b(\mathbf{k}_2)X^c(\mathbf{k}_3)
+\right\rangle_c,
+$$
+
+after stripping off the momentum-conserving delta function. The subscript
+$c$ denotes the connected part, and
+$\mathbf{k}_1+\mathbf{k}_2+\mathbf{k}_3=0$.
 
 Their storage types carry physical dimensions for each slot.  Momentum-leg
 permutations move both the Fourier label and its associated phase-space slot.
@@ -68,22 +87,23 @@ They are not implemented as field-index permutations.
 
 ## Momentum triangles
 
-`MomentumTriangle` owns three positive normalized wavenumbers and validates
+`MomentumTriangle` owns the three positive magnitudes
+$k_r=|\mathbf{k}_r|$ and validates
 
-```text
-k_1 <= k_2 + k_3,
-k_2 <= k_1 + k_3,
-k_3 <= k_1 + k_2.
-```
+$$
+k_1\le k_2+k_3,\qquad
+k_2\le k_1+k_3,\qquad
+k_3\le k_1+k_2.
+$$
 
 The canonical representation orders `k_1 >= k_2 >= k_3` and stores scale and
 shape separately:
 
-```text
-k_t = k_1 + k_2 + k_3,
-x_2 = k_2 / k_1,
-x_3 = k_3 / k_1.
-```
+$$
+k_t=k_1+k_2+k_3,\qquad
+x_2=\frac{k_2}{k_1},\qquad
+x_3=\frac{k_3}{k_1}.
+$$
 
 This prevents duplicate integrations of permuted triangles while retaining a
 mapping back to caller leg order.  Degenerate squeezed boundaries require an
@@ -97,22 +117,35 @@ power-spectrum benchmark.
 
 Writing the nonlinear phase-space flow schematically as
 
-```text
-D_N X^a = u^a_b X^b + 1/2 u^a_bc X^b X^c + ...,
-```
+$$
+D_NX^a=u^a{}_bX^b+\frac12u^a{}_{bc}X^bX^c+\cdots,
+\qquad D_N\equiv H^{-1}D_t,
+$$
 
-the equal-time tree-level hierarchy closes at three-point order as
+where $u^a{}_b$ is the linear flow Jacobian and $u^a{}_{bc}$ is its quadratic
+extension derived from the cubic Hamiltonian, the equal-time tree-level
+hierarchy closes at three-point order:
 
-```text
-D_N Sigma^{ab}
-  = u^a_c Sigma^{cb} + u^b_c Sigma^{ac},
+$$
+D_N\Sigma^{ab}
+=u^a{}_c\Sigma^{cb}+u^b{}_c\Sigma^{ac},
+$$
 
-D_N Alpha^{abc}
-  = u^a_d Alpha^{dbc} + u^b_d Alpha^{adc} + u^c_d Alpha^{abd}
-    + u^a_de Sigma^{db} Sigma^{ec}
-    + u^b_de Sigma^{da} Sigma^{ec}
-    + u^c_de Sigma^{da} Sigma^{eb}.
-```
+$$
+\begin{aligned}
+D_N\alpha^{abc}={}&
+u^a{}_d\alpha^{dbc}
++u^b{}_d\alpha^{adc}
++u^c{}_d\alpha^{abd}\\
+&+u^a{}_{de}\Sigma^{db}\Sigma^{ec}
++u^b{}_{de}\Sigma^{da}\Sigma^{ec}
++u^c{}_{de}\Sigma^{da}\Sigma^{eb}.
+\end{aligned}
+$$
+
+Momentum arguments are suppressed only in this overview. They are written
+explicitly in [`three-point-transport.md`](three-point-transport.md), where the
+ordering of the two input legs of each $u^a{}_{bc}$ is fixed.
 
 In the full subhorizon calculation the kernels retain their momentum
 arguments and quantum real/imaginary structure.  Covariant derivatives along
@@ -122,37 +155,56 @@ finite-differencing exported CSV rows.
 
 The existing linear mode matrix remains the reference oracle.  The transport
 two-point sector must reproduce its `QQ`, `QP`, `PQ`, and `PP` covariances for
-shared wavenumbers before `u^a_bc` or `Alpha` is accepted.
+shared wavenumbers before $u^a{}_{bc}$ or $\alpha^{abc}$ is accepted.
 
 ## Initial conditions and time range
 
-Correlation functions start in the same Bunch-Davies regime as the linear
+Correlation functions start in the same Bunch--Davies regime as the linear
 solver.  The two-point initial condition is derived from the existing mode
 normalization.  The three-point initial condition and source kernels come
-from the cubic action/quantum transport prescription; setting `Alpha = 0` at
+from the cubic action/quantum transport prescription; setting $\alpha=0$ at
 horizon exit is not an acceptable substitute because it discards intrinsic
 horizon-crossing interactions and general momentum shapes.
 
-All three legs of a triangle use one common start time deep inside the horizon
-of its largest relevant scale, with an explicit convergence study in
-`x_init`.  The shared P2 background trajectory supplies every Runge--Kutta
-stage.
+All three legs of a triangle use one common start time deep inside the horizon.
+Writing $x_r=k_r/(aH)$, the start criterion must be stated in terms of all
+three $x_r$ and tested by moving the common initial slice deeper. The shared
+P2 background trajectory supplies every Runge--Kutta stage.
 
 ## Projection to curvature observables
 
 Field/phase-space correlators are not yet the observable curvature
 bispectrum.  At the requested output slice, a separately tested nonlinear
 gauge transformation supplies first- and second-order projection coefficients
-`N_a` and `N_ab`.  The output records:
+$N_a$ and $N_{ab}$. Schematically,
 
-- the field/phase-space `Alpha` before projection;
-- `P_zeta(k)` after projection;
-- dimensional `B_zeta(k_1,k_2,k_3)`;
-- the exact reduced-amplitude convention used for any reported `f_NL`;
+$$
+\zeta=N_aX^a+\frac12N_{ab}X^aX^b+\cdots,
+$$
+
+so the curvature bispectrum receives both an intrinsic contribution from
+$\alpha^{abc}$ and a gauge-transformation contribution quadratic in
+$\Sigma^{ab}$:
+
+$$
+B_\zeta
+=N_aN_bN_c\alpha^{abc}
++N_{ab}N_cN_d\bigl(\Sigma^{ac}\Sigma^{bd}
++\text{leg permutations}\bigr).
+$$
+
+The precise momentum arguments and normalization will be fixed in P3e rather
+than inferred from this schematic equation. The output records:
+
+- the field/phase-space $\alpha^{abc}$ before projection;
+- $P_\zeta(k)$ after projection;
+- dimensional $B_\zeta(k_1,k_2,k_3)$;
+- the exact reduced-amplitude convention used for any reported
+  $f_{\mathrm{NL}}$;
 - the output slice, triangle convention, background/model provenance, and
   whether reheating transfer is absent.
 
-No single `f_NL` column may be emitted without a shape and normalization
+No single $f_{\mathrm{NL}}$ column may be emitted without a shape and normalization
 identifier.
 
 ## Required mathematical capabilities
@@ -160,8 +212,8 @@ identifier.
 The implementation sequence adds only what the transport kernels consume:
 
 - third-order automatic differentiation for the potential;
-- a symmetric covariant `V_;(IJK)` with dimension `M`;
-- rank-five field tensors and `nabla_M R^I_JKL` where required;
+- a symmetric covariant $V_{;(IJK)}$ with dimension $M$;
+- rank-five field tensors and $\nabla_M R^I{}_{JKL}$ where required;
 - phase-space tensors whose slot dimensions are explicit;
 - complex Hermitian two-point blocks and permutation-aware complex
   three-point blocks;
@@ -175,16 +227,17 @@ Third derivative order and tensor rank remain separate concepts in the API.
 1. **P3a — momentum and phase-space types.** Add validated momentum triangles,
    tagged phase-space indices, dimensioned two-/three-point containers, and
    permutation tests. No dynamics yet.
-2. **P3b — third-order model geometry.** Add third-order AD, `V_;(IJK)`, and the
+2. **P3b — third-order model geometry.** Add third-order AD, $V_{;(IJK)}$, and the
    curvature-derivative capabilities actually required by the selected
    kernels, with analytic flat and curved tests.
 3. **P3c — two-point transport oracle.** Evolve the phase-space covariance on
    the shared background and reproduce every block of the existing mode
    solver across subhorizon, horizon-exit, turn, and final epochs.
-4. **P3d — three-point transport.** Implement `u^a_bc`, quantum initial
-   conditions, sourced `Alpha`, and triangle/permutation regression tests.
+4. **P3d — three-point transport.** Implement $u^a{}_{bc}$, quantum initial
+   conditions, sourced $\alpha^{abc}$, and triangle/permutation regression
+   tests.
 5. **P3e — curvature projection and benchmark.** Implement the nonlinear
-   projection, publish `B_zeta` with convention-labeled reduced amplitudes,
+   projection, publish $B_\zeta$ with convention-labeled reduced amplitudes,
    and compare a canonical model with an independent transport result.
 
 Each milestone has its own public types and tests.  A later milestone cannot
@@ -223,31 +276,34 @@ P3b is complete:
   rules, transcendental functions, a mixed cubic, and a vanishing quadratic
   third derivative.
 
-- `ChristoffelDerivatives` represents `partial_M Gamma^I_JK` explicitly as a
+- `ChristoffelDerivatives` represents $\partial_M\Gamma^I{}_{JK}$ explicitly as a
   coordinate-dependent non-tensor, and `ThirdOrderFieldSpaceGeometry` supplies
   it analytically;
-- `CovariantMultifieldSystem` forms `nabla_K V_;IJ` and then explicitly
-  symmetrizes it to the `V_;(IJK)` combination selected by the cubic action;
+- `CovariantMultifieldSystem` forms $\nabla_KV_{;IJ}$ and then explicitly
+  symmetrizes it to the $V_{;(IJK)}$ combination selected by the cubic action;
 - `FieldTensor5` and `CovariantRiemannDerivative` represent
-  `nabla_M R^I_JKL` with variance and dimension fixed by the type system;
+  $\nabla_MR^I{}_{JKL}$ with variance and dimension fixed by the type system;
 - `CurvatureDerivativeGeometry` is a separate capability, implemented
   analytically by the built-in flat and constant-curvature hyperbolic spaces.
 
 Finite-difference tests independently check the hyperbolic connection
 derivatives and every component of the symmetrized covariant potential third
-derivative.  Flat-space reduction, `nabla R = 0` for both built-in geometries,
+derivative.  Flat-space reduction, $\nabla R=0$ for both built-in geometries,
 full permutation symmetry, and rank-five variance rejection are also fixed by
-tests. P3c is the next milestone.
+tests. P3b is complete; P3c subsequently validated the linear transport
+convention consumed by P3d.
 
 ### P3c implementation status
 
-P3c is complete. The convention is fixed to `Q^I = U^I` and
-`P^I = D_t U^I`; `P` is neither a conformal derivative nor an `a^3`-weighted
+P3c is complete. The convention is fixed to $Q^I=U^I$ and
+$P^I=D_tU^I$; $P$ is neither a conformal derivative nor an $a^3$-weighted
 canonical momentum. `TwoPointPhaseSpaceCovariance` carries dimensioned complex
 `QQ`, `QP`, `PQ`, and `PP` blocks, and
 `two_point_covariance_from_mode_state` derives all four from one complete
 mode/background state. Bunch--Davies closed forms and the identities
-`QQ = QQ^dagger`, `PP = PP^dagger`, and `PQ = QP^dagger` are tested.
+$\Sigma_{QQ}=\Sigma_{QQ}^\dagger$,
+$\Sigma_{PP}=\Sigma_{PP}^\dagger$, and
+$\Sigma_{PQ}=\Sigma_{QP}^\dagger$ are tested.
 
 The detailed conversion and remaining acceptance stages are specified in
 [`two-point-transport-oracle.md`](two-point-transport-oracle.md).
@@ -272,7 +328,7 @@ A compile-fail test fixes the distinct `M^(-3/2)`, `M^(-1/2)`, `M^(1/2)`, and
 the P3c linear flow to all three canonical triangle legs on the shared P2
 background, and is regression-tested for leg-permutation covariance. No cubic
 kernel or physical bispectrum is claimed yet. The dimensioned eight-block
-`QuadraticPhaseSpaceKernel` and the three ordered `u Sigma Sigma` contractions
+`QuadraticPhaseSpaceKernel` and the three ordered $u\Sigma\Sigma$ contractions
 are implemented separately from the still-missing model-derived kernel. The
 staged contract and next kernel-construction step are documented in
 [`three-point-transport.md`](three-point-transport.md).

@@ -10,40 +10,50 @@ reuse its mode amplitudes after initialization.
 
 ## Phase-space convention
 
-For each Fourier wavenumber, the transport coordinate is
+For each Fourier wavevector $\mathbf{k}$, with magnitude
+$k=|\mathbf{k}|$, the transport coordinate is
 
-```text
-X^a = (Q^I, P^I),
-Q^I = U^I,
-P^I = D_t U^I.
-```
+$$
+X^a=(Q^I,P^I),\qquad Q^I=U^I,\qquad P^I=D_tU^I.
+$$
+
+Field-space indices $I,J$ transform with $G_{IJ}$. A phase-space index $a$
+means both a $Q/P$ slot and a field-space index. $D_t$ is the field-space
+covariant cosmic-time derivative.
 
 The existing solver integrates the numerically better conditioned variables
-`v^I_A = a U^I_A` and `w^I_A = D_t v^I_A`.  At any oracle snapshot,
+$v^I_A=aU^I_A$ and $w^I_A=D_tv^I_A$, where $A$ labels the independent
+vacuum oscillator. At any oracle snapshot,
 
-```text
-Q^I_A = v^I_A / a,
-P^I_A = (w^I_A - H v^I_A) / a.
-```
+$$
+Q^I_A=\frac{v^I_A}{a},\qquad
+P^I_A=\frac{w^I_A-Hv^I_A}{a}.
+$$
 
-`P` is therefore a cosmic-time covariant velocity, not a canonical momentum
-with an implicit factor of `a^3`, and not a conformal-time derivative.  A later
+$P$ is therefore a cosmic-time covariant velocity, not a canonical momentum
+with an implicit factor of $a^3$, and not a conformal-time derivative. A later
 change of convention requires a new semantic type rather than reinterpretation
 of `MomentumPerturbation`.
 
 ## Equal-time blocks
 
 The unsymmetrized quantum covariance sums over the independent vacuum
-oscillators `A`:
+oscillators $A$:
 
-```text
-Sigma_QQ^{IJ} = sum_A Q^I_A Q^{J*}_A,
-Sigma_QP^{IJ} = sum_A Q^I_A P^{J*}_A,
-Sigma_PQ^{IJ} = sum_A P^I_A Q^{J*}_A,
-Sigma_PP^{IJ} = sum_A P^I_A P^{J*}_A.
-```
+$$
+\begin{aligned}
+\Sigma_{QQ}^{IJ}(k)&=\sum_A Q^I_A(k)Q^{J*}_A(k),\\
+\Sigma_{QP}^{IJ}(k)&=\sum_A Q^I_A(k)P^{J*}_A(k),\\
+\Sigma_{PQ}^{IJ}(k)&=\sum_A P^I_A(k)Q^{J*}_A(k),\\
+\Sigma_{PP}^{IJ}(k)&=\sum_A P^I_A(k)P^{J*}_A(k).
+\end{aligned}
+$$
 
-Because `Q` has dimension `M^-1/2` and `P` has dimension `M^1/2`, the block
+The star denotes complex conjugation. These are unsymmetrized quantum
+covariances; retaining their imaginary parts preserves the equal-time
+commutator information needed by the three-point source.
+
+Because $[Q]=M^{-1/2}$ and $[P]=M^{1/2}$, the block
 dimensions are:
 
 | Block | Slot type | Dimension |
@@ -53,9 +63,16 @@ dimensions are:
 | `PQ` | momentum, field | `M^0` |
 | `PP` | momentum, momentum | `M^1` |
 
-The oracle must satisfy `QQ = QQ^dagger`, `PP = PP^dagger`, and
-`PQ = QP^dagger`.  Complex values are retained; taking real parts would erase
-the quantum commutator information carried by the mixed blocks.
+The oracle must satisfy
+
+$$
+\Sigma_{QQ}=\Sigma_{QQ}^\dagger,\qquad
+\Sigma_{PP}=\Sigma_{PP}^\dagger,\qquad
+\Sigma_{PQ}=\Sigma_{QP}^\dagger.
+$$
+
+The dagger means complex conjugation together with exchange of the two field
+indices.
 
 ## Ordered implementation and acceptance
 
@@ -81,15 +98,22 @@ this two-point oracle.
 ## Direct evolution equation
 
 `TwoPointTransportSystem` evolves the covariance itself in elapsed e-folds.
-For `A^I_J = C^I_J + (k/a)^2 delta^I_J`, the mode-level equations are
+Let $C^I{}_J$ be the covariant perturbation mass matrix and define
 
-```text
-D_N Q^I = P^I / H,
-D_N P^I = -3 P^I - A^I_J Q^J / H.
-```
+$$
+\mathcal{A}^I{}_J(k)
+=C^I{}_J+\frac{k^2}{a^2}\delta^I{}_J.
+$$
 
-The implementation expands `D_N` into coordinate derivatives and applies the
-connection flow `Gamma^I_JK pi^J/H` to both field-space indices of every
+With $D_N\equiv H^{-1}D_t$, the mode-level equations are
+
+$$
+D_NQ^I=\frac{P^I}{H},\qquad
+D_NP^I=-3P^I-\frac{\mathcal{A}^I{}_JQ^J}{H}.
+$$
+
+The implementation expands $D_N$ into coordinate derivatives and applies the
+connection flow $\Gamma^I{}_{JK}\pi^J/H$ to both field-space indices of every
 covariance block. It receives the background only through
 `TwoFieldBackgroundProvider`; the P2 cubic-Hermite trajectory implements this
 interface and is queried at every Runge--Kutta stage.

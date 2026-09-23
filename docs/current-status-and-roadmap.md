@@ -5,7 +5,7 @@ detailed mathematical contracts remain in the design documents linked below;
 this page records what is implemented, what is only designed, and the order in
 which unfinished work should proceed.
 
-## Status on 2026-09-22
+## Status on 2026-09-23
 
 The first scientific milestone is complete: `phys-type` can evolve a
 covariant two-field inflationary background and its linear quantum
@@ -36,6 +36,35 @@ and Clippy.
 The conformal-time and former cosmic-time formulations agree in the final
 curvature spectrum to a maximum relative difference of `3.1e-10` over the
 41-point benchmark grid.
+
+## Executive scientific snapshot
+
+The repository currently has two distinct scientific boundaries:
+
+| Capability | Status | Meaning |
+| --- | --- | --- |
+| Two-field background and linear perturbations | complete | produces validated adiabatic, entropy, cross, and curvature power spectra |
+| Direct two-point phase-space transport | complete | reproduces the independent mode solver for all complex covariance blocks |
+| Three-point transport infrastructure | in progress | state, homogeneous flow, typed quadratic kernel, and source contraction exist |
+| Primordial bispectrum prediction | not yet available | physical cubic kernel, quantum initial condition, sourced benchmark, and curvature projection remain |
+
+Consequently, the crate can presently make power-spectrum predictions within
+its documented inflation/no-reheating scope. It must not yet describe its
+three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
+
+### Reading order for the active P3 work
+
+1. [`non-gaussianity-architecture.md`](non-gaussianity-architecture.md)
+   explains the physical target, index domains, transport hierarchy, scope,
+   and P3a--P3e acceptance order.
+2. [`two-point-transport-oracle.md`](two-point-transport-oracle.md) fixes the
+   phase-space normalization and records why P3c is accepted.
+3. [`three-point-transport.md`](three-point-transport.md) gives the detailed
+   P3d equations, maps them to Rust types, and separates implemented source
+   algebra from the missing physical cubic kernel.
+4. [`field-space-curvature-design.md`](field-space-curvature-design.md) fixes
+   the Riemann convention and the higher-rank geometry consumed by that
+   kernel.
 
 ## Release state
 
@@ -110,18 +139,18 @@ turn and the complete 41-point benchmark.
   **P3a is completed:** validated canonical momentum triangles, bounded tagged
   phase-space indices, and dimensioned two-/three-point blocks are implemented.
   **P3b is completed:** third-order automatic differentiation, dimensioned
-  coordinate `V_,IJK`, symmetrized covariant `V_;(IJK)`, explicit connection
-  derivatives, and typed `nabla_M R^I_JKL` are implemented with flat and
+  coordinate $V_{,IJK}$, symmetrized covariant $V_{;(IJK)}$, explicit connection
+  derivatives, and typed $\nabla_MR^I{}_{JKL}$ are implemented with flat and
   hyperbolic analytic tests. **P3c is completed:** the phase-space convention
   and all-block mode-solver oracle are implemented. Direct covariance evolution
   agrees with the mode solver at subhorizon, horizon-exit, maximum-turn, and
   final epochs, and passes adaptive-tolerance and initialization-depth
   convergence tests. **P3d is in progress:** its first slice adds the complete
   dimensioned `QQQ`--`PPP` correlation state, permutation-safe Fourier-leg
-  operations, and integration arithmetic. Homogeneous `u^a_b` evolution now
+  operations, and integration arithmetic. Homogeneous $u^a{}_b$ evolution now
   propagates all three canonical triangle legs on the shared P2 background and
-  commutes with equal-leg permutations. The dimensioned `u^a_bc` container and
-  ordered three-leg `u Sigma Sigma` contraction are implemented; deriving the
+  commutes with equal-leg permutations. The dimensioned $u^a{}_{bc}$ container and
+  ordered three-leg $u\Sigma\Sigma$ contraction are implemented; deriving the
   curved-field-space cubic kernel and quantum initial conditions remains. See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
   [`three-point-transport.md`](three-point-transport.md);
