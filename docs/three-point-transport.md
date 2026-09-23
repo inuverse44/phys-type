@@ -2,8 +2,9 @@
 
 ## Status
 
-P3d is in progress. Its first implementation slice fixes the state and
-permutation contract before adding cubic dynamics.
+P3d is in progress. Its state/permutation contract and homogeneous linear
+transport are implemented; cubic sourcing and quantum initial conditions are
+not yet implemented.
 
 `ThreePointPhaseSpaceCorrelation<N>` stores the connected equal-time
 correlator
@@ -43,16 +44,31 @@ move a leg and is represented separately. This is the foundation for later
 permutation and reality residuals; it does not assert that an arbitrary stored
 state already satisfies those identities.
 
-## Integration boundary
+## Homogeneous transport
 
 The state implements addition and multiplication by dimensionless Runge--Kutta
-coefficients, so it can be used directly by the existing integrators. This
-first slice deliberately contains no cubic kernel and makes no physical
-bispectrum claim.
+coefficients, so it can be used directly by the existing integrators.
+`ThreePointHomogeneousTransportSystem` applies the P3c linear phase-space flow
+to each Fourier leg,
 
-The next P3d slice will add the homogeneous three-leg action of `u^a_b` using
-the same P2 background trajectory and per-leg wavenumbers as P3c. After that
-is verified, the sourced term
+```text
+D_N Alpha^{abc}
+  = u^a_d(k_1) Alpha^{dbc}
+  + u^b_d(k_2) Alpha^{adc}
+  + u^c_d(k_3) Alpha^{abd}.
+```
+
+It reads every Runge--Kutta stage from the shared P2 background provider. The
+state legs and per-leg wavenumbers use `MomentumTriangle` canonical order. The
+linear flow retains the declared P3c convention, including connection terms,
+Hubble friction, the covariant perturbation mass matrix, and each leg's
+`k_i^2/a^2` contribution.
+
+The public name says `Homogeneous` deliberately: this system contains no cubic
+kernel and makes no physical bispectrum claim. In particular, a zero state
+remains zero.
+
+The next P3d slice will add the sourced term
 
 ```text
 u^a_de Sigma^{db}(k_2) Sigma^{ec}(k_3) + two leg permutations
@@ -71,3 +87,6 @@ and subhorizon start-depth convergence remain acceptance requirements; zeroing
 - complex conjugation squares to the identity;
 - a compile-fail test rejects assigning the `M^(-1/2)` `QQP` block the
   `M^(-3/2)` dimension expected for `QQQ`.
+- the `QQQ` derivative receives the expected `PQQ + QPQ + QQP` linear terms;
+- for an equilateral triangle, homogeneous evolution commutes with a
+  Fourier-leg exchange in all eight blocks and every field component.
