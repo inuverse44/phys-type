@@ -13,7 +13,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   complex conjugation, integration arithmetic, and compile-time rejection of
   block-dimension mismatches. Homogeneous three-leg evolution applies the P3c
   linear flow at each shared-background stage and preserves equal-leg
-  permutation covariance.
+  permutation covariance. A dimensioned quadratic phase-space kernel and the
+  three ordered complex `u Sigma Sigma` source contractions establish the
+  hierarchy boundary before model-specific cubic coefficients are added.
 - Separate horizon-exit spectrum rows refined at each mode's `k = aH`
   crossing. Both horizon-exit and requested-output CSVs carry `N`, `k/(aH)`,
   and explicit evaluation-epoch metadata.

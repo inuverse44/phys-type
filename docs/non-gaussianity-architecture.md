@@ -271,8 +271,10 @@ A compile-fail test fixes the distinct `M^(-3/2)`, `M^(-1/2)`, `M^(1/2)`, and
 `M^(3/2)` block dimensions. `ThreePointHomogeneousTransportSystem` now applies
 the P3c linear flow to all three canonical triangle legs on the shared P2
 background, and is regression-tested for leg-permutation covariance. No cubic
-kernel or physical bispectrum is claimed yet. The staged contract and next
-sourced-transport step are documented in
+kernel or physical bispectrum is claimed yet. The dimensioned eight-block
+`QuadraticPhaseSpaceKernel` and the three ordered `u Sigma Sigma` contractions
+are implemented separately from the still-missing model-derived kernel. The
+staged contract and next kernel-construction step are documented in
 [`three-point-transport.md`](three-point-transport.md).
 
 ## Acceptance boundary

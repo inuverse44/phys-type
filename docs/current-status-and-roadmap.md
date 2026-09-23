@@ -120,8 +120,9 @@ turn and the complete 41-point benchmark.
   dimensioned `QQQ`--`PPP` correlation state, permutation-safe Fourier-leg
   operations, and integration arithmetic. Homogeneous `u^a_b` evolution now
   propagates all three canonical triangle legs on the shared P2 background and
-  commutes with equal-leg permutations. Cubic sourcing and quantum initial
-  conditions remain required. See
+  commutes with equal-leg permutations. The dimensioned `u^a_bc` container and
+  ordered three-leg `u Sigma Sigma` contraction are implemented; deriving the
+  curved-field-space cubic kernel and quantum initial conditions remains. See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
   [`three-point-transport.md`](three-point-transport.md);
 - reheating and post-inflationary transfer;
