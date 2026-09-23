@@ -13,7 +13,9 @@
 use core::marker::PhantomData;
 use core::ops::{Add, Sub};
 
-use typenum::{Diff, N1, N2, N4, N6, P1, P2, P3, P4, P5, P6, P8, PartialDiv, PartialQuot, Sum, Z0};
+use typenum::{
+    Diff, N1, N2, N3, N4, N6, P1, P2, P3, P4, P5, P6, P8, PartialDiv, PartialQuot, Sum, Z0,
+};
 
 /// A mass dimension whose exponent is encoded in half-power steps.
 ///
@@ -83,6 +85,8 @@ pub type M4 = MassPower<P8>;
 pub type MMinus1 = MassPower<N2>;
 /// `M^(-1/2)`.
 pub type MMinusHalf = MassPower<N1>;
+/// `M^(-3/2)`.
+pub type MMinus3Over2 = MassPower<N3>;
 /// `M^-2`.
 pub type MMinus2 = MassPower<N4>;
 /// `M^-3`.

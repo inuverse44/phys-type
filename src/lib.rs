@@ -27,7 +27,7 @@ pub use background::{
 };
 pub use dimension::{
     DimDiv, DimMul, DimSqrt, M0, M1, M2, M3, M3Over2, M4, M5Over2, MHalf, MMinus1, MMinus2,
-    MMinus3, MMinusHalf, MassPower,
+    MMinus3, MMinus3Over2, MMinusHalf, MassPower,
 };
 pub use field_space::{
     ChristoffelDerivativeComponents, ChristoffelDerivatives, ChristoffelSymbols,
@@ -86,8 +86,9 @@ pub use transport::{
     AnyPhaseSpaceIndex, DEFAULT_TRIANGLE_CLOSURE_TOLERANCE, FieldPerturbation, FourierLeg,
     MomentumPerturbation, MomentumTriangle, MomentumTriangleError, PhaseSpaceIndex,
     PhaseSpaceIndexError, PhaseSpaceSlot, PhaseSpaceSlotKind, ThreePointBlock,
-    TwoFieldBackgroundProvider, TwoPointBlock, TwoPointPhaseSpaceCovariance,
-    TwoPointTransportSystem, TwoPointTransportTolerance, two_point_covariance_from_mode_state,
+    ThreePointPhaseSpaceCorrelation, TwoFieldBackgroundProvider, TwoPointBlock,
+    TwoPointPhaseSpaceCovariance, TwoPointTransportSystem, TwoPointTransportTolerance,
+    two_point_covariance_from_mode_state,
 };
 
 /// A dimensionless quantity, such as the scale factor.

@@ -116,8 +116,12 @@ turn and the complete 41-point benchmark.
   and all-block mode-solver oracle are implemented. Direct covariance evolution
   agrees with the mode solver at subhorizon, horizon-exit, maximum-turn, and
   final epochs, and passes adaptive-tolerance and initialization-depth
-  convergence tests. P3d three-point transport is next. See
-  [`two-point-transport-oracle.md`](two-point-transport-oracle.md);
+  convergence tests. **P3d is in progress:** its first slice adds the complete
+  dimensioned `QQQ`--`PPP` correlation state, permutation-safe Fourier-leg
+  operations, and integration arithmetic. Homogeneous three-leg transport is
+  next; cubic sourcing and quantum initial conditions remain required. See
+  [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
+  [`three-point-transport.md`](three-point-transport.md);
 - reheating and post-inflationary transfer;
 - dynamically sized field spaces if a concrete model requires more than the
   current const-generic representation.
