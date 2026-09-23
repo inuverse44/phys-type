@@ -13,9 +13,9 @@ use num_complex::Complex64;
 
 use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
 use crate::{
-    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, Hubble, M0, M1, MMinus1,
-    Mass, ModeAmplitude, ModeVelocity, MultifieldState, Quantity,
-    TwiceDifferentiableMultifieldPotential, TwoFieldPerturbationState,
+    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, Hubble, M0, M1, M3Over2,
+    MHalf, MMinus1, MMinus3Over2, MMinusHalf, Mass, ModeAmplitude, ModeVelocity, MultifieldState,
+    Quantity, TwiceDifferentiableMultifieldPotential, TwoFieldPerturbationState,
 };
 
 /// Default relative tolerance for numerical triangle closure.
@@ -871,6 +871,226 @@ impl<A, B, C, D, V, const N: usize> ThreePointBlock<A, B, C, D, V, N> {
     }
 }
 
+impl<A, B, C, D: Copy, const N: usize> ThreePointBlock<A, B, C, D, Complex64, N> {
+    /// Complex-conjugates every component without moving its Fourier leg.
+    pub fn conjugate(self) -> Self {
+        Self::new(self.components.map(|matrix| {
+            matrix.map(|row| row.map(|component| Quantity::new(component.value().conj())))
+        }))
+    }
+}
+
+/// The complete connected three-point function for `X^a = (Q^I, P^I)`.
+///
+/// Each field slot contributes dimension `M^-1/2`, and each momentum slot
+/// contributes `M^1/2`. Keeping all eight phase-space blocks distinct makes a
+/// dimensionally invalid block assignment a compile-time error. Fourier-leg
+/// permutations move both the component axis and its phase-space slot.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ThreePointPhaseSpaceCorrelation<const N: usize> {
+    /// `Alpha_QQQ^{IJK}`.
+    pub qqq: ThreePointBlock<
+        FieldPerturbation,
+        FieldPerturbation,
+        FieldPerturbation,
+        MMinus3Over2,
+        Complex64,
+        N,
+    >,
+    /// `Alpha_QQP^{IJK}`.
+    pub qqp: ThreePointBlock<
+        FieldPerturbation,
+        FieldPerturbation,
+        MomentumPerturbation,
+        MMinusHalf,
+        Complex64,
+        N,
+    >,
+    /// `Alpha_QPQ^{IJK}`.
+    pub qpq: ThreePointBlock<
+        FieldPerturbation,
+        MomentumPerturbation,
+        FieldPerturbation,
+        MMinusHalf,
+        Complex64,
+        N,
+    >,
+    /// `Alpha_PQQ^{IJK}`.
+    pub pqq: ThreePointBlock<
+        MomentumPerturbation,
+        FieldPerturbation,
+        FieldPerturbation,
+        MMinusHalf,
+        Complex64,
+        N,
+    >,
+    /// `Alpha_QPP^{IJK}`.
+    pub qpp: ThreePointBlock<
+        FieldPerturbation,
+        MomentumPerturbation,
+        MomentumPerturbation,
+        MHalf,
+        Complex64,
+        N,
+    >,
+    /// `Alpha_PQP^{IJK}`.
+    pub pqp: ThreePointBlock<
+        MomentumPerturbation,
+        FieldPerturbation,
+        MomentumPerturbation,
+        MHalf,
+        Complex64,
+        N,
+    >,
+    /// `Alpha_PPQ^{IJK}`.
+    pub ppq: ThreePointBlock<
+        MomentumPerturbation,
+        MomentumPerturbation,
+        FieldPerturbation,
+        MHalf,
+        Complex64,
+        N,
+    >,
+    /// `Alpha_PPP^{IJK}`.
+    pub ppp: ThreePointBlock<
+        MomentumPerturbation,
+        MomentumPerturbation,
+        MomentumPerturbation,
+        M3Over2,
+        Complex64,
+        N,
+    >,
+}
+
+impl<const N: usize> ThreePointPhaseSpaceCorrelation<N> {
+    /// Returns the additive identity in every phase-space block.
+    pub fn zero() -> Self {
+        Self {
+            qqq: zero_three_point_block(),
+            qqp: zero_three_point_block(),
+            qpq: zero_three_point_block(),
+            pqq: zero_three_point_block(),
+            qpp: zero_three_point_block(),
+            pqp: zero_three_point_block(),
+            ppq: zero_three_point_block(),
+            ppp: zero_three_point_block(),
+        }
+    }
+
+    /// Exchanges Fourier legs one and two, including their phase-space slots.
+    pub fn swap_first_second(self) -> Self {
+        Self {
+            qqq: self.qqq.swap_first_second(),
+            qqp: self.qqp.swap_first_second(),
+            qpq: self.pqq.swap_first_second(),
+            pqq: self.qpq.swap_first_second(),
+            qpp: self.pqp.swap_first_second(),
+            pqp: self.qpp.swap_first_second(),
+            ppq: self.ppq.swap_first_second(),
+            ppp: self.ppp.swap_first_second(),
+        }
+    }
+
+    /// Exchanges Fourier legs two and three, including their phase-space slots.
+    pub fn swap_second_third(self) -> Self {
+        Self {
+            qqq: self.qqq.swap_second_third(),
+            qqp: self.qpq.swap_second_third(),
+            qpq: self.qqp.swap_second_third(),
+            pqq: self.pqq.swap_second_third(),
+            qpp: self.qpp.swap_second_third(),
+            pqp: self.ppq.swap_second_third(),
+            ppq: self.pqp.swap_second_third(),
+            ppp: self.ppp.swap_second_third(),
+        }
+    }
+
+    /// Complex-conjugates all eight phase-space blocks.
+    pub fn conjugate(self) -> Self {
+        Self {
+            qqq: self.qqq.conjugate(),
+            qqp: self.qqp.conjugate(),
+            qpq: self.qpq.conjugate(),
+            pqq: self.pqq.conjugate(),
+            qpp: self.qpp.conjugate(),
+            pqp: self.pqp.conjugate(),
+            ppq: self.ppq.conjugate(),
+            ppp: self.ppp.conjugate(),
+        }
+    }
+}
+
+impl<const N: usize> Add for ThreePointPhaseSpaceCorrelation<N> {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            qqq: add_three_point_blocks(self.qqq, rhs.qqq),
+            qqp: add_three_point_blocks(self.qqp, rhs.qqp),
+            qpq: add_three_point_blocks(self.qpq, rhs.qpq),
+            pqq: add_three_point_blocks(self.pqq, rhs.pqq),
+            qpp: add_three_point_blocks(self.qpp, rhs.qpp),
+            pqp: add_three_point_blocks(self.pqp, rhs.pqp),
+            ppq: add_three_point_blocks(self.ppq, rhs.ppq),
+            ppp: add_three_point_blocks(self.ppp, rhs.ppp),
+        }
+    }
+}
+
+impl<const N: usize> Mul<f64> for ThreePointPhaseSpaceCorrelation<N> {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self {
+            qqq: scale_three_point_block(self.qqq, rhs),
+            qqp: scale_three_point_block(self.qqp, rhs),
+            qpq: scale_three_point_block(self.qpq, rhs),
+            pqq: scale_three_point_block(self.pqq, rhs),
+            qpp: scale_three_point_block(self.qpp, rhs),
+            pqp: scale_three_point_block(self.pqp, rhs),
+            ppq: scale_three_point_block(self.ppq, rhs),
+            ppp: scale_three_point_block(self.ppp, rhs),
+        }
+    }
+}
+
+impl<const N: usize> Mul<Dimensionless> for ThreePointPhaseSpaceCorrelation<N> {
+    type Output = Self;
+
+    fn mul(self, rhs: Dimensionless) -> Self::Output {
+        self * rhs.into_value()
+    }
+}
+
+fn add_three_point_blocks<A, B, C, D: Copy, const N: usize>(
+    lhs: ThreePointBlock<A, B, C, D, Complex64, N>,
+    rhs: ThreePointBlock<A, B, C, D, Complex64, N>,
+) -> ThreePointBlock<A, B, C, D, Complex64, N> {
+    ThreePointBlock::new(core::array::from_fn(|first| {
+        core::array::from_fn(|second| {
+            core::array::from_fn(|third| {
+                lhs.components[first][second][third] + rhs.components[first][second][third]
+            })
+        })
+    }))
+}
+
+fn scale_three_point_block<A, B, C, D: Copy, const N: usize>(
+    block: ThreePointBlock<A, B, C, D, Complex64, N>,
+    scale: f64,
+) -> ThreePointBlock<A, B, C, D, Complex64, N> {
+    ThreePointBlock::new(
+        block
+            .components
+            .map(|matrix| matrix.map(|row| row.map(|component| component * scale))),
+    )
+}
+
+fn zero_three_point_block<A, B, C, D: Copy, const N: usize>()
+-> ThreePointBlock<A, B, C, D, Complex64, N> {
+    ThreePointBlock::new([[[Quantity::new(Complex64::new(0.0, 0.0)); N]; N]; N])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1041,5 +1261,71 @@ mod tests {
         > = block.swap_first_second();
 
         assert_eq!(swapped.components()[1][0][1].into_value(), 11.0);
+    }
+
+    #[test]
+    fn complete_three_point_state_permutations_move_blocks_and_axes() {
+        fn block<A, B, C, D>(offset: f64) -> ThreePointBlock<A, B, C, D, Complex64, 2> {
+            ThreePointBlock::new(core::array::from_fn(|first| {
+                core::array::from_fn(|second| {
+                    core::array::from_fn(|third| {
+                        Quantity::new(Complex64::new(
+                            offset + (100 * first + 10 * second + third) as f64,
+                            -offset,
+                        ))
+                    })
+                })
+            }))
+        }
+
+        let alpha = ThreePointPhaseSpaceCorrelation {
+            qqq: block(0.0),
+            qqp: block(1_000.0),
+            qpq: block(2_000.0),
+            pqq: block(3_000.0),
+            qpp: block(4_000.0),
+            pqp: block(5_000.0),
+            ppq: block(6_000.0),
+            ppp: block(7_000.0),
+        };
+
+        let first_second = alpha.swap_first_second();
+        assert_eq!(
+            first_second.qpq.components()[1][0][1].into_value(),
+            Complex64::new(3_011.0, -3_000.0)
+        );
+        assert_eq!(
+            first_second.pqp.components()[1][0][1].into_value(),
+            Complex64::new(4_011.0, -4_000.0)
+        );
+        assert_eq!(first_second.swap_first_second(), alpha);
+
+        let second_third = alpha.swap_second_third();
+        assert_eq!(
+            second_third.qqp.components()[1][0][1].into_value(),
+            Complex64::new(2_110.0, -2_000.0)
+        );
+        assert_eq!(
+            second_third.pqp.components()[1][0][1].into_value(),
+            Complex64::new(6_110.0, -6_000.0)
+        );
+        assert_eq!(second_third.swap_second_third(), alpha);
+        assert_eq!(alpha.conjugate().conjugate(), alpha);
+        assert_eq!(alpha + ThreePointPhaseSpaceCorrelation::zero(), alpha);
+        assert_eq!(alpha * Dimensionless::new(1.0), alpha);
+    }
+
+    #[test]
+    fn complete_three_point_zero_has_the_dimensioned_additive_identity() {
+        let alpha = ThreePointPhaseSpaceCorrelation::<2>::zero();
+
+        assert_eq!(
+            alpha.qqq.components()[0][0][0].into_value(),
+            Complex64::new(0.0, 0.0)
+        );
+        assert_eq!(
+            alpha.ppp.components()[1][1][1].into_value(),
+            Complex64::new(0.0, 0.0)
+        );
     }
 }

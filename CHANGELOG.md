@@ -8,6 +8,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The first P3d three-point transport slice: a complete dimensioned
+  `QQQ`--`PPP` phase-space correlation state, permutation-safe leg exchanges,
+  complex conjugation, integration arithmetic, and compile-time rejection of
+  block-dimension mismatches.
 - Separate horizon-exit spectrum rows refined at each mode's `k = aH`
   crossing. Both horizon-exit and requested-output CSVs carry `N`, `k/(aH)`,
   and explicit evaluation-epoch metadata.

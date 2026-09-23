@@ -21,6 +21,8 @@ toward non-Gaussianity are specified in
 The selected tree-level phase-space transport architecture and its ordered
 two-/three-point validation milestones are specified in
 [`docs/non-gaussianity-architecture.md`](docs/non-gaussianity-architecture.md).
+The active P3d state and dynamics boundary is tracked in
+[`docs/three-point-transport.md`](docs/three-point-transport.md).
 The implemented milestone, known limitations, release state, and ordered next
 steps are summarized in
 [`docs/current-status-and-roadmap.md`](docs/current-status-and-roadmap.md).

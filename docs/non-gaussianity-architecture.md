@@ -261,6 +261,17 @@ than `2e-6`. Starts at 3, 4, and 5 e-folds before exit show successively
 smaller differences, with each refinement shrinking by more than a factor of
 two. P3d is the next milestone.
 
+### P3d implementation status
+
+P3d is in progress. The first slice implements the complete dimensioned
+`ThreePointPhaseSpaceCorrelation` state with separate `QQQ` through `PPP`
+blocks, complex conjugation, Runge--Kutta arithmetic, and Fourier-leg
+transpositions that move their phase-space slots and component axes together.
+A compile-fail test fixes the distinct `M^(-3/2)`, `M^(-1/2)`, `M^(1/2)`, and
+`M^(3/2)` block dimensions. No cubic kernel or physical bispectrum is claimed
+yet. The staged contract and next homogeneous-transport step are documented in
+[`three-point-transport.md`](three-point-transport.md).
+
 ## Acceptance boundary
 
 The non-Gaussianity milestone is complete only when:
