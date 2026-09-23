@@ -69,9 +69,14 @@ the quantum commutator information carried by the mixed blocks.
    shared fixed-step RK4 comparison bounds the maximum block-normalized error
    by `2e-7` at all four epochs.
 4. Require convergence under tighter integration tolerance and deeper
-   Bunch--Davies initialization before marking P3c complete.
+   Bunch--Davies initialization before marking P3c complete. **Complete:**
+   tightening the relative tolerance from `1e-7` to `1e-10` changes the final
+   all-block result by less than `2e-6`, and the change from successively
+   deeper starts at 3, 4, and 5 e-folds before exit shrinks by more than a
+   factor of two.
 
-P3d cannot begin until steps 2--4 pass with declared numerical tolerances.
+All P3c gates pass. P3d may now build the sourced three-point hierarchy on
+this two-point oracle.
 
 ## Direct evolution equation
 
@@ -88,3 +93,8 @@ connection flow `Gamma^I_JK pi^J/H` to both field-space indices of every
 covariance block. It receives the background only through
 `TwoFieldBackgroundProvider`; the P2 cubic-Hermite trajectory implements this
 interface and is queried at every Runge--Kutta stage.
+
+`TwoPointTransportTolerance` carries a correctly dimensioned absolute floor
+for each block. The adaptive norm uses the largest complex modulus across a
+whole block as its relative scale, so an exactly zero off-diagonal component
+does not force an otherwise physical state to take vanishing steps.

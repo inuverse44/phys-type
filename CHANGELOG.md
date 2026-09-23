@@ -36,6 +36,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   including coordinate-basis connection flow on both tensor indices and
   all-block comparisons at subhorizon, horizon-exit, maximum-turn, and final
   epochs.
+- Dimensioned adaptive tolerances for each two-point phase-space block, with
+  tighter-tolerance and deeper-vacuum-start convergence tests completing the
+  P3c two-point transport milestone.
 
 ### Changed
 
