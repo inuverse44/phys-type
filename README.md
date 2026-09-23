@@ -191,6 +191,11 @@ symmetries and the first Bianchi identity with structured validation errors.
 Third-order geometry supplies the symmetrized `V_;(IJK)` and the typed
 rank-five `nabla_M R^I_JKL` capability needed by cubic transport.
 
+The transport layer fixes `X^a = (Q^I, P^I)` with `P^I = D_t Q^I` and can
+convert a complete linear mode-solver state into dimensioned complex `QQ`,
+`QP`, `PQ`, and `PP` oracle blocks. Direct covariance evolution is the next
+P3c step.
+
 `CovariantMultifieldSystem<P, G, N>` accepts a `FieldSpaceGeometry<N>` that
 supplies `G_IJ`, `G^IJ`, and `Gamma^I_JK`. `FlatFieldSpace` exactly reproduces
 the canonical solver, and `HyperbolicFieldSpace` supplies the constant

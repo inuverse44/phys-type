@@ -112,7 +112,10 @@ turn and the complete 41-point benchmark.
   **P3b is completed:** third-order automatic differentiation, dimensioned
   coordinate `V_,IJK`, symmetrized covariant `V_;(IJK)`, explicit connection
   derivatives, and typed `nabla_M R^I_JKL` are implemented with flat and
-  hyperbolic analytic tests. P3c, the two-point transport oracle, is next;
+  hyperbolic analytic tests. **P3c is in progress:** the phase-space convention
+  and all-block mode-solver oracle are implemented; direct covariance
+  evolution on the shared background is next. See
+  [`two-point-transport-oracle.md`](two-point-transport-oracle.md);
 - reheating and post-inflationary transfer;
 - dynamically sized field spaces if a concrete model requires more than the
   current const-generic representation.

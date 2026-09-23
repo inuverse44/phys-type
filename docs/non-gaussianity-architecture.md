@@ -239,6 +239,20 @@ derivative.  Flat-space reduction, `nabla R = 0` for both built-in geometries,
 full permutation symmetry, and rank-five variance rejection are also fixed by
 tests. P3c is the next milestone.
 
+### P3c implementation status
+
+P3c is in progress. The convention is fixed to `Q^I = U^I` and
+`P^I = D_t U^I`; `P` is neither a conformal derivative nor an `a^3`-weighted
+canonical momentum. `TwoPointPhaseSpaceCovariance` carries dimensioned complex
+`QQ`, `QP`, `PQ`, and `PP` blocks, and
+`two_point_covariance_from_mode_state` derives all four from one complete
+mode/background state. Bunch--Davies closed forms and the identities
+`QQ = QQ^dagger`, `PP = PP^dagger`, and `PQ = QP^dagger` are tested.
+
+The detailed conversion and remaining acceptance stages are specified in
+[`two-point-transport-oracle.md`](two-point-transport-oracle.md). Direct
+covariance evolution and multi-epoch agreement remain before P3c is complete.
+
 ## Acceptance boundary
 
 The non-Gaussianity milestone is complete only when:
