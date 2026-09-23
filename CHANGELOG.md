@@ -25,6 +25,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `ThirdOrderJet<N>` forward automatic differentiation, including third-order
   product and chain rules, and a dimensioned one-pass multifield potential API
   for the coordinate derivative `V_,IJK`.
+- Third-order field-space geometry with explicit non-tensor `partial_M
+  Gamma^I_JK`, fully symmetrized `V_;(IJK)`, and a typed rank-five
+  `nabla_M R^I_JKL` capability. Flat and hyperbolic built-in geometries provide
+  analytic implementations.
 
 ### Changed
 

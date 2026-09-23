@@ -160,7 +160,7 @@ identifier.
 The implementation sequence adds only what the transport kernels consume:
 
 - third-order automatic differentiation for the potential;
-- a symmetric covariant `V_;IJK` with dimension `M`;
+- a symmetric covariant `V_;(IJK)` with dimension `M`;
 - rank-five field tensors and `nabla_M R^I_JKL` where required;
 - phase-space tensors whose slot dimensions are explicit;
 - complex Hermitian two-point blocks and permutation-aware complex
@@ -175,7 +175,7 @@ Third derivative order and tensor rank remain separate concepts in the API.
 1. **P3a — momentum and phase-space types.** Add validated momentum triangles,
    tagged phase-space indices, dimensioned two-/three-point containers, and
    permutation tests. No dynamics yet.
-2. **P3b — third-order model geometry.** Add third-order AD, `V_;IJK`, and the
+2. **P3b — third-order model geometry.** Add third-order AD, `V_;(IJK)`, and the
    curvature-derivative capabilities actually required by the selected
    kernels, with analytic flat and curved tests.
 3. **P3c — two-point transport oracle.** Evolve the phase-space covariance on
@@ -211,7 +211,7 @@ that enters through P3b/P3c.
 
 ### P3b implementation status
 
-P3b is in progress.  Its first independently testable slice is complete:
+P3b is complete:
 
 - `ThirdOrderJet<N>` carries a value, gradient, Hessian, and fully symmetric
   third derivative without changing the established `Jet<N>` representation;
@@ -223,10 +223,21 @@ P3b is in progress.  Its first independently testable slice is complete:
   rules, transcendental functions, a mixed cubic, and a vanishing quadratic
   third derivative.
 
-This slice deliberately exposes `V_,IJK`, not `V_;IJK`.  The next P3b slice
-must add the field-space covariantization and only the derivative of curvature
-required by the selected transport kernel, with flat and curved analytic
-tests, before P3b can be marked complete.
+- `ChristoffelDerivatives` represents `partial_M Gamma^I_JK` explicitly as a
+  coordinate-dependent non-tensor, and `ThirdOrderFieldSpaceGeometry` supplies
+  it analytically;
+- `CovariantMultifieldSystem` forms `nabla_K V_;IJ` and then explicitly
+  symmetrizes it to the `V_;(IJK)` combination selected by the cubic action;
+- `FieldTensor5` and `CovariantRiemannDerivative` represent
+  `nabla_M R^I_JKL` with variance and dimension fixed by the type system;
+- `CurvatureDerivativeGeometry` is a separate capability, implemented
+  analytically by the built-in flat and constant-curvature hyperbolic spaces.
+
+Finite-difference tests independently check the hyperbolic connection
+derivatives and every component of the symmetrized covariant potential third
+derivative.  Flat-space reduction, `nabla R = 0` for both built-in geometries,
+full permutation symmetry, and rank-five variance rejection are also fixed by
+tests. P3c is the next milestone.
 
 ## Acceptance boundary
 
