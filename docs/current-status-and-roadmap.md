@@ -158,9 +158,11 @@ turn and the complete 41-point benchmark.
   The source derivation has exposed a required semantic decision: the
   published cubic-Hamiltonian kernel evolves rescaled canonical momentum
   $\Pi^I$, while the accepted P3c type means $P^I=D_tQ^I$. They coincide only
-  at linear order. The next code change must either introduce a separate
-  canonical-momentum slot or transform the complete quadratic system to the
-  velocity variable; it may not silently reinterpret the existing marker. See
+  at linear order. A separate `CanonicalMomentumPerturbation` marker and
+  canonical covariance, correlation, and kernel aliases now preserve this
+  distinction at compile time; a compile-fail test rejects mixing a canonical
+  kernel with velocity covariances. The next code change is construction of
+  the canonical $A$, $B$, and $C$ kernel coefficients. See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
   [`three-point-transport.md`](three-point-transport.md), with the detailed
   derivation in

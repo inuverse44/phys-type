@@ -25,6 +25,10 @@ The following pieces are not implemented:
 - general-triangle permutation, reality, and convergence tests;
 - nonlinear projection to the curvature bispectrum.
 
+The canonical-momentum type boundary required by the first missing item is
+implemented: canonical and velocity covariances, correlations, and kernels
+cannot be mixed in the typed source contraction.
+
 Therefore the current API is transport infrastructure, not yet a primordial
 bispectrum prediction.
 
@@ -269,8 +273,9 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
 
 ## Remaining P3d acceptance work
 
-1. select and type the velocity or canonical-momentum phase-space route;
-2. derive and implement the corresponding curved-field-space
+1. **Completed:** select the separately typed canonical-momentum phase-space
+   route while preserving the velocity types used by P3c;
+2. derive and implement the canonical curved-field-space
    $u^a{}_{bc}$ coefficients;
 3. test flat-space, single-field, and field-coordinate covariance limits;
 4. implement the quantum initial condition for all eight blocks;

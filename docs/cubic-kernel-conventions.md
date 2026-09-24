@@ -281,16 +281,30 @@ The implementation must choose one of two explicit routes:
 2. analytically transform the full quadratic flow and initial condition to
    $(Q,V)$ before constructing the existing kernel type.
 
-The repository does not yet select between these routes. A silent
-reinterpretation of `MomentumPerturbation` is forbidden because it would
-invalidate the already accepted P3c convention.
+The repository selects the first route. `CanonicalMomentumPerturbation` is a
+distinct public marker, and the two-point covariance, three-point correlation,
+and quadratic kernel types are generic over their second phase-space slot.
+Their existing one-argument forms retain `MomentumPerturbation` as the default,
+so P3c remains source-compatible and continues to mean $V^I=D_tQ^I$. The
+canonical aliases are:
+
+- `CanonicalTwoPointPhaseSpaceCovariance<N>`;
+- `CanonicalThreePointPhaseSpaceCorrelation<N>`;
+- `CanonicalQuadraticPhaseSpaceKernel<N>`.
+
+The source contraction requires the same marker on the kernel and both
+correlator types. A compile-fail test proves that a canonical kernel cannot be
+contracted with velocity covariances. Erasing a `PhaseSpaceIndex` retains only
+the structural field/momentum position; semantic safety is carried by the
+typed containers and must be preserved until after contraction.
 
 ## Acceptance checklist for implementation
 
 The physical kernel is not accepted until all of the following are explicit
 in code and tests:
 
-1. the phase-space variable is named and typed as either $V$ or $\Pi$;
+1. **Implemented:** the phase-space variable is named and typed as either $V$
+   or $\Pi$;
 2. cosmic-time coefficients are converted once, and only once, to e-fold
    coefficients by $H^{-1}$;
 3. all field-index symmetrizations move their Fourier legs simultaneously;
@@ -298,8 +312,8 @@ in code and tests:
 5. $M_{\mathrm{Pl}}=1$ is applied only at the system boundary;
 6. flat-field-space and single-field reductions are checked analytically;
 7. exchanging the two input legs maps each ordered block to its partner;
-8. a nonlinear $V\leftrightarrow\Pi$ correlator conversion is tested if the
-   canonical route is selected;
+8. a nonlinear $V\leftrightarrow\Pi$ correlator conversion is tested for the
+   selected canonical route;
 9. dimensions, permutation identities, and an independent numerical
    benchmark all pass.
 
