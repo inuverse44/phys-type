@@ -50,6 +50,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- P3 documentation now uses rendered TeX for the transport hierarchy and
+  geometry conventions, defines every index and momentum argument near first
+  use, and separates implemented three-point infrastructure from the missing
+  physical cubic kernel, quantum initial condition, and curvature projection.
 - `k/k_pivot` is the canonical spectrum coordinate. Raw comoving wavenumbers
   are labeled `k_internal_over_m_pl` because they depend on the arbitrary
   scale-factor normalization.

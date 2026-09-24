@@ -1,117 +1,263 @@
 # Three-point transport
 
-## Status
+## Purpose and current boundary
 
-P3d is in progress. Its state/permutation contract, homogeneous linear
-transport, and typed quadratic-source contraction are implemented. The
-model-derived cubic kernel and quantum initial conditions are not yet
-implemented.
+This document describes P3d: evolution of the connected three-point function
+of scalar perturbations. It begins where the validated P3c two-point transport
+ends. The immediate input is therefore a background trajectory and three
+complex phase-space covariances, not a curvature bispectrum or an
+$f_{\mathrm{NL}}$ value.
 
-`ThreePointPhaseSpaceCorrelation<N>` stores the connected equal-time
-correlator
+P3d is in progress. The following pieces are implemented:
 
-```text
-Alpha^{abc}(k_1,k_2,k_3)
-  = <X^a(k_1) X^b(k_2) X^c(k_3)>_connected,
-X^a = (Q^I, P^I),
-```
+- the complete dimensioned three-point state;
+- Fourier-leg permutation and complex-conjugation operations;
+- homogeneous evolution by the linear flow $u^a{}_b$;
+- a dimensioned container for the quadratic flow $u^a{}_{bc}$;
+- contraction of three ordered $u\Sigma\Sigma$ source terms.
 
-as eight separate complex blocks:
+The following pieces are not implemented:
 
-| Block | Dimension |
+- the model-derived curved-field-space coefficients of $u^a{}_{bc}$;
+- the in-in/Bunch--Davies initial value for the three-point function;
+- one adaptive system that evolves the sourced state through a physical
+  benchmark;
+- general-triangle permutation, reality, and convergence tests;
+- nonlinear projection to the curvature bispectrum.
+
+Therefore the current API is transport infrastructure, not yet a primordial
+bispectrum prediction.
+
+## Notation and index domains
+
+There are three different kinds of indices:
+
+| Symbol | Meaning |
 | --- | --- |
-| `QQQ` | `M^(-3/2)` |
-| `QQP`, `QPQ`, `PQQ` | `M^(-1/2)` |
-| `QPP`, `PQP`, `PPQ` | `M^(1/2)` |
-| `PPP` | `M^(3/2)` |
+| $I,J,K,\ldots$ | field-space coordinates, transformed with $G_{IJ}$ |
+| $a,b,c,\ldots$ | phase-space indices; each means a slot $Q$ or $P$ together with a field index |
+| $r,s\in\{1,2,3\}$ | Fourier-leg labels associated with $\mathbf{k}_1,\mathbf{k}_2,\mathbf{k}_3$ |
 
-These dimensions follow the P3c convention `Q^I = U^I` and
-`P^I = D_t U^I`. A block's three slot markers and its dimension are both part
-of its Rust type. The public API therefore rejects, for example, treating a
-`QQP` block as `QQQ`, even when both contain the same numerical array shape.
+Bold $\mathbf{k}_r$ denotes a wavevector and $k_r=|\mathbf{k}_r|$ its positive
+magnitude. Translation invariance imposes
+
+$$
+\mathbf{k}_1+\mathbf{k}_2+\mathbf{k}_3=0,
+$$
+
+which is why the three magnitudes form a triangle. A Fourier-leg permutation
+moves both $\mathbf{k}_r$ and the phase-space slot attached to that leg. It is
+not a permutation of field-space indices.
+
+The P3c phase-space convention is
+
+$$
+X^a=(Q^I,P^I),\qquad Q^I=U^I,\qquad P^I=D_tU^I,
+$$
+
+where $U^I$ is the covariant field perturbation and $D_t$ is the field-space
+covariant cosmic-time derivative. The e-fold derivative is
+
+$$
+D_N\equiv H^{-1}D_t.
+$$
+
+In the Fourier normalization used by this crate,
+$[Q]=M^{-1/2}$ and $[P]=M^{1/2}$.
+
+## Correlation functions
+
+After removing the momentum-conserving delta function, the equal-time
+two-point covariance and connected three-point function are
+
+$$
+\Sigma^{ab}(k)
+  =\left\langle X^a(\mathbf{k})X^b(-\mathbf{k})\right\rangle,
+$$
+
+$$
+\alpha^{abc}(k_1,k_2,k_3)
+  =\left\langle
+      X^a(\mathbf{k}_1)X^b(\mathbf{k}_2)X^c(\mathbf{k}_3)
+    \right\rangle_{\!c}.
+$$
+
+The subscript $c$ means the connected part. The Rust type
+`ThreePointPhaseSpaceCorrelation<N>` represents $\alpha^{abc}$ using eight
+blocks:
+
+| Block | Meaning | Dimension |
+| --- | --- | --- |
+| `QQQ` | $\langle Q^I Q^J Q^K\rangle_c$ | $M^{-3/2}$ |
+| `QQP`, `QPQ`, `PQQ` | one momentum slot | $M^{-1/2}$ |
+| `QPP`, `PQP`, `PPQ` | two momentum slots | $M^{1/2}$ |
+| `PPP` | $\langle P^I P^J P^K\rangle_c$ | $M^{3/2}$ |
+
+The slot markers and physical dimension are both part of each Rust type. For
+example, a numerical array stored as `QQP` cannot be assigned to `QQQ`.
 
 ## Fourier-leg operations
 
-The two generating transpositions exchange legs `(1 2)` and `(2 3)`. They
-move together:
+The API supplies the two transpositions $(12)$ and $(23)$. Each operation
+moves all of the following together:
 
-1. the corresponding array axis;
-2. the phase-space slot marker;
-3. the containing block within the eight-block state.
+1. the appropriate component-array axis;
+2. the compile-time $Q/P$ slot marker;
+3. the containing block among `QQQ` through `PPP`.
 
-Applying either exchange twice is the identity. Their compositions generate
-all six permutations of a momentum triangle. Complex conjugation does not
-move a leg and is represented separately. This is the foundation for later
-permutation and reality residuals; it does not assert that an arbitrary stored
-state already satisfies those identities.
+Each transposition squares to the identity, and their compositions generate
+all six permutations in $S_3$. Complex conjugation is separate because it
+changes quantum phase information without moving a Fourier leg. These
+operations make it possible to define permutation and reality residuals later;
+they do not force an arbitrary input state to obey those identities.
 
-## Homogeneous transport
+## Nonlinear phase-space flow
 
-The state implements addition and multiplication by dimensionless Runge--Kutta
-coefficients, so it can be used directly by the existing integrators.
-`ThreePointHomogeneousTransportSystem` applies the P3c linear phase-space flow
-to each Fourier leg,
+Expanding the perturbation equations to quadratic order gives
 
-```text
-D_N Alpha^{abc}
-  = u^a_d(k_1) Alpha^{dbc}
-  + u^b_d(k_2) Alpha^{adc}
-  + u^c_d(k_3) Alpha^{abd}.
-```
+$$
+D_NX^a(\mathbf{k})
+=u^a{}_b(k)X^b(\mathbf{k})
++\frac12\int\!\frac{d^3q}{(2\pi)^3}\,
+  u^a{}_{bc}(\mathbf{k};\mathbf{q},\mathbf{k}-\mathbf{q})
+  X^b(\mathbf{q})X^c(\mathbf{k}-\mathbf{q})+\cdots.
+$$
 
-It reads every Runge--Kutta stage from the shared P2 background provider. The
-state legs and per-leg wavenumbers use `MomentumTriangle` canonical order. The
-linear flow retains the declared P3c convention, including connection terms,
-Hubble friction, the covariant perturbation mass matrix, and each leg's
-`k_i^2/a^2` contribution.
+Here $u^a{}_b$ is the linear phase-space flow and $u^a{}_{bc}$ is the
+quadratic flow derived from the cubic Hamiltonian. The factor $1/2$ belongs to
+the quadratic expansion. At tree level, the two Wick contractions of the
+quadratic term cancel this factor in the three-point source equation below.
 
-The public name says `Homogeneous` deliberately: this system contains no cubic
-kernel and makes no physical bispectrum claim. In particular, a zero state
-remains zero.
+### Homogeneous part
 
-## Quadratic source contraction
+`ThreePointHomogeneousTransportSystem` implements
 
-`QuadraticPhaseSpaceKernel<N>` stores the eight ordered blocks of `u^a_bc`.
-Their dimensions are derived from
+$$
+\begin{aligned}
+D_N\alpha^{abc}
+={}&u^a{}_d(k_1)\alpha^{dbc}
+   +u^b{}_d(k_2)\alpha^{adc}
+   +u^c{}_d(k_3)\alpha^{abd}.
+\end{aligned}
+$$
 
-```text
-dim(u^a_bc) = dim(X^a) - dim(X^b) - dim(X^c).
-```
+The three terms propagate legs 1, 2, and 3 respectively. Every Runge--Kutta
+stage reads the shared P2 background trajectory. The linear flow contains the
+connection, Hubble friction, covariant perturbation mass matrix, and the
+leg-dependent $k_r^2/a^2$ term already validated in P3c.
 
-For a field output these are `M^(1/2)`, `M^(-1/2)`, `M^(-1/2)`, and
-`M^(-3/2)` for `QQ`, `QP`, `PQ`, and `PP` inputs. For a momentum output they
-are `M^(3/2)`, `M^(1/2)`, `M^(1/2)`, and `M^(-1/2)`.
+The word `Homogeneous` is intentional: if $\alpha=0$, this equation alone
+keeps $\alpha=0$.
 
-`three_point_source_from_kernels` evaluates
+### Quadratic source
 
-```text
-u^a_de Sigma^{db}(k_2) Sigma^{ec}(k_3) + two leg permutations
-```
+The complete tree-level source is
 
-from three ordered kernels and three complex phase-space covariances. Kernel
-`a` has output leg `a`; its input legs use ascending order among the remaining
-legs: `[1,2]`, `[0,2]`, and `[0,1]`. This explicit convention prevents a
-cyclic/ascending-order ambiguity for the middle output leg.
+$$
+\begin{aligned}
+S^{abc}={}&
+u^a{}_{de}(\mathbf{k}_1;\mathbf{k}_2,\mathbf{k}_3)
+  \Sigma^{db}(k_2)\Sigma^{ec}(k_3)\\
+&+u^b{}_{de}(\mathbf{k}_2;\mathbf{k}_1,\mathbf{k}_3)
+  \Sigma^{da}(k_1)\Sigma^{ec}(k_3)\\
+&+u^c{}_{de}(\mathbf{k}_3;\mathbf{k}_1,\mathbf{k}_2)
+  \Sigma^{da}(k_1)\Sigma^{eb}(k_2).
+\end{aligned}
+$$
 
-This layer performs only the hierarchy contraction. The next slice must derive
-the actual curved-field-space kernel from the cubic Hamiltonian and the fixed
-`P = D_t Q` convention. Quantum initial conditions and subhorizon start-depth
-convergence remain acceptance requirements; zeroing `Alpha` at horizon exit is
-not an allowed substitute.
+The sourced transport equation will be
 
-## Verification in this slice
+$$
+D_N\alpha^{abc}
+=\left.D_N\alpha^{abc}\right|_{\mathrm{hom}}+S^{abc}.
+$$
 
-- all eight blocks have their declared compile-time dimensions;
-- zero, addition, and dimensionless scaling preserve each block type;
-- both generating leg exchanges move block and component axes together and
-  square to the identity;
-- complex conjugation squares to the identity;
-- a compile-fail test rejects assigning the `M^(-1/2)` `QQP` block the
-  `M^(-3/2)` dimension expected for `QQQ`.
-- the `QQQ` derivative receives the expected `PQQ + QPQ + QQP` linear terms;
-- for an equilateral triangle, homogeneous evolution commutes with a
-  Fourier-leg exchange in all eight blocks and every field component.
-- a scalar complex regression sums the three ordered `u Sigma Sigma` terms
-  independently and leaves unsourced phase-space blocks zero;
-- a compile-fail test rejects giving `u^P_QQ` the `M^(1/2)` dimension required
-  by `u^Q_QQ` instead of its own `M^(3/2)` dimension.
+`QuadraticPhaseSpaceKernel<N>` stores the eight ordered $Q/P$ blocks of
+$u^a{}_{bc}$. Dimensional consistency requires
+
+$$
+[u^a{}_{bc}]=[X^a]-[X^b]-[X^c].
+$$
+
+Therefore:
+
+| Output | Inputs `QQ` | Inputs `QP` | Inputs `PQ` | Inputs `PP` |
+| --- | ---: | ---: | ---: | ---: |
+| $Q$ | $M^{1/2}$ | $M^{-1/2}$ | $M^{-1/2}$ | $M^{-3/2}$ |
+| $P$ | $M^{3/2}$ | $M^{1/2}$ | $M^{1/2}$ | $M^{-1/2}$ |
+
+`three_point_source_from_kernels` evaluates the displayed expression for
+$S^{abc}$. Its three kernel arguments have output legs 1, 2, and 3. The two
+input legs are stored in ascending order among the remaining legs:
+
+| Kernel output leg | Ordered input legs |
+| --- | --- |
+| 1 | $(2,3)$ |
+| 2 | $(1,3)$ |
+| 3 | $(1,2)$ |
+
+Making the middle row explicit prevents confusing ascending order $(1,3)$
+with a cyclic convention $(3,1)$.
+
+## Why the source algebra is not yet the physical kernel
+
+The current contraction accepts correctly dimensioned numerical kernel
+blocks, but does not manufacture their values. The next implementation must
+derive those values from the curved-field-space cubic Hamiltonian and convert
+them consistently to $P^I=D_tQ^I$.
+
+That conversion must include the terms involving the symmetrized covariant
+potential derivative $V_{;(IJK)}$, field-space curvature, and the required
+covariant curvature derivative. These are the reasons P3b implemented the
+third-order geometry first.
+
+This boundary is important: compile-time dimensions can reject a kernel in the
+wrong physical slot, but they cannot prove that a coefficient, sign, momentum
+argument, or curvature contraction was derived correctly. Those properties
+require analytic limits, permutation tests, and comparison with an independent
+calculation.
+
+## Initial conditions
+
+All three legs begin at one common time when the triangle is sufficiently deep
+inside the horizon. If
+
+$$
+x_r\equiv\frac{k_r}{aH},
+$$
+
+the start criterion must control all three $x_r$, with the smallest $k_r$
+usually setting the most restrictive leg. The initial $\Sigma^{ab}$ values
+come from the validated Bunch--Davies mode state.
+
+The initial $\alpha^{abc}$ is not generally zero. It must be obtained from the
+early-time in-in integral or an analytically equivalent quantum-transport
+initial condition. Setting $\alpha=0$ at horizon exit would discard intrinsic
+horizon-crossing interactions and distort nonlocal triangle shapes.
+
+## Verification already present
+
+- all eight $\alpha$ blocks have compile-time slot and dimension checks;
+- addition and multiplication by dimensionless Runge--Kutta coefficients
+  preserve every block type;
+- $(12)^2=(23)^2=1$ and complex conjugation squares to the identity;
+- the `QQQ` homogeneous derivative contains the expected
+  $(\mathrm{PQQ}+\mathrm{QPQ}+\mathrm{QQP})/H$ terms;
+- homogeneous evolution commutes with an equal-leg exchange for an
+  equilateral triangle in every block and field component;
+- a scalar complex regression independently reproduces all three ordered
+  $u\Sigma\Sigma$ terms;
+- compile-fail tests reject both a mismatched $\alpha$ block and an incorrectly
+  dimensioned $u^P{}_{QQ}$ block.
+
+## Remaining P3d acceptance work
+
+1. derive and implement the curved-field-space $u^a{}_{bc}$ coefficients;
+2. test flat-space, single-field, and field-coordinate covariance limits;
+3. implement the quantum initial condition for all eight blocks;
+4. combine homogeneous and sourced terms into one adaptive transport system;
+5. verify general-triangle permutation and reality identities;
+6. demonstrate convergence in integration tolerance and start depth.
+
+Only after these items pass does P3e project $\alpha^{abc}$ to the observable
+curvature bispectrum $B_\zeta$.

@@ -185,23 +185,29 @@ implement `RaiseFirst`; already-lower indices are rejected at compile time.
 `ChristoffelSymbols` and `ChristoffelDerivatives` deliberately remain distinct
 non-tensor types.
 
-`RiemannTensor<N>` fixes the convention `R^I_JKL` and dimension `M^-2`.
+`RiemannTensor<N>` fixes the convention $R^I{}_{JKL}$ and dimension $M^{-2}$.
 `CurvedFieldSpaceGeometry<N>` supplies it analytically, while
 `contract_velocities` produces the mixed `M^2` curvature contribution needed
 by the perturbation mass matrix. All-lower curvature can be checked for pair
 symmetries and the first Bianchi identity with structured validation errors.
-Third-order geometry supplies the symmetrized `V_;(IJK)` and the typed
-rank-five `nabla_M R^I_JKL` capability needed by cubic transport.
+Third-order geometry supplies the symmetrized $V_{;(IJK)}$ and the typed
+rank-five $\nabla_MR^I{}_{JKL}$ capability needed by cubic transport.
 
-The transport layer fixes `X^a = (Q^I, P^I)` with `P^I = D_t Q^I` and can
+The transport layer fixes $X^a=(Q^I,P^I)$ with $P^I=D_tQ^I$ and can
 convert a complete linear mode-solver state into dimensioned complex `QQ`,
 `QP`, `PQ`, and `PP` oracle blocks. `TwoPointTransportSystem` evolves those
 blocks directly on the shared interpolated background and is regression-tested
 against the mode oracle at four physical epochs. Dimensioned adaptive
 tolerances and initialization-depth convergence complete the P3c validation.
+P3d now provides the complete dimensioned `QQQ`--`PPP` state, homogeneous
+three-leg evolution, the typed quadratic kernel $u^a{}_{bc}$, and the ordered
+$u\Sigma\Sigma$ contraction. The model-derived cubic coefficients, quantum
+three-point initial condition, and observable $B_\zeta$ projection remain
+unfinished; the repository therefore does not yet claim a bispectrum
+prediction.
 
 `CovariantMultifieldSystem<P, G, N>` accepts a `FieldSpaceGeometry<N>` that
-supplies `G_IJ`, `G^IJ`, and `Gamma^I_JK`. `FlatFieldSpace` exactly reproduces
+supplies $G_{IJ}$, $G^{IJ}$, and $\Gamma^I{}_{JK}$. `FlatFieldSpace` exactly reproduces
 the canonical solver, and `HyperbolicFieldSpace` supplies the constant
 negative curvature of alpha-attractor and hyperbolic-inflation models, which
 is the smallest geometry that exercises a non-vanishing connection and Riemann
@@ -211,9 +217,9 @@ signed dimensionless turn rate.
 
 Potentials that can be evaluated with `Jet<N>` automatically implement
 `TwiceDifferentiableMultifieldPotential<N>`. A single formula evaluation
-returns `V`, `V_,I`, and `V_,IJ`; the covariant system then constructs
-`V_;IJ = V_,IJ - Gamma^K_IJ V_,K` with lower tensor indices and dimension
-`M^2`. The shared `Transcendental` trait provides `exp`, `ln`, `cos`, and
+returns $V$, $V_{,I}$, and $V_{,IJ}$; the covariant system then constructs
+$V_{;IJ}=V_{,IJ}-\Gamma^K{}_{IJ}V_{,K}$ with lower tensor indices and dimension
+$M^2$. The shared `Transcendental` trait provides `exp`, `ln`, `cos`, and
 `tanh` for `f64`, `Dual`, and `Jet<N>`, so plateau, natural-inflation, and
 alpha-attractor formulas use the same automatic-differentiation path as
 polynomials.
@@ -232,9 +238,9 @@ ratio `|dz| / (a_tol + r_tol |z|)`, where the absolute tolerance carries the
 dimension of the component it bounds and the modulus keeps one acceptance
 decision for both parts.
 
-`mode_covariance` forms the Hermitian `Sigma^IJ = sum_A U^I_A U^{J*}_A` and
-`field_power_spectrum` applies the `k^3 / (2 pi^2)` normalization, so the
-`M^-1` covariance and the `M^2` spectrum cannot be confused and the
+`mode_covariance` forms the Hermitian covariance
+$\Sigma^{IJ}=\sum_AU^I{}_AU^{J*}{}_A$, and `field_power_spectrum` applies the
+$k^3/(2\pi^2)$ normalization, so the $M^{-1}$ covariance and the $M^2$ spectrum cannot be confused and the
 normalization cannot be applied twice. `project` contracts the two upper
 indices with lowered adiabatic and entropy covectors and returns `P_R`, `P_S`,
 the signed `C_RS`, and the correlation coefficient. Hermiticity, the imaginary
