@@ -63,6 +63,14 @@ covariant cosmic-time derivative. Therefore $P^I$ is a velocity perturbation,
 not an $a^3$-weighted canonical momentum. A phase-space index is a tagged pair
 such as $(Q,I)$ or $(P,I)$, not a third field-space variance marker.
 
+At cubic order there is a second, subtler distinction. The usual Hamiltonian
+transport formulas use the rescaled conjugate momentum $\Pi^I=a^{-3}p^I$.
+Although $\Pi^I=D_tQ^I$ at linear order, cubic interactions make them differ
+at quadratic order in perturbations. This is exactly the order entering
+$u^a{}_{bc}$ and the three-point function. The derivation and the rule against
+silently reinterpreting the existing slot marker are fixed in
+[`cubic-kernel-conventions.md`](cubic-kernel-conventions.md).
+
 The two-point and connected three-point objects are
 
 $$
@@ -331,7 +339,12 @@ kernel or physical bispectrum is claimed yet. The dimensioned eight-block
 `QuadraticPhaseSpaceKernel` and the three ordered $u\Sigma\Sigma$ contractions
 are implemented separately from the still-missing model-derived kernel. The
 staged contract and next kernel-construction step are documented in
-[`three-point-transport.md`](three-point-transport.md).
+[`three-point-transport.md`](three-point-transport.md). Source-level
+reconciliation found that the published eight-block cubic-Hamiltonian kernel
+is expressed in $(Q,\Pi)$ rather than the already validated $(Q,D_tQ)$
+variables. [`cubic-kernel-conventions.md`](cubic-kernel-conventions.md) now
+records the full $A$, $B$, and $C$ formulas, ordered block map, and the explicit
+implementation decision that must precede the physical kernel.
 
 ## Acceptance boundary
 

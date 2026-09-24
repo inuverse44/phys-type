@@ -65,6 +65,12 @@ $$
 In the Fourier normalization used by this crate,
 $[Q]=M^{-1/2}$ and $[P]=M^{1/2}$.
 
+Here the symbol $P$ and the Rust marker `MomentumPerturbation` mean a
+covariant velocity. They must not be identified beyond linear order with the
+rescaled canonical momentum used in the standard cubic-Hamiltonian
+derivation. The exact relation and the eight-block canonical kernel are given
+in [`cubic-kernel-conventions.md`](cubic-kernel-conventions.md).
+
 ## Correlation functions
 
 After removing the momentum-conserving delta function, the equal-time
@@ -124,9 +130,13 @@ D_NX^a(\mathbf{k})
 $$
 
 Here $u^a{}_b$ is the linear phase-space flow and $u^a{}_{bc}$ is the
-quadratic flow derived from the cubic Hamiltonian. The factor $1/2$ belongs to
-the quadratic expansion. At tree level, the two Wick contractions of the
-quadratic term cancel this factor in the three-point source equation below.
+quadratic flow in the declared phase-space variables. The commonly quoted
+cubic-Hamiltonian coefficients are initially written for
+$X_\Pi=(Q,\Pi)$, whereas this document uses $X=(Q,P)$ with $P=D_tQ$.
+They agree linearly but require a nonlinear variable transformation at this
+order. The factor $1/2$ belongs to the quadratic expansion. At tree level, the
+two Wick contractions of the quadratic term cancel this factor in the
+three-point source equation below.
 
 ### Homogeneous part
 
@@ -204,7 +214,8 @@ with a cyclic convention $(3,1)$.
 The current contraction accepts correctly dimensioned numerical kernel
 blocks, but does not manufacture their values. The next implementation must
 derive those values from the curved-field-space cubic Hamiltonian and convert
-them consistently to $P^I=D_tQ^I$.
+them consistently to $P^I=D_tQ^I$, or introduce a distinct typed canonical
+momentum $\Pi^I$ and keep the conversion explicit.
 
 That conversion must include the terms involving the symmetrized covariant
 potential derivative $V_{;(IJK)}$, field-space curvature, and the required
@@ -216,6 +227,12 @@ wrong physical slot, but they cannot prove that a coefficient, sign, momentum
 argument, or curvature contraction was derived correctly. Those properties
 require analytic limits, permutation tests, and comparison with an independent
 calculation.
+
+The full formulas for $A_{IJK}$, $B_{IJK}$, $C_{IJK}$, their simultaneous
+index/momentum symmetrizations, the canonical eight-block $u^a{}_{bc}$ table,
+and the unresolved $P$--$\Pi$ decision are recorded in
+[`cubic-kernel-conventions.md`](cubic-kernel-conventions.md). That document is
+the implementation gate for the next P3d slice.
 
 ## Initial conditions
 
@@ -252,12 +269,14 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
 
 ## Remaining P3d acceptance work
 
-1. derive and implement the curved-field-space $u^a{}_{bc}$ coefficients;
-2. test flat-space, single-field, and field-coordinate covariance limits;
-3. implement the quantum initial condition for all eight blocks;
-4. combine homogeneous and sourced terms into one adaptive transport system;
-5. verify general-triangle permutation and reality identities;
-6. demonstrate convergence in integration tolerance and start depth.
+1. select and type the velocity or canonical-momentum phase-space route;
+2. derive and implement the corresponding curved-field-space
+   $u^a{}_{bc}$ coefficients;
+3. test flat-space, single-field, and field-coordinate covariance limits;
+4. implement the quantum initial condition for all eight blocks;
+5. combine homogeneous and sourced terms into one adaptive transport system;
+6. verify general-triangle permutation and reality identities;
+7. demonstrate convergence in integration tolerance and start depth.
 
 Only after these items pass does P3e project $\alpha^{abc}$ to the observable
 curvature bispectrum $B_\zeta$.
