@@ -164,6 +164,11 @@ turn and the complete 41-point benchmark.
   kernel with velocity covariances. A typed five-tensor container now also
   distinguishes first- and third-index raising for $B$ and $C$, and maps the
   cosmic-time $A/B/C$ coefficients into all eight e-fold-time kernel blocks.
+  A Fourier-normalization audit corrected the stripped three-point dimensions
+  to $M^{-3}$, $M^{-2}$, $M^{-1}$, and $M^0$ for zero through three momentum
+  slots. Accordingly $A$, $B$, and $C$ carry $M^1$, $M^0$, and $M^{-1}$.
+  The former half-integer assignment had incorrectly treated a stripped
+  three-point function as a simple product of three linear mode functions.
   The next code change is model-derived evaluation of those coefficients. See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
   [`three-point-transport.md`](three-point-transport.md), with the detailed

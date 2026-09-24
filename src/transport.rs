@@ -14,9 +14,9 @@ use num_complex::Complex64;
 
 use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
 use crate::{
-    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, Hubble, M0, M1, M3Over2,
-    M5Over2, MHalf, MMinus1, MMinus3Over2, MMinusHalf, Mass, ModeAmplitude, ModeVelocity,
-    MultifieldState, Quantity, TwiceDifferentiableMultifieldPotential, TwoFieldPerturbationState,
+    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, Hubble, M0, M1, MMinus1,
+    MMinus2, MMinus3, Mass, ModeAmplitude, ModeVelocity, MultifieldState, Quantity,
+    TwiceDifferentiableMultifieldPotential, TwoFieldPerturbationState,
 };
 
 /// Default relative tolerance for numerical triangle closure.
@@ -933,12 +933,14 @@ impl<A, B, C, D: Copy, const N: usize> ThreePointBlock<A, B, C, D, Complex64, N>
 
 /// The complete connected three-point function for `X^a = (Q^I, P^I)`.
 ///
-/// Each field slot contributes dimension `M^-1/2`, and each momentum slot
-/// contributes `M^1/2`. Keeping all eight phase-space blocks distinct makes a
-/// dimensionally invalid block assignment a compile-time error. Fourier-leg
-/// permutations move both the component axis and its phase-space slot. The
-/// trailing marker fixes whether the second slot is velocity or rescaled
-/// canonical momentum.
+/// After the single momentum-conserving delta function has been removed, the
+/// blocks with zero through three momentum slots have dimensions `M^-3`,
+/// `M^-2`, `M^-1`, and `M^0`. These are not obtained by simply cubing the
+/// `M^-1/2` linear mode-function dimension, because a stripped three-point
+/// function retains a different Fourier-volume dimension than a stripped
+/// two-point function. Fourier-leg permutations move both the component axis
+/// and its phase-space slot. The trailing marker fixes whether the second slot
+/// is velocity or rescaled canonical momentum.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ThreePointPhaseSpaceCorrelation<const N: usize, P: PhaseSpaceSlot = MomentumPerturbation>
 {
@@ -947,24 +949,24 @@ pub struct ThreePointPhaseSpaceCorrelation<const N: usize, P: PhaseSpaceSlot = M
         FieldPerturbation,
         FieldPerturbation,
         FieldPerturbation,
-        MMinus3Over2,
+        MMinus3,
         Complex64,
         N,
     >,
     /// `Alpha_QQP^{IJK}`.
-    pub qqp: ThreePointBlock<FieldPerturbation, FieldPerturbation, P, MMinusHalf, Complex64, N>,
+    pub qqp: ThreePointBlock<FieldPerturbation, FieldPerturbation, P, MMinus2, Complex64, N>,
     /// `Alpha_QPQ^{IJK}`.
-    pub qpq: ThreePointBlock<FieldPerturbation, P, FieldPerturbation, MMinusHalf, Complex64, N>,
+    pub qpq: ThreePointBlock<FieldPerturbation, P, FieldPerturbation, MMinus2, Complex64, N>,
     /// `Alpha_PQQ^{IJK}`.
-    pub pqq: ThreePointBlock<P, FieldPerturbation, FieldPerturbation, MMinusHalf, Complex64, N>,
+    pub pqq: ThreePointBlock<P, FieldPerturbation, FieldPerturbation, MMinus2, Complex64, N>,
     /// `Alpha_QPP^{IJK}`.
-    pub qpp: ThreePointBlock<FieldPerturbation, P, P, MHalf, Complex64, N>,
+    pub qpp: ThreePointBlock<FieldPerturbation, P, P, MMinus1, Complex64, N>,
     /// `Alpha_PQP^{IJK}`.
-    pub pqp: ThreePointBlock<P, FieldPerturbation, P, MHalf, Complex64, N>,
+    pub pqp: ThreePointBlock<P, FieldPerturbation, P, MMinus1, Complex64, N>,
     /// `Alpha_PPQ^{IJK}`.
-    pub ppq: ThreePointBlock<P, P, FieldPerturbation, MHalf, Complex64, N>,
+    pub ppq: ThreePointBlock<P, P, FieldPerturbation, MMinus1, Complex64, N>,
     /// `Alpha_PPP^{IJK}`.
-    pub ppp: ThreePointBlock<P, P, P, M3Over2, Complex64, N>,
+    pub ppp: ThreePointBlock<P, P, P, M0, Complex64, N>,
 }
 
 /// A connected three-point function in canonical phase-space variables.
@@ -979,23 +981,23 @@ pub type CanonicalThreePointPhaseSpaceCorrelation<const N: usize> =
 /// three-point block.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct QuadraticPhaseSpaceKernel<const N: usize, P: PhaseSpaceSlot = MomentumPerturbation> {
-    /// `u^Q_QQ`, dimension `M^(1/2)`.
+    /// `u^Q_QQ`, dimension `M^-1`.
     pub q_qq:
-        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MHalf, f64, N>,
-    /// `u^Q_QP`, dimension `M^(-1/2)`.
-    pub q_qp: ThreePointBlock<FieldPerturbation, FieldPerturbation, P, MMinusHalf, f64, N>,
-    /// `u^Q_PQ`, dimension `M^(-1/2)`.
-    pub q_pq: ThreePointBlock<FieldPerturbation, P, FieldPerturbation, MMinusHalf, f64, N>,
-    /// `u^Q_PP`, dimension `M^(-3/2)`.
-    pub q_pp: ThreePointBlock<FieldPerturbation, P, P, MMinus3Over2, f64, N>,
-    /// `u^P_QQ`, dimension `M^(3/2)`.
-    pub p_qq: ThreePointBlock<P, FieldPerturbation, FieldPerturbation, M3Over2, f64, N>,
-    /// `u^P_QP`, dimension `M^(1/2)`.
-    pub p_qp: ThreePointBlock<P, FieldPerturbation, P, MHalf, f64, N>,
-    /// `u^P_PQ`, dimension `M^(1/2)`.
-    pub p_pq: ThreePointBlock<P, P, FieldPerturbation, MHalf, f64, N>,
-    /// `u^P_PP`, dimension `M^(-1/2)`.
-    pub p_pp: ThreePointBlock<P, P, P, MMinusHalf, f64, N>,
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>,
+    /// `u^Q_QP`, dimension `M^-2`.
+    pub q_qp: ThreePointBlock<FieldPerturbation, FieldPerturbation, P, MMinus2, f64, N>,
+    /// `u^Q_PQ`, dimension `M^-2`.
+    pub q_pq: ThreePointBlock<FieldPerturbation, P, FieldPerturbation, MMinus2, f64, N>,
+    /// `u^Q_PP`, dimension `M^-3`.
+    pub q_pp: ThreePointBlock<FieldPerturbation, P, P, MMinus3, f64, N>,
+    /// `u^P_QQ`, dimension `M^0`.
+    pub p_qq: ThreePointBlock<P, FieldPerturbation, FieldPerturbation, M0, f64, N>,
+    /// `u^P_QP`, dimension `M^-1`.
+    pub p_qp: ThreePointBlock<P, FieldPerturbation, P, MMinus1, f64, N>,
+    /// `u^P_PQ`, dimension `M^-1`.
+    pub p_pq: ThreePointBlock<P, P, FieldPerturbation, MMinus1, f64, N>,
+    /// `u^P_PP`, dimension `M^-2`.
+    pub p_pp: ThreePointBlock<P, P, P, MMinus2, f64, N>,
 }
 
 /// A quadratic flow whose second phase-space slot is canonical momentum.
@@ -1009,21 +1011,21 @@ pub type CanonicalQuadraticPhaseSpaceKernel<const N: usize> =
 /// explicit and prevents first- and third-index raising from being confused.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CanonicalCubicHamiltonianCoefficients<const N: usize> {
-    /// `A^I_JK`, stored as `[I][J][K]`, dimension `M^(5/2)`.
+    /// `A^I_JK`, stored as `[I][J][K]`, dimension `M^1`.
     pub a_first_raised:
-        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M5Over2, f64, N>,
-    /// `B^I_JK`, with the first original index raised, dimension `M^(3/2)`.
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M1, f64, N>,
+    /// `B^I_JK`, with the first original index raised, dimension `M^0`.
     pub b_first_raised:
-        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M3Over2, f64, N>,
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M0, f64, N>,
     /// `B_JK^I`, with the third original index raised, stored as `[I][J][K]`.
     pub b_third_raised:
-        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M3Over2, f64, N>,
-    /// `C^I_JK`, with the first original index raised, dimension `M^(1/2)`.
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M0, f64, N>,
+    /// `C^I_JK`, with the first original index raised, dimension `M^-1`.
     pub c_first_raised:
-        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MHalf, f64, N>,
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>,
     /// `C_JK^I`, with the third original index raised, stored as `[I][J][K]`.
     pub c_third_raised:
-        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MHalf, f64, N>,
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>,
 }
 
 /// An invalid Hubble rate supplied while converting a cosmic-time cubic flow.
@@ -2118,11 +2120,11 @@ mod tests {
         }
 
         let coefficients = CanonicalCubicHamiltonianCoefficients {
-            a_first_raised: block::<M5Over2>(1_000.0),
-            b_first_raised: block::<M3Over2>(2_000.0),
-            b_third_raised: block::<M3Over2>(3_000.0),
-            c_first_raised: block::<MHalf>(4_000.0),
-            c_third_raised: block::<MHalf>(5_000.0),
+            a_first_raised: block::<M1>(1_000.0),
+            b_first_raised: block::<M0>(2_000.0),
+            b_third_raised: block::<M0>(3_000.0),
+            c_first_raised: block::<MMinus1>(4_000.0),
+            c_third_raised: block::<MMinus1>(5_000.0),
         };
         let kernel = CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian(
             coefficients,

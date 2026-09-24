@@ -68,8 +68,19 @@ $$
 D_N\equiv H^{-1}D_t.
 $$
 
-In the Fourier normalization used by this crate,
-$[Q]=M^{-1/2}$ and $[P]=M^{1/2}$.
+The linear mode functions used by P3c have dimensions $M^{-1/2}$ for the
+field amplitude and $M^{1/2}$ for its cosmic-time derivative. These are not
+the dimensions of the Fourier-space field operators themselves. With
+
+$$
+Q(\mathbf{k})=\int d^3x\,e^{-i\mathbf{k}\cdot\mathbf{x}}Q(\mathbf{x}),
+$$
+
+the operator dimensions are $[Q(\mathbf{k})]=M^{-2}$ and
+$[P(\mathbf{k})]=M^{-1}$. The annihilation operator carries the compensating
+Fourier-volume dimension that makes a linear mode function proportional to
+$1/\sqrt{2k}$. This distinction matters beginning at the stripped three-point
+function.
 
 Here the symbol $P$ and the Rust marker `MomentumPerturbation` mean a
 covariant velocity. They must not be identified beyond linear order with the
@@ -100,13 +111,19 @@ blocks:
 
 | Block | Meaning | Dimension |
 | --- | --- | --- |
-| `QQQ` | $\langle Q^I Q^J Q^K\rangle_c$ | $M^{-3/2}$ |
-| `QQP`, `QPQ`, `PQQ` | one momentum slot | $M^{-1/2}$ |
-| `QPP`, `PQP`, `PPQ` | two momentum slots | $M^{1/2}$ |
-| `PPP` | $\langle P^I P^J P^K\rangle_c$ | $M^{3/2}$ |
+| `QQQ` | $\langle Q^I Q^J Q^K\rangle_c$ | $M^{-3}$ |
+| `QQP`, `QPQ`, `PQQ` | one momentum slot | $M^{-2}$ |
+| `QPP`, `PQP`, `PPQ` | two momentum slots | $M^{-1}$ |
+| `PPP` | $\langle P^I P^J P^K\rangle_c$ | $M^0$ |
 
 The slot markers and physical dimension are both part of each Rust type. For
 example, a numerical array stored as `QQP` cannot be assigned to `QQQ`.
+
+These dimensions follow after removing one
+$(2\pi)^3\delta^3(\mathbf{k}_1+\mathbf{k}_2+\mathbf{k}_3)$, whose dimension is
+$M^{-3}$. A stripped $n$-point function does not in general have the dimension
+of a naive product of $n$ linear mode functions. For $n=2$ the two happen to
+agree, which is why the error is invisible in the P3c covariance.
 
 ## Fourier-leg operations
 
@@ -189,18 +206,20 @@ D_N\alpha^{abc}
 $$
 
 `QuadraticPhaseSpaceKernel<N>` stores the eight ordered $Q/P$ blocks of
-$u^a{}_{bc}$. Dimensional consistency requires
+$u^a{}_{bc}$. The convolution measure contributes $M^3$, so dimensional
+consistency requires
 
 $$
-[u^a{}_{bc}]=[X^a]-[X^b]-[X^c].
+[u^a{}_{bc}]
+=[X^a(\mathbf{k})]-[X^b(\mathbf{q})]-[X^c(\mathbf{k}-\mathbf{q})]-M^3.
 $$
 
 Therefore:
 
 | Output | Inputs `QQ` | Inputs `QP` | Inputs `PQ` | Inputs `PP` |
 | --- | ---: | ---: | ---: | ---: |
-| $Q$ | $M^{1/2}$ | $M^{-1/2}$ | $M^{-1/2}$ | $M^{-3/2}$ |
-| $P$ | $M^{3/2}$ | $M^{1/2}$ | $M^{1/2}$ | $M^{-1/2}$ |
+| $Q$ | $M^{-1}$ | $M^{-2}$ | $M^{-2}$ | $M^{-3}$ |
+| $P$ | $M^0$ | $M^{-1}$ | $M^{-1}$ | $M^{-2}$ |
 
 `three_point_source_from_kernels` evaluates the displayed expression for
 $S^{abc}$. Its three kernel arguments have output legs 1, 2, and 3. The two

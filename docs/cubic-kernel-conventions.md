@@ -304,11 +304,11 @@ by the eight-block table as five distinct fields:
 
 | Field | Components | Dimension |
 | --- | --- | --- |
-| `a_first_raised` | $A^I{}_{JK}$ | $M^{5/2}$ |
-| `b_first_raised` | $B^I{}_{JK}$ | $M^{3/2}$ |
-| `b_third_raised` | $B_{JK}{}^I$ | $M^{3/2}$ |
-| `c_first_raised` | $C^I{}_{JK}$ | $M^{1/2}$ |
-| `c_third_raised` | $C_{JK}{}^I$ | $M^{1/2}$ |
+| `a_first_raised` | $A^I{}_{JK}$ | $M^1$ |
+| `b_first_raised` | $B^I{}_{JK}$ | $M^0$ |
+| `b_third_raised` | $B_{JK}{}^I$ | $M^0$ |
+| `c_first_raised` | $C^I{}_{JK}$ | $M^{-1}$ |
+| `c_third_raised` | $C_{JK}{}^I$ | $M^{-1}$ |
 
 Every array is stored in output/first-input/second-input order $[I][J][K]$.
 `CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian` applies the
@@ -317,6 +317,12 @@ coefficient by a positive finite $H$ exactly once. Tests use deliberately
 asymmetric component values so that either an index exchange or a first/third
 raising mistake changes the result. A compile-fail test fixes all five mass
 dimensions.
+
+These integer dimensions are also obtained term by term from the displayed
+cubic action. The earlier half-integer assignment incorrectly cubed the
+dimension of a linear mode function after stripping only one three-point
+delta function. The Fourier-operator and convolution-measure accounting is
+given explicitly in [`three-point-transport.md`](three-point-transport.md).
 
 This layer maps already evaluated $A$, $B$, and $C$ tensors. Computing those
 tensors from a background state, field-space geometry, potential derivatives,

@@ -1,6 +1,5 @@
 use phys_type::{
-    CanonicalCubicHamiltonianCoefficients, FieldPerturbation, M3Over2, Quantity,
-    ThreePointBlock,
+    CanonicalCubicHamiltonianCoefficients, FieldPerturbation, M0, Quantity, ThreePointBlock,
 };
 
 fn main() {
@@ -8,7 +7,7 @@ fn main() {
         FieldPerturbation,
         FieldPerturbation,
         FieldPerturbation,
-        M3Over2,
+        M0,
         f64,
         1,
     >::new([[[Quantity::new(0.0)]]]);

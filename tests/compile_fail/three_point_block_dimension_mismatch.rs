@@ -1,5 +1,5 @@
 use phys_type::{
-    Complex64, FieldPerturbation, MMinus3Over2, MMinusHalf, MomentumPerturbation, Quantity,
+    Complex64, FieldPerturbation, MMinus2, MMinus3, MomentumPerturbation, Quantity,
     ThreePointBlock,
 };
 
@@ -8,7 +8,7 @@ fn main() {
         FieldPerturbation,
         FieldPerturbation,
         MomentumPerturbation,
-        MMinusHalf,
+        MMinus2,
         Complex64,
         2,
     >::new([[[Quantity::new(Complex64::new(0.0, 0.0)); 2]; 2]; 2]);
@@ -17,7 +17,7 @@ fn main() {
         FieldPerturbation,
         FieldPerturbation,
         MomentumPerturbation,
-        MMinus3Over2,
+        MMinus3,
         Complex64,
         2,
     > = qqp;
