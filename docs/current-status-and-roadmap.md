@@ -5,7 +5,7 @@ detailed mathematical contracts remain in the design documents linked below;
 this page records what is implemented, what is only designed, and the order in
 which unfinished work should proceed.
 
-## Status on 2026-09-23
+## Status on 2026-09-24
 
 The first scientific milestone is complete: `phys-type` can evolve a
 covariant two-field inflationary background and its linear quantum
@@ -65,6 +65,9 @@ three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
 4. [`field-space-curvature-design.md`](field-space-curvature-design.md) fixes
    the Riemann convention and the higher-rank geometry consumed by that
    kernel.
+5. [`cubic-kernel-conventions.md`](cubic-kernel-conventions.md) writes the
+   curved-space cubic kernels explicitly and fixes the nonlinear distinction
+   between velocity and rescaled canonical momentum.
 
 ## Release state
 
@@ -151,9 +154,17 @@ turn and the complete 41-point benchmark.
   propagates all three canonical triangle legs on the shared P2 background and
   commutes with equal-leg permutations. The dimensioned $u^a{}_{bc}$ container and
   ordered three-leg $u\Sigma\Sigma$ contraction are implemented; deriving the
-  curved-field-space cubic kernel and quantum initial conditions remains. See
+  curved-field-space cubic kernel and quantum initial conditions remains.
+  The source derivation has exposed a required semantic decision: the
+  published cubic-Hamiltonian kernel evolves rescaled canonical momentum
+  $\Pi^I$, while the accepted P3c type means $P^I=D_tQ^I$. They coincide only
+  at linear order. The next code change must either introduce a separate
+  canonical-momentum slot or transform the complete quadratic system to the
+  velocity variable; it may not silently reinterpret the existing marker. See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
-  [`three-point-transport.md`](three-point-transport.md);
+  [`three-point-transport.md`](three-point-transport.md), with the detailed
+  derivation in
+  [`cubic-kernel-conventions.md`](cubic-kernel-conventions.md);
 - reheating and post-inflationary transfer;
 - dynamically sized field spaces if a concrete model requires more than the
   current const-generic representation.
