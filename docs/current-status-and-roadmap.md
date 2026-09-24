@@ -161,8 +161,10 @@ turn and the complete 41-point benchmark.
   at linear order. A separate `CanonicalMomentumPerturbation` marker and
   canonical covariance, correlation, and kernel aliases now preserve this
   distinction at compile time; a compile-fail test rejects mixing a canonical
-  kernel with velocity covariances. The next code change is construction of
-  the canonical $A$, $B$, and $C$ kernel coefficients. See
+  kernel with velocity covariances. A typed five-tensor container now also
+  distinguishes first- and third-index raising for $B$ and $C$, and maps the
+  cosmic-time $A/B/C$ coefficients into all eight e-fold-time kernel blocks.
+  The next code change is model-derived evaluation of those coefficients. See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
   [`three-point-transport.md`](three-point-transport.md), with the detailed
   derivation in

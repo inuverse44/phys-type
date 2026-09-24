@@ -14,6 +14,8 @@ P3d is in progress. The following pieces are implemented:
 - Fourier-leg permutation and complex-conjugation operations;
 - homogeneous evolution by the linear flow $u^a{}_b$;
 - a dimensioned container for the quadratic flow $u^a{}_{bc}$;
+- a dimensioned canonical $A/B/C$ container and its ordered conversion to all
+  eight e-fold-time $u^a{}_{bc}$ blocks;
 - contraction of three ordered $u\Sigma\Sigma$ source terms.
 
 The following pieces are not implemented:
@@ -275,13 +277,15 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
 
 1. **Completed:** select the separately typed canonical-momentum phase-space
    route while preserving the velocity types used by P3c;
-2. derive and implement the canonical curved-field-space
-   $u^a{}_{bc}$ coefficients;
-3. test flat-space, single-field, and field-coordinate covariance limits;
-4. implement the quantum initial condition for all eight blocks;
-5. combine homogeneous and sourced terms into one adaptive transport system;
-6. verify general-triangle permutation and reality identities;
-7. demonstrate convergence in integration tolerance and start depth.
+2. **Completed:** map dimensioned, raised canonical $A/B/C$ coefficients to
+   the eight ordered e-fold-time $u^a{}_{bc}$ blocks;
+3. evaluate $A$, $B$, and $C$ from the model, background, geometry, and
+   triangle;
+4. test flat-space, single-field, and field-coordinate covariance limits;
+5. implement the quantum initial condition for all eight blocks;
+6. combine homogeneous and sourced terms into one adaptive transport system;
+7. verify general-triangle permutation and reality identities;
+8. demonstrate convergence in integration tolerance and start depth.
 
 Only after these items pass does P3e project $\alpha^{abc}$ to the observable
 curvature bispectrum $B_\zeta$.

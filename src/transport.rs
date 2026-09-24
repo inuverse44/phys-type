@@ -2,8 +2,9 @@
 //!
 //! This module separates Fourier legs, phase-space slots, field coordinates,
 //! and physical dimensions. It provides the linear mode solver's two-point
-//! oracle and direct two-point covariance dynamics; nonlinear three-point
-//! evolution is not implemented yet.
+//! oracle, direct two-point covariance dynamics, and typed three-point
+//! transport infrastructure. Model-derived cubic coefficients and sourced
+//! end-to-end evolution are not implemented yet.
 
 use core::fmt;
 use core::marker::PhantomData;
@@ -14,8 +15,8 @@ use num_complex::Complex64;
 use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
 use crate::{
     CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, Hubble, M0, M1, M3Over2,
-    MHalf, MMinus1, MMinus3Over2, MMinusHalf, Mass, ModeAmplitude, ModeVelocity, MultifieldState,
-    Quantity, TwiceDifferentiableMultifieldPotential, TwoFieldPerturbationState,
+    M5Over2, MHalf, MMinus1, MMinus3Over2, MMinusHalf, Mass, ModeAmplitude, ModeVelocity,
+    MultifieldState, Quantity, TwiceDifferentiableMultifieldPotential, TwoFieldPerturbationState,
 };
 
 /// Default relative tolerance for numerical triangle closure.
@@ -1001,6 +1002,122 @@ pub struct QuadraticPhaseSpaceKernel<const N: usize, P: PhaseSpaceSlot = Momentu
 pub type CanonicalQuadraticPhaseSpaceKernel<const N: usize> =
     QuadraticPhaseSpaceKernel<N, CanonicalMomentumPerturbation>;
 
+/// Raised cubic-Hamiltonian coefficients in output/first-input/second-input order.
+///
+/// All component arrays use `[I][J][K]`, even when `I` originated as the
+/// third covariant index. This makes the subsequent phase-space block mapping
+/// explicit and prevents first- and third-index raising from being confused.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CanonicalCubicHamiltonianCoefficients<const N: usize> {
+    /// `A^I_JK`, stored as `[I][J][K]`, dimension `M^(5/2)`.
+    pub a_first_raised:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M5Over2, f64, N>,
+    /// `B^I_JK`, with the first original index raised, dimension `M^(3/2)`.
+    pub b_first_raised:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M3Over2, f64, N>,
+    /// `B_JK^I`, with the third original index raised, stored as `[I][J][K]`.
+    pub b_third_raised:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M3Over2, f64, N>,
+    /// `C^I_JK`, with the first original index raised, dimension `M^(1/2)`.
+    pub c_first_raised:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MHalf, f64, N>,
+    /// `C_JK^I`, with the third original index raised, stored as `[I][J][K]`.
+    pub c_third_raised:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MHalf, f64, N>,
+}
+
+/// An invalid Hubble rate supplied while converting a cosmic-time cubic flow.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CanonicalKernelError {
+    /// Rejected Hubble value in reduced Planck units.
+    pub hubble: f64,
+}
+
+impl fmt::Display for CanonicalKernelError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "canonical cubic kernel requires a positive finite Hubble rate, got {}",
+            self.hubble
+        )
+    }
+}
+
+impl std::error::Error for CanonicalKernelError {}
+
+impl<const N: usize> QuadraticPhaseSpaceKernel<N, CanonicalMomentumPerturbation> {
+    /// Maps cosmic-time `A`, `B`, and `C` coefficients to the eight e-fold
+    /// canonical phase-space blocks.
+    ///
+    /// The conversion divides every block by `H` exactly once and applies the
+    /// ordered input-index exchanges required by the Hamilton equations.
+    pub fn from_cubic_hamiltonian(
+        coefficients: CanonicalCubicHamiltonianCoefficients<N>,
+        hubble: Hubble,
+    ) -> Result<Self, CanonicalKernelError> {
+        let hubble_value = hubble.into_value();
+        if !hubble_value.is_finite() || hubble_value <= 0.0 {
+            return Err(CanonicalKernelError {
+                hubble: hubble_value,
+            });
+        }
+        let hubble = Hubble::new(hubble_value);
+
+        Ok(Self {
+            q_qq: ThreePointBlock::new(core::array::from_fn(|i| {
+                core::array::from_fn(|j| {
+                    core::array::from_fn(|k| {
+                        -(coefficients.b_third_raised.components[i][j][k] / hubble)
+                    })
+                })
+            })),
+            q_qp: ThreePointBlock::new(core::array::from_fn(|i| {
+                core::array::from_fn(|j| {
+                    core::array::from_fn(|k| {
+                        -(coefficients.c_first_raised.components[i][k][j] / hubble)
+                    })
+                })
+            })),
+            q_pq: ThreePointBlock::new(core::array::from_fn(|i| {
+                core::array::from_fn(|j| {
+                    core::array::from_fn(|k| {
+                        -(coefficients.c_first_raised.components[i][j][k] / hubble)
+                    })
+                })
+            })),
+            q_pp: zero_real_three_point_block(),
+            p_qq: ThreePointBlock::new(core::array::from_fn(|i| {
+                core::array::from_fn(|j| {
+                    core::array::from_fn(|k| {
+                        coefficients.a_first_raised.components[i][j][k] * 3.0 / hubble
+                    })
+                })
+            })),
+            p_qp: ThreePointBlock::new(core::array::from_fn(|i| {
+                core::array::from_fn(|j| {
+                    core::array::from_fn(|k| {
+                        coefficients.b_first_raised.components[i][j][k] / hubble
+                    })
+                })
+            })),
+            p_pq: ThreePointBlock::new(core::array::from_fn(|i| {
+                core::array::from_fn(|j| {
+                    core::array::from_fn(|k| {
+                        coefficients.b_first_raised.components[i][k][j] / hubble
+                    })
+                })
+            })),
+            p_pp: ThreePointBlock::new(core::array::from_fn(|i| {
+                core::array::from_fn(|j| {
+                    core::array::from_fn(|k| {
+                        coefficients.c_third_raised.components[i][k][j] / hubble
+                    })
+                })
+            })),
+        })
+    }
+}
+
 impl<const N: usize, P: PhaseSpaceSlot> QuadraticPhaseSpaceKernel<N, P> {
     /// Returns a kernel whose eight blocks vanish.
     pub fn zero() -> Self {
@@ -1985,5 +2102,65 @@ mod tests {
         );
 
         assert_eq!(source, CanonicalThreePointPhaseSpaceCorrelation::zero());
+    }
+
+    #[test]
+    fn cubic_hamiltonian_map_preserves_raised_index_order_and_divides_by_hubble() {
+        fn block<D: Copy>(
+            offset: f64,
+        ) -> ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, D, f64, 2>
+        {
+            ThreePointBlock::new(core::array::from_fn(|i| {
+                core::array::from_fn(|j| {
+                    core::array::from_fn(|k| Quantity::new(offset + (100 * i + 10 * j + k) as f64))
+                })
+            }))
+        }
+
+        let coefficients = CanonicalCubicHamiltonianCoefficients {
+            a_first_raised: block::<M5Over2>(1_000.0),
+            b_first_raised: block::<M3Over2>(2_000.0),
+            b_third_raised: block::<M3Over2>(3_000.0),
+            c_first_raised: block::<MHalf>(4_000.0),
+            c_third_raised: block::<MHalf>(5_000.0),
+        };
+        let kernel = CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian(
+            coefficients,
+            Hubble::new(2.0),
+        )
+        .unwrap();
+
+        assert_eq!(*kernel.q_qq.components()[1][0][1].value(), -3_101.0 / 2.0);
+        assert_eq!(*kernel.q_qp.components()[1][0][1].value(), -4_110.0 / 2.0);
+        assert_eq!(*kernel.q_pq.components()[1][0][1].value(), -4_101.0 / 2.0);
+        assert_eq!(*kernel.q_pp.components()[1][0][1].value(), 0.0);
+        assert_eq!(
+            *kernel.p_qq.components()[1][0][1].value(),
+            3.0 * 1_101.0 / 2.0
+        );
+        assert_eq!(*kernel.p_qp.components()[1][0][1].value(), 2_101.0 / 2.0);
+        assert_eq!(*kernel.p_pq.components()[1][0][1].value(), 2_110.0 / 2.0);
+        assert_eq!(*kernel.p_pp.components()[1][0][1].value(), 5_110.0 / 2.0);
+    }
+
+    #[test]
+    fn cubic_hamiltonian_map_rejects_nonphysical_hubble_rates() {
+        let coefficients = CanonicalCubicHamiltonianCoefficients::<1> {
+            a_first_raised: zero_real_three_point_block(),
+            b_first_raised: zero_real_three_point_block(),
+            b_third_raised: zero_real_three_point_block(),
+            c_first_raised: zero_real_three_point_block(),
+            c_third_raised: zero_real_three_point_block(),
+        };
+
+        for invalid in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(
+                CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian(
+                    coefficients,
+                    Hubble::new(invalid),
+                )
+                .is_err()
+            );
+        }
     }
 }
