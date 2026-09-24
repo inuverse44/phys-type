@@ -280,6 +280,8 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
 ## Verification already present
 
 - all eight $\alpha$ blocks have compile-time slot and dimension checks;
+- canonical triangle dot products carry dimension $M^2$, are symmetric, and
+  reproduce equilateral and folded transverse-factor limits;
 - addition and multiplication by dimensionless Runge--Kutta coefficients
   preserve every block type;
 - $(12)^2=(23)^2=1$ and complex conjugation squares to the identity;

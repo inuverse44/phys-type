@@ -169,6 +169,9 @@ turn and the complete 41-point benchmark.
   slots. Accordingly $A$, $B$, and $C$ carry $M^1$, $M^0$, and $M^{-1}$.
   The former half-integer assignment had incorrectly treated a stripped
   three-point function as a simple product of three linear mode functions.
+  Canonical triangle helpers now supply the dimensioned all-incoming dot
+  products, cosines, and transverse factors used repeatedly by the cubic
+  coefficients, with general, equilateral, and folded tests.
   The next code change is model-derived evaluation of those coefficients. See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
   [`three-point-transport.md`](three-point-transport.md), with the detailed

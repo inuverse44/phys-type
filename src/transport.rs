@@ -14,8 +14,8 @@ use num_complex::Complex64;
 
 use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
 use crate::{
-    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, Hubble, M0, M1, MMinus1,
-    MMinus2, MMinus3, Mass, ModeAmplitude, ModeVelocity, MultifieldState, Quantity,
+    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, Hubble, M0, M1, M2,
+    MMinus1, MMinus2, MMinus3, Mass, ModeAmplitude, ModeVelocity, MultifieldState, Quantity,
     TwiceDifferentiableMultifieldPotential, TwoFieldPerturbationState,
 };
 
@@ -184,6 +184,46 @@ impl MomentumTriangle {
             first * self.second_over_first,
             first * self.third_over_first,
         ]
+    }
+
+    /// Returns `k_i . k_j` in the canonical all-incoming convention.
+    ///
+    /// Momentum conservation is `k_1 + k_2 + k_3 = 0`. Therefore, for
+    /// distinct legs, `k_i . k_j = (k_l^2 - k_i^2 - k_j^2) / 2`, where `l`
+    /// is the remaining leg. The result has mass dimension two.
+    pub fn wavevector_dot(self, left: FourierLeg, right: FourierLeg) -> Quantity<M2, f64> {
+        let wavenumbers = self.canonical_wavenumbers();
+        let left_index = left.index();
+        let right_index = right.index();
+        let value = if left_index == right_index {
+            wavenumbers[left_index].powi(2)
+        } else {
+            let remaining_index = 3 - left_index - right_index;
+            (wavenumbers[remaining_index].powi(2)
+                - wavenumbers[left_index].powi(2)
+                - wavenumbers[right_index].powi(2))
+                / 2.0
+        };
+        Quantity::new(value)
+    }
+
+    /// Returns the cosine between two canonical all-incoming wavevectors.
+    ///
+    /// The result is clamped to `[-1, 1]` to remove closure-tolerance
+    /// roundoff at folded boundaries.
+    pub fn wavevector_cosine(self, left: FourierLeg, right: FourierLeg) -> f64 {
+        let wavenumbers = self.canonical_wavenumbers();
+        let denominator = wavenumbers[left.index()] * wavenumbers[right.index()];
+        (self.wavevector_dot(left, right).into_value() / denominator).clamp(-1.0, 1.0)
+    }
+
+    /// Returns `1 - (k_i . k_j)^2 / (k_i^2 k_j^2)`.
+    ///
+    /// This dimensionless transverse factor occurs repeatedly in the cubic
+    /// `A`, `B`, and `C` coefficients.
+    pub fn transverse_factor(self, left: FourierLeg, right: FourierLeg) -> f64 {
+        let cosine = self.wavevector_cosine(left, right);
+        (1.0 - cosine * cosine).max(0.0)
     }
 
     /// The perimeter `k_t = k_1 + k_2 + k_3`.
@@ -1743,6 +1783,58 @@ mod tests {
         assert_eq!(
             triangle.restore_input_order(['c', 'b', 'a']),
             ['a', 'b', 'c']
+        );
+
+        assert_eq!(
+            triangle
+                .wavevector_dot(FourierLeg::One, FourierLeg::One)
+                .into_value(),
+            16.0
+        );
+        assert_eq!(
+            triangle
+                .wavevector_dot(FourierLeg::One, FourierLeg::Two)
+                .into_value(),
+            -10.5
+        );
+        assert_eq!(
+            triangle
+                .wavevector_dot(FourierLeg::One, FourierLeg::Three)
+                .into_value(),
+            -5.5
+        );
+        assert_eq!(
+            triangle
+                .wavevector_dot(FourierLeg::Two, FourierLeg::Three)
+                .into_value(),
+            1.5
+        );
+        assert_eq!(
+            triangle.wavevector_dot(FourierLeg::Two, FourierLeg::One),
+            triangle.wavevector_dot(FourierLeg::One, FourierLeg::Two)
+        );
+    }
+
+    #[test]
+    fn triangle_transverse_factors_cover_equilateral_and_folded_limits() {
+        let equilateral = MomentumTriangle::try_new(2.0, 2.0, 2.0).unwrap();
+        let folded = MomentumTriangle::try_new(2.0, 1.0, 1.0).unwrap();
+
+        assert_eq!(
+            equilateral.wavevector_cosine(FourierLeg::One, FourierLeg::Two),
+            -0.5
+        );
+        assert_eq!(
+            equilateral.transverse_factor(FourierLeg::One, FourierLeg::Two),
+            0.75
+        );
+        assert_eq!(
+            folded.wavevector_cosine(FourierLeg::Two, FourierLeg::Three),
+            1.0
+        );
+        assert_eq!(
+            folded.transverse_factor(FourierLeg::Two, FourierLeg::Three),
+            0.0
         );
     }
 

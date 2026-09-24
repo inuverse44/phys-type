@@ -50,6 +50,21 @@ $$
 =\frac{k_1^2-k_2^2-k_3^2}{2}.
 $$
 
+`MomentumTriangle::wavevector_dot` implements these relations in canonical
+leg order and returns a quantity of dimension $M^2$.
+`wavevector_cosine` and `transverse_factor` provide
+
+$$
+\cos\theta_{ij}
+=\frac{\mathbf{k}_i\cdot\mathbf{k}_j}{k_i k_j},
+\qquad
+T_{ij}=1-\cos^2\theta_{ij}.
+$$
+
+The cosine is clamped only for closure-tolerance roundoff at folded
+boundaries. Tests fix the general $(4,3,2)$ dot products, the equilateral
+$T_{ij}=3/4$, and the folded $T_{23}=0$ limit.
+
 The crate evolves in e-fold time, $D_N=H^{-1}D_t$. The formulas quoted from
 the paper are initially cosmic-time formulas. Every block of a cosmic-time
 quadratic flow must therefore be divided by $H$ before it can populate an
@@ -338,7 +353,8 @@ in code and tests:
 2. **Implemented:** cosmic-time coefficients are converted once, and only
    once, to e-fold coefficients by $H^{-1}$;
 3. all field-index symmetrizations move their Fourier legs simultaneously;
-4. triangle dot products use the declared all-incoming convention;
+4. **Implemented:** triangle dot products use the declared all-incoming
+   convention;
 5. $M_{\mathrm{Pl}}=1$ is applied only at the system boundary;
 6. flat-field-space and single-field reductions are checked analytically;
 7. **Implemented for the block map:** exchanging the two input legs maps each
