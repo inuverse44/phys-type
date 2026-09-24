@@ -83,10 +83,12 @@ pub use spectrum_run::{
 pub use state::{State, StateDelta, StateDerivative};
 pub use time::ConformalTime;
 pub use transport::{
-    AnyPhaseSpaceIndex, DEFAULT_TRIANGLE_CLOSURE_TOLERANCE, FieldPerturbation, FourierLeg,
-    MomentumPerturbation, MomentumTriangle, MomentumTriangleError, PhaseSpaceIndex,
-    PhaseSpaceIndexError, PhaseSpaceSlot, PhaseSpaceSlotKind, QuadraticPhaseSpaceKernel,
-    ThreePointBlock, ThreePointHomogeneousTransportSystem, ThreePointPhaseSpaceCorrelation,
+    AnyPhaseSpaceIndex, CanonicalMomentumPerturbation, CanonicalQuadraticPhaseSpaceKernel,
+    CanonicalThreePointPhaseSpaceCorrelation, CanonicalTwoPointPhaseSpaceCovariance,
+    DEFAULT_TRIANGLE_CLOSURE_TOLERANCE, FieldPerturbation, FourierLeg, MomentumPerturbation,
+    MomentumTriangle, MomentumTriangleError, PhaseSpaceIndex, PhaseSpaceIndexError, PhaseSpaceSlot,
+    PhaseSpaceSlotKind, QuadraticPhaseSpaceKernel, ThreePointBlock,
+    ThreePointHomogeneousTransportSystem, ThreePointPhaseSpaceCorrelation,
     TwoFieldBackgroundProvider, TwoPointBlock, TwoPointPhaseSpaceCovariance,
     TwoPointTransportSystem, TwoPointTransportTolerance, three_point_source_from_kernels,
     two_point_covariance_from_mode_state,

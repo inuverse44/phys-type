@@ -230,11 +230,18 @@ mod sealed {
 pub enum PhaseSpaceSlotKind {
     /// A `Q^I` slot.
     Field,
-    /// A `P^I` slot.
+    /// The second phase-space slot, either velocity or canonical momentum.
+    ///
+    /// The semantic distinction is retained by its compile-time marker and is
+    /// intentionally erased by this structural tag.
     Momentum,
 }
 
-/// Marker implemented by the two phase-space slot kinds.
+/// Marker implemented by a semantic phase-space slot.
+///
+/// `KIND` describes the structural position used by the two-slot contraction
+/// algebra. Distinct momentum semantics remain distinct through the marker
+/// type even when they occupy the same structural position.
 pub trait PhaseSpaceSlot: sealed::Sealed + Copy + fmt::Debug + 'static {
     /// Stable machine-readable name.
     const NAME: &'static str;
@@ -247,11 +254,23 @@ pub trait PhaseSpaceSlot: sealed::Sealed + Copy + fmt::Debug + 'static {
 pub struct FieldPerturbation;
 
 /// The momentum-perturbation slot `P^I`.
+///
+/// In the validated P3c convention this means the covariant velocity
+/// `P^I = D_t Q^I`; it is not the nonlinear canonical momentum.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MomentumPerturbation;
 
+/// The rescaled canonical-momentum slot `Pi^I = a^-3 p^I`.
+///
+/// It agrees with [`MomentumPerturbation`] at linear order but differs at
+/// quadratic order in perturbations. Keeping a distinct marker prevents a
+/// canonical cubic kernel from being contracted with velocity correlators.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CanonicalMomentumPerturbation;
+
 impl sealed::Sealed for FieldPerturbation {}
 impl sealed::Sealed for MomentumPerturbation {}
+impl sealed::Sealed for CanonicalMomentumPerturbation {}
 
 impl PhaseSpaceSlot for FieldPerturbation {
     const NAME: &'static str = "field";
@@ -260,6 +279,11 @@ impl PhaseSpaceSlot for FieldPerturbation {
 
 impl PhaseSpaceSlot for MomentumPerturbation {
     const NAME: &'static str = "momentum";
+    const KIND: PhaseSpaceSlotKind = PhaseSpaceSlotKind::Momentum;
+}
+
+impl PhaseSpaceSlot for CanonicalMomentumPerturbation {
+    const NAME: &'static str = "canonical_momentum";
     const KIND: PhaseSpaceSlotKind = PhaseSpaceSlotKind::Momentum;
 }
 
@@ -413,20 +437,26 @@ impl<L, R, D, const N: usize> TwoPointBlock<L, R, D, Complex64, N> {
 ///
 /// The P3c convention is `Q^I = U^I` and `P^I = D_t U^I`, where the existing
 /// linear solver integrates `v^I = a U^I`. The four blocks therefore have
-/// dimensions `M^-1`, `M^0`, `M^0`, and `M^1`, respectively.
+/// dimensions `M^-1`, `M^0`, `M^0`, and `M^1`, respectively. The trailing
+/// marker can instead be [`CanonicalMomentumPerturbation`] for a canonical
+/// phase space; the default preserves the P3c velocity convention.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct TwoPointPhaseSpaceCovariance<const N: usize> {
+pub struct TwoPointPhaseSpaceCovariance<const N: usize, P: PhaseSpaceSlot = MomentumPerturbation> {
     /// `Sigma_QQ^{IJ} = <Q^I Q^{J*}>`.
     pub qq: TwoPointBlock<FieldPerturbation, FieldPerturbation, MMinus1, Complex64, N>,
     /// `Sigma_QP^{IJ} = <Q^I P^{J*}>`.
-    pub qp: TwoPointBlock<FieldPerturbation, MomentumPerturbation, M0, Complex64, N>,
+    pub qp: TwoPointBlock<FieldPerturbation, P, M0, Complex64, N>,
     /// `Sigma_PQ^{IJ} = <P^I Q^{J*}>`.
-    pub pq: TwoPointBlock<MomentumPerturbation, FieldPerturbation, M0, Complex64, N>,
+    pub pq: TwoPointBlock<P, FieldPerturbation, M0, Complex64, N>,
     /// `Sigma_PP^{IJ} = <P^I P^{J*}>`.
-    pub pp: TwoPointBlock<MomentumPerturbation, MomentumPerturbation, M1, Complex64, N>,
+    pub pp: TwoPointBlock<P, P, M1, Complex64, N>,
 }
 
-impl<const N: usize> Add for TwoPointPhaseSpaceCovariance<N> {
+/// A covariance whose second phase-space slot is rescaled canonical momentum.
+pub type CanonicalTwoPointPhaseSpaceCovariance<const N: usize> =
+    TwoPointPhaseSpaceCovariance<N, CanonicalMomentumPerturbation>;
+
+impl<const N: usize, P: PhaseSpaceSlot> Add for TwoPointPhaseSpaceCovariance<N, P> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -439,7 +469,7 @@ impl<const N: usize> Add for TwoPointPhaseSpaceCovariance<N> {
     }
 }
 
-impl<const N: usize> TwoPointPhaseSpaceCovariance<N> {
+impl<const N: usize, P: PhaseSpaceSlot> TwoPointPhaseSpaceCovariance<N, P> {
     fn component(&self, slots: [PhaseSpaceSlotKind; 2], indices: [usize; 2]) -> Complex64 {
         let [left, right] = indices;
         match slots {
@@ -459,7 +489,7 @@ impl<const N: usize> TwoPointPhaseSpaceCovariance<N> {
     }
 }
 
-impl<const N: usize> Mul<f64> for TwoPointPhaseSpaceCovariance<N> {
+impl<const N: usize, P: PhaseSpaceSlot> Mul<f64> for TwoPointPhaseSpaceCovariance<N, P> {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self::Output {
@@ -472,7 +502,7 @@ impl<const N: usize> Mul<f64> for TwoPointPhaseSpaceCovariance<N> {
     }
 }
 
-impl<const N: usize> Mul<Dimensionless> for TwoPointPhaseSpaceCovariance<N> {
+impl<const N: usize, P: PhaseSpaceSlot> Mul<Dimensionless> for TwoPointPhaseSpaceCovariance<N, P> {
     type Output = Self;
 
     fn mul(self, rhs: Dimensionless) -> Self::Output {
@@ -905,9 +935,12 @@ impl<A, B, C, D: Copy, const N: usize> ThreePointBlock<A, B, C, D, Complex64, N>
 /// Each field slot contributes dimension `M^-1/2`, and each momentum slot
 /// contributes `M^1/2`. Keeping all eight phase-space blocks distinct makes a
 /// dimensionally invalid block assignment a compile-time error. Fourier-leg
-/// permutations move both the component axis and its phase-space slot.
+/// permutations move both the component axis and its phase-space slot. The
+/// trailing marker fixes whether the second slot is velocity or rescaled
+/// canonical momentum.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ThreePointPhaseSpaceCorrelation<const N: usize> {
+pub struct ThreePointPhaseSpaceCorrelation<const N: usize, P: PhaseSpaceSlot = MomentumPerturbation>
+{
     /// `Alpha_QQQ^{IJK}`.
     pub qqq: ThreePointBlock<
         FieldPerturbation,
@@ -918,69 +951,24 @@ pub struct ThreePointPhaseSpaceCorrelation<const N: usize> {
         N,
     >,
     /// `Alpha_QQP^{IJK}`.
-    pub qqp: ThreePointBlock<
-        FieldPerturbation,
-        FieldPerturbation,
-        MomentumPerturbation,
-        MMinusHalf,
-        Complex64,
-        N,
-    >,
+    pub qqp: ThreePointBlock<FieldPerturbation, FieldPerturbation, P, MMinusHalf, Complex64, N>,
     /// `Alpha_QPQ^{IJK}`.
-    pub qpq: ThreePointBlock<
-        FieldPerturbation,
-        MomentumPerturbation,
-        FieldPerturbation,
-        MMinusHalf,
-        Complex64,
-        N,
-    >,
+    pub qpq: ThreePointBlock<FieldPerturbation, P, FieldPerturbation, MMinusHalf, Complex64, N>,
     /// `Alpha_PQQ^{IJK}`.
-    pub pqq: ThreePointBlock<
-        MomentumPerturbation,
-        FieldPerturbation,
-        FieldPerturbation,
-        MMinusHalf,
-        Complex64,
-        N,
-    >,
+    pub pqq: ThreePointBlock<P, FieldPerturbation, FieldPerturbation, MMinusHalf, Complex64, N>,
     /// `Alpha_QPP^{IJK}`.
-    pub qpp: ThreePointBlock<
-        FieldPerturbation,
-        MomentumPerturbation,
-        MomentumPerturbation,
-        MHalf,
-        Complex64,
-        N,
-    >,
+    pub qpp: ThreePointBlock<FieldPerturbation, P, P, MHalf, Complex64, N>,
     /// `Alpha_PQP^{IJK}`.
-    pub pqp: ThreePointBlock<
-        MomentumPerturbation,
-        FieldPerturbation,
-        MomentumPerturbation,
-        MHalf,
-        Complex64,
-        N,
-    >,
+    pub pqp: ThreePointBlock<P, FieldPerturbation, P, MHalf, Complex64, N>,
     /// `Alpha_PPQ^{IJK}`.
-    pub ppq: ThreePointBlock<
-        MomentumPerturbation,
-        MomentumPerturbation,
-        FieldPerturbation,
-        MHalf,
-        Complex64,
-        N,
-    >,
+    pub ppq: ThreePointBlock<P, P, FieldPerturbation, MHalf, Complex64, N>,
     /// `Alpha_PPP^{IJK}`.
-    pub ppp: ThreePointBlock<
-        MomentumPerturbation,
-        MomentumPerturbation,
-        MomentumPerturbation,
-        M3Over2,
-        Complex64,
-        N,
-    >,
+    pub ppp: ThreePointBlock<P, P, P, M3Over2, Complex64, N>,
 }
+
+/// A connected three-point function in canonical phase-space variables.
+pub type CanonicalThreePointPhaseSpaceCorrelation<const N: usize> =
+    ThreePointPhaseSpaceCorrelation<N, CanonicalMomentumPerturbation>;
 
 /// The quadratic phase-space flow `u^a_bc` for one ordered momentum vertex.
 ///
@@ -989,76 +977,31 @@ pub struct ThreePointPhaseSpaceCorrelation<const N: usize> {
 /// contraction with two covariance blocks has the dimension of the target
 /// three-point block.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct QuadraticPhaseSpaceKernel<const N: usize> {
+pub struct QuadraticPhaseSpaceKernel<const N: usize, P: PhaseSpaceSlot = MomentumPerturbation> {
     /// `u^Q_QQ`, dimension `M^(1/2)`.
     pub q_qq:
         ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MHalf, f64, N>,
     /// `u^Q_QP`, dimension `M^(-1/2)`.
-    pub q_qp: ThreePointBlock<
-        FieldPerturbation,
-        FieldPerturbation,
-        MomentumPerturbation,
-        MMinusHalf,
-        f64,
-        N,
-    >,
+    pub q_qp: ThreePointBlock<FieldPerturbation, FieldPerturbation, P, MMinusHalf, f64, N>,
     /// `u^Q_PQ`, dimension `M^(-1/2)`.
-    pub q_pq: ThreePointBlock<
-        FieldPerturbation,
-        MomentumPerturbation,
-        FieldPerturbation,
-        MMinusHalf,
-        f64,
-        N,
-    >,
+    pub q_pq: ThreePointBlock<FieldPerturbation, P, FieldPerturbation, MMinusHalf, f64, N>,
     /// `u^Q_PP`, dimension `M^(-3/2)`.
-    pub q_pp: ThreePointBlock<
-        FieldPerturbation,
-        MomentumPerturbation,
-        MomentumPerturbation,
-        MMinus3Over2,
-        f64,
-        N,
-    >,
+    pub q_pp: ThreePointBlock<FieldPerturbation, P, P, MMinus3Over2, f64, N>,
     /// `u^P_QQ`, dimension `M^(3/2)`.
-    pub p_qq: ThreePointBlock<
-        MomentumPerturbation,
-        FieldPerturbation,
-        FieldPerturbation,
-        M3Over2,
-        f64,
-        N,
-    >,
+    pub p_qq: ThreePointBlock<P, FieldPerturbation, FieldPerturbation, M3Over2, f64, N>,
     /// `u^P_QP`, dimension `M^(1/2)`.
-    pub p_qp: ThreePointBlock<
-        MomentumPerturbation,
-        FieldPerturbation,
-        MomentumPerturbation,
-        MHalf,
-        f64,
-        N,
-    >,
+    pub p_qp: ThreePointBlock<P, FieldPerturbation, P, MHalf, f64, N>,
     /// `u^P_PQ`, dimension `M^(1/2)`.
-    pub p_pq: ThreePointBlock<
-        MomentumPerturbation,
-        MomentumPerturbation,
-        FieldPerturbation,
-        MHalf,
-        f64,
-        N,
-    >,
+    pub p_pq: ThreePointBlock<P, P, FieldPerturbation, MHalf, f64, N>,
     /// `u^P_PP`, dimension `M^(-1/2)`.
-    pub p_pp: ThreePointBlock<
-        MomentumPerturbation,
-        MomentumPerturbation,
-        MomentumPerturbation,
-        MMinusHalf,
-        f64,
-        N,
-    >,
+    pub p_pp: ThreePointBlock<P, P, P, MMinusHalf, f64, N>,
 }
 
-impl<const N: usize> QuadraticPhaseSpaceKernel<N> {
+/// A quadratic flow whose second phase-space slot is canonical momentum.
+pub type CanonicalQuadraticPhaseSpaceKernel<const N: usize> =
+    QuadraticPhaseSpaceKernel<N, CanonicalMomentumPerturbation>;
+
+impl<const N: usize, P: PhaseSpaceSlot> QuadraticPhaseSpaceKernel<N, P> {
     /// Returns a kernel whose eight blocks vanish.
     pub fn zero() -> Self {
         Self {
@@ -1126,10 +1069,10 @@ impl<const N: usize> QuadraticPhaseSpaceKernel<N> {
 /// legs in ascending order: `[1, 2]`, `[0, 2]`, and `[0, 1]`. The returned
 /// value is exactly the three cyclic `u Sigma Sigma` terms in `D_N Alpha`; it
 /// does not include homogeneous propagation or an initial condition.
-pub fn three_point_source_from_kernels<const N: usize>(
-    kernels: [&QuadraticPhaseSpaceKernel<N>; 3],
-    covariances: [&TwoPointPhaseSpaceCovariance<N>; 3],
-) -> ThreePointPhaseSpaceCorrelation<N> {
+pub fn three_point_source_from_kernels<const N: usize, P: PhaseSpaceSlot>(
+    kernels: [&QuadraticPhaseSpaceKernel<N, P>; 3],
+    covariances: [&TwoPointPhaseSpaceCovariance<N, P>; 3],
+) -> ThreePointPhaseSpaceCorrelation<N, P> {
     let source_block = |output_slots: [PhaseSpaceSlotKind; 3]| {
         core::array::from_fn(|first| {
             core::array::from_fn(|second| {
@@ -1238,7 +1181,7 @@ fn complex_three_point_block<A, B, C, D, const N: usize>(
     ThreePointBlock::new(components.map(|matrix| matrix.map(|row| row.map(Quantity::new))))
 }
 
-impl<const N: usize> ThreePointPhaseSpaceCorrelation<N> {
+impl<const N: usize, P: PhaseSpaceSlot> ThreePointPhaseSpaceCorrelation<N, P> {
     /// Returns the additive identity in every phase-space block.
     pub fn zero() -> Self {
         Self {
@@ -1342,7 +1285,7 @@ impl<const N: usize> ThreePointPhaseSpaceCorrelation<N> {
     }
 }
 
-impl<const N: usize> Add for ThreePointPhaseSpaceCorrelation<N> {
+impl<const N: usize, P: PhaseSpaceSlot> Add for ThreePointPhaseSpaceCorrelation<N, P> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -1359,7 +1302,7 @@ impl<const N: usize> Add for ThreePointPhaseSpaceCorrelation<N> {
     }
 }
 
-impl<const N: usize> Mul<f64> for ThreePointPhaseSpaceCorrelation<N> {
+impl<const N: usize, P: PhaseSpaceSlot> Mul<f64> for ThreePointPhaseSpaceCorrelation<N, P> {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self::Output {
@@ -1376,7 +1319,9 @@ impl<const N: usize> Mul<f64> for ThreePointPhaseSpaceCorrelation<N> {
     }
 }
 
-impl<const N: usize> Mul<Dimensionless> for ThreePointPhaseSpaceCorrelation<N> {
+impl<const N: usize, P: PhaseSpaceSlot> Mul<Dimensionless>
+    for ThreePointPhaseSpaceCorrelation<N, P>
+{
     type Output = Self;
 
     fn mul(self, rhs: Dimensionless) -> Self::Output {
@@ -1716,10 +1661,14 @@ mod tests {
     fn phase_space_indices_keep_slot_and_field_coordinate_separate() {
         let field = PhaseSpaceIndex::<FieldPerturbation, 2>::try_new(1).unwrap();
         let momentum = PhaseSpaceIndex::<MomentumPerturbation, 2>::try_new(1).unwrap();
+        let canonical = PhaseSpaceIndex::<CanonicalMomentumPerturbation, 2>::try_new(1).unwrap();
 
         assert_eq!(field.field_index(), 1);
         assert_eq!(field.erase().flat_index(), 1);
         assert_eq!(momentum.erase().flat_index(), 3);
+        assert_eq!(canonical.erase().flat_index(), 3);
+        assert_eq!(MomentumPerturbation::NAME, "momentum");
+        assert_eq!(CanonicalMomentumPerturbation::NAME, "canonical_momentum");
         assert!(PhaseSpaceIndex::<FieldPerturbation, 2>::try_new(2).is_err());
     }
 
@@ -2018,5 +1967,23 @@ mod tests {
             source.ppp.components()[0][0][0].into_value(),
             Complex64::new(0.0, 0.0)
         );
+    }
+
+    #[test]
+    fn canonical_kernel_contracts_only_with_canonical_covariances() {
+        let kernel = CanonicalQuadraticPhaseSpaceKernel::<1>::zero();
+        let covariance = CanonicalTwoPointPhaseSpaceCovariance {
+            qq: TwoPointBlock::new([[Quantity::new(Complex64::new(1.0, 0.0))]]),
+            qp: TwoPointBlock::new([[Quantity::new(Complex64::new(0.0, 0.0))]]),
+            pq: TwoPointBlock::new([[Quantity::new(Complex64::new(0.0, 0.0))]]),
+            pp: TwoPointBlock::new([[Quantity::new(Complex64::new(1.0, 0.0))]]),
+        };
+
+        let source: CanonicalThreePointPhaseSpaceCorrelation<1> = three_point_source_from_kernels(
+            [&kernel, &kernel, &kernel],
+            [&covariance, &covariance, &covariance],
+        );
+
+        assert_eq!(source, CanonicalThreePointPhaseSpaceCorrelation::zero());
     }
 }

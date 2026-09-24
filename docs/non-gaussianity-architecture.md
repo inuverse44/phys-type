@@ -344,7 +344,11 @@ reconciliation found that the published eight-block cubic-Hamiltonian kernel
 is expressed in $(Q,\Pi)$ rather than the already validated $(Q,D_tQ)$
 variables. [`cubic-kernel-conventions.md`](cubic-kernel-conventions.md) now
 records the full $A$, $B$, and $C$ formulas, ordered block map, and the explicit
-implementation decision that must precede the physical kernel.
+implementation decision that must precede the physical kernel. That decision
+is now implemented using the distinct `CanonicalMomentumPerturbation` marker
+and canonical aliases for the covariance, three-point correlation, and
+quadratic kernel. The typed source contraction rejects canonical/velocity
+mixing at compile time.
 
 ## Acceptance boundary
 

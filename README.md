@@ -26,6 +26,8 @@ The active P3d state and dynamics boundary is tracked in
 The cubic-action formulas and the nonlinear distinction between
 $P^I=D_tQ^I$ and rescaled canonical momentum are fixed in
 [`docs/cubic-kernel-conventions.md`](docs/cubic-kernel-conventions.md).
+The corresponding public phase-space containers carry distinct velocity and
+canonical-momentum marker types, preventing mixed source contractions.
 The implemented milestone, known limitations, release state, and ordered next
 steps are summarized in
 [`docs/current-status-and-roadmap.md`](docs/current-status-and-roadmap.md).
