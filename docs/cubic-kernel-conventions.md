@@ -298,6 +298,30 @@ contracted with velocity covariances. Erasing a `PhaseSpaceIndex` retains only
 the structural field/momentum position; semantic safety is carried by the
 typed containers and must be preserved until after contraction.
 
+The next mapping layer is also implemented.
+`CanonicalCubicHamiltonianCoefficients<N>` stores the raised tensors required
+by the eight-block table as five distinct fields:
+
+| Field | Components | Dimension |
+| --- | --- | --- |
+| `a_first_raised` | $A^I{}_{JK}$ | $M^{5/2}$ |
+| `b_first_raised` | $B^I{}_{JK}$ | $M^{3/2}$ |
+| `b_third_raised` | $B_{JK}{}^I$ | $M^{3/2}$ |
+| `c_first_raised` | $C^I{}_{JK}$ | $M^{1/2}$ |
+| `c_third_raised` | $C_{JK}{}^I$ | $M^{1/2}$ |
+
+Every array is stored in output/first-input/second-input order $[I][J][K]$.
+`CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian` applies the
+required $J\leftrightarrow K$ exchanges and divides every cosmic-time
+coefficient by a positive finite $H$ exactly once. Tests use deliberately
+asymmetric component values so that either an index exchange or a first/third
+raising mistake changes the result. A compile-fail test fixes all five mass
+dimensions.
+
+This layer maps already evaluated $A$, $B$, and $C$ tensors. Computing those
+tensors from a background state, field-space geometry, potential derivatives,
+and a momentum triangle remains the next physical implementation step.
+
 ## Acceptance checklist for implementation
 
 The physical kernel is not accepted until all of the following are explicit
@@ -305,13 +329,15 @@ in code and tests:
 
 1. **Implemented:** the phase-space variable is named and typed as either $V$
    or $\Pi$;
-2. cosmic-time coefficients are converted once, and only once, to e-fold
-   coefficients by $H^{-1}$;
+2. **Implemented:** cosmic-time coefficients are converted once, and only
+   once, to e-fold coefficients by $H^{-1}$;
 3. all field-index symmetrizations move their Fourier legs simultaneously;
 4. triangle dot products use the declared all-incoming convention;
 5. $M_{\mathrm{Pl}}=1$ is applied only at the system boundary;
 6. flat-field-space and single-field reductions are checked analytically;
-7. exchanging the two input legs maps each ordered block to its partner;
+7. **Implemented for the block map:** exchanging the two input legs maps each
+   ordered block to its partner; the model-derived coefficient symmetry tests
+   remain;
 8. a nonlinear $V\leftrightarrow\Pi$ correlator conversion is tested for the
    selected canonical route;
 9. dimensions, permutation identities, and an independent numerical
