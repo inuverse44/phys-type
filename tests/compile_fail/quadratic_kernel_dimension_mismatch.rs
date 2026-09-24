@@ -1,5 +1,5 @@
 use phys_type::{
-    FieldPerturbation, MHalf, MomentumPerturbation, QuadraticPhaseSpaceKernel, Quantity,
+    FieldPerturbation, MMinus1, MomentumPerturbation, QuadraticPhaseSpaceKernel, Quantity,
     ThreePointBlock,
 };
 
@@ -9,7 +9,7 @@ fn main() {
         MomentumPerturbation,
         FieldPerturbation,
         FieldPerturbation,
-        MHalf,
+        MMinus1,
         f64,
         1,
     >::new([[[Quantity::new(1.0)]]]);

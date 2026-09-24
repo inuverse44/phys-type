@@ -331,8 +331,9 @@ P3d is in progress. The first slice implements the complete dimensioned
 `ThreePointPhaseSpaceCorrelation` state with separate `QQQ` through `PPP`
 blocks, complex conjugation, Runge--Kutta arithmetic, and Fourier-leg
 transpositions that move their phase-space slots and component axes together.
-A compile-fail test fixes the distinct `M^(-3/2)`, `M^(-1/2)`, `M^(1/2)`, and
-`M^(3/2)` block dimensions. `ThreePointHomogeneousTransportSystem` now applies
+A compile-fail test fixes the distinct `M^-3`, `M^-2`, `M^-1`, and `M^0`
+dimensions of the delta-function-stripped three-point blocks.
+`ThreePointHomogeneousTransportSystem` now applies
 the P3c linear flow to all three canonical triangle legs on the shared P2
 background, and is regression-tested for leg-permutation covariance. No cubic
 kernel or physical bispectrum is claimed yet. The dimensioned eight-block
