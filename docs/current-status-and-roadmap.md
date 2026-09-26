@@ -52,6 +52,32 @@ Consequently, the crate can presently make power-spectrum predictions within
 its documented inflation/no-reheating scope. It must not yet describe its
 three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
 
+### Next-session handoff
+
+The implementation boundary is merge commit `399e9fd` (PR #18). The validated
+state at this boundary is 184 unit tests plus 24 compile-fail cases;
+`cargo test --all-targets`, Clippy with warnings denied, rustfmt, rustdoc, and
+both GitHub CI jobs pass.
+
+Resume P3d with the quantum equal-time three-point initial condition in the
+canonical $(Q,\Pi)$ basis. Before adding an adaptive sourced system, the next
+slice should:
+
+1. fix the stripped Fourier normalization and common early-time slice for all
+   three legs;
+2. derive and implement the Bunch--Davies/in-in initial values for all eight
+   `QQQ`--`PPP` blocks without setting $\alpha=0$ at horizon exit;
+3. preserve `CanonicalMomentumPerturbation` through initialization and source
+   contraction, using the existing tree-level conversion only at the explicit
+   velocity-output boundary;
+4. test dimensions, Hermitian/reality relations, Fourier-leg permutations,
+   and at least one independently calculated scalar or equilateral limit.
+
+Only after this initial-condition slice is accepted should homogeneous and
+sourced terms be combined in one adaptive transport system. General
+field-coordinate covariance and end-to-end triangle convergence remain
+acceptance requirements for P3d, not assumptions supplied by the type system.
+
 ### Reading order for the active P3 work
 
 1. [`non-gaussianity-architecture.md`](non-gaussianity-architecture.md)
@@ -60,8 +86,9 @@ three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
 2. [`two-point-transport-oracle.md`](two-point-transport-oracle.md) fixes the
    phase-space normalization and records why P3c is accepted.
 3. [`three-point-transport.md`](three-point-transport.md) gives the detailed
-   P3d equations, maps them to Rust types, and separates implemented source
-   algebra from the missing physical cubic kernel.
+   P3d equations, maps them to Rust types, and separates the implemented
+   physical cubic kernel and basis conversion from the remaining quantum
+   initial condition and sourced integration.
 4. [`field-space-curvature-design.md`](field-space-curvature-design.md) fixes
    the Riemann convention and the higher-rank geometry consumed by that
    kernel.
