@@ -392,6 +392,62 @@ $M_{\mathrm{Pl}}$ values.
 point. It evaluates $A/B/C$ and produces the five raised tensors consumed by
 `CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian`.
 
+The cyclic source needs three differently ordered vertices, rather than three
+references to this one canonical ordering. The
+`canonical_cubic_hamiltonian_vertices` entry point returns a
+`CanonicalCubicHamiltonianVertices<N>` whose output-leg order is
+
+| Output leg | Input legs |
+| --- | --- |
+| $1$ | $(2,3)$ |
+| $2$ | $(1,3)$ |
+| $3$ | $(1,2)$ |
+
+The field indices and the Fourier legs are permuted together before $A$, $B$,
+and $C$ are evaluated. `e_fold_kernels` then converts all three vertices to
+the ordered kernels expected by `three_point_source_from_kernels`.
+For the nonsymmetric $B$ and $C$ tensors this rule also applies while changing
+which covariant index becomes the output: the third-raised forms evaluate
+$B_{JKL}$ and $C_{JKL}$ with leg order `(input 1, input 2, output)` before
+raising $L$. They are not obtained by reindexing values evaluated in
+`(output, input 1, input 2)` order.
+
+## Typed canonical--velocity conversion
+
+The public conversion boundary now implements the perturbative relations
+displayed above. At linear order,
+`canonical_two_point_from_velocity_linear` and
+`velocity_two_point_from_canonical_linear` preserve all four numerical
+covariance blocks while changing the phase-space marker. Their names make the
+linear-order restriction explicit.
+
+At tree level, `velocity_three_point_from_canonical_tree` applies
+
+$$
+\begin{aligned}
+N^{V^I}{}_{Q^JQ^K}&=-B_{JK}{}^I,\\
+N^{V^I}{}_{Q^J\Pi^K}&=-C^I{}_{KJ},\\
+N^{V^I}{}_{\Pi^JQ^K}&=-C^I{}_{JK},\\
+N^{Q^I}{}_{bc}&=N^{V^I}{}_{\Pi^J\Pi^K}=0,
+\end{aligned}
+$$
+
+to each output leg. For a quadratic field redefinition
+$X_V^a=X_\Pi^a+\tfrac12N^a{}_{bc}X_\Pi^bX_\Pi^c$, the connected tree-level
+correlator is therefore
+
+$$
+\alpha_V^{abc}=\alpha_\Pi^{abc}
++N^a{}_{de}\Sigma_\Pi^{db}\Sigma_\Pi^{ec}
++N^b{}_{de}\Sigma_\Pi^{da}\Sigma_\Pi^{ec}
++N^c{}_{de}\Sigma_\Pi^{da}\Sigma_\Pi^{eb}.
+$$
+
+The conversion accepts only canonical correlations and covariances and returns
+the velocity-marked correlation. Tests check the exact scalar $B$ and $C$
+contributions, preservation of `QQQ`, the linear two-point round trip, and the
+fact that a non-equilateral model produces distinct output-leg vertices.
+
 ## Acceptance checklist for implementation
 
 The physical kernel is not accepted until all of the following are explicit
@@ -412,11 +468,12 @@ in code and tests:
    componentwise regressions;
 7. **Implemented:** exchanging the two input legs maps each ordered block to
    its partner and all coefficients are symmetrized with their momentum labels;
-8. a nonlinear $V\leftrightarrow\Pi$ correlator conversion is tested for the
-   selected canonical route;
+8. **Implemented:** the nonlinear $V\leftrightarrow\Pi$ correlator conversion
+   is tested for the selected canonical route;
 9. dimensions, permutation identities, and an independent numerical
    benchmark all pass.
 
-Until this checklist is met, the existing `QuadraticPhaseSpaceKernel` remains
-a dimensioned source-algebra container rather than a model-derived physical
-kernel.
+The model-derived physical kernel and its variable boundary are now present.
+The remaining acceptance gap is item 9's independent numerical benchmark,
+along with the quantum initial condition and sourced integration described in
+[`three-point-transport.md`](three-point-transport.md).

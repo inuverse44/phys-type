@@ -27,7 +27,9 @@ The cubic-action formulas and the nonlinear distinction between
 $P^I=D_tQ^I$ and rescaled canonical momentum are fixed in
 [`docs/cubic-kernel-conventions.md`](docs/cubic-kernel-conventions.md).
 The corresponding public phase-space containers carry distinct velocity and
-canonical-momentum marker types, preventing mixed source contractions.
+canonical-momentum marker types, preventing mixed source contractions. Typed
+linear two-point and nonlinear tree-level three-point conversions make the
+boundary explicit when entering or leaving canonical transport.
 The implemented milestone, known limitations, release state, and ordered next
 steps are summarized in
 [`docs/current-status-and-roadmap.md`](docs/current-status-and-roadmap.md).
@@ -209,9 +211,13 @@ three-leg evolution, the typed quadratic kernel $u^a{}_{bc}$, and the ordered
 $u\Sigma\Sigma$ contraction. Model-derived $A_{IJK}$, $B_{IJK}$, and $C_{IJK}$
 evaluation is also implemented with typed dimensions, simultaneous
 field-index/Fourier-leg symmetrization, field-space curvature regressions, and
-rank-five $\nabla R$ index checks. The quantum three-point initial condition,
-sourced evolution, and observable $B_\zeta$ projection are unfinished; the
-repository therefore does not yet claim a bispectrum prediction.
+rank-five $\nabla R$ index checks. The cubic builder produces the three ordered
+output-leg vertices required by the cyclic source. The nonlinear
+$V^I\leftrightarrow\Pi^I$ field redefinition is included at tree level through
+its local products of two-point covariances. The quantum three-point initial
+condition, sourced evolution, and observable $B_\zeta$ projection are
+unfinished; the repository therefore does not yet claim a bispectrum
+prediction.
 
 `CovariantMultifieldSystem<P, G, N>` accepts a `FieldSpaceGeometry<N>` that
 supplies $G_{IJ}$, $G^{IJ}$, and $\Gamma^I{}_{JK}$. `FlatFieldSpace` exactly reproduces

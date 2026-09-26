@@ -21,7 +21,10 @@ P3d is in progress. The following pieces are implemented:
   form required by the block map;
 - one model-to-kernel entry point that evaluates $A/B/C$ and feeds the eight
   canonical e-fold-time blocks;
-- contraction of three ordered $u\Sigma\Sigma$ source terms.
+- an output-leg-aware vertex set with input orders $(2,3)$, $(1,3)$, and
+  $(1,2)$, plus contraction of the three ordered $u\Sigma\Sigma$ source terms;
+- explicit linear two-point and tree-level nonlinear three-point conversion
+  between the canonical $(Q,\Pi)$ and velocity $(Q,V)$ bases.
 
 The following pieces are not implemented:
 
@@ -33,7 +36,10 @@ The following pieces are not implemented:
 
 The canonical-momentum type boundary required by the first missing item is
 implemented: canonical and velocity covariances, correlations, and kernels
-cannot be mixed in the typed source contraction.
+cannot be mixed in the typed source contraction. Initial linear covariances
+can be relabelled only through an explicitly named linear-order conversion;
+the tree-level output conversion adds the required local $B\Sigma\Sigma$ and
+$C\Sigma\Sigma$ terms before returning a velocity-marked correlation.
 
 Therefore the current API is transport infrastructure, not yet a primordial
 bispectrum prediction.
@@ -238,13 +244,19 @@ input legs are stored in ascending order among the remaining legs:
 Making the middle row explicit prevents confusing ascending order $(1,3)$
 with a cyclic convention $(3,1)$.
 
-## Why the source algebra is not yet the physical kernel
+## Physical kernel boundary and remaining validation
 
-The current contraction accepts correctly dimensioned numerical kernel
-blocks. The library now manufactures all $A_{IJK}$, $B_{IJK}$, and $C_{IJK}$
+The contraction accepts correctly dimensioned numerical kernel blocks. The
+library manufactures all $A_{IJK}$, $B_{IJK}$, and $C_{IJK}$
 contributions from a model, background state, geometry, and momentum triangle.
 The canonical route uses a distinct typed momentum $\Pi^I$; it is not silently
 identified with $P^I=D_tQ^I$.
+
+`canonical_cubic_hamiltonian_vertices` evaluates the coefficient set once for
+each output leg, moving every field index with its attached Fourier momentum.
+This supplies exactly the three orderings required by the source table above.
+`velocity_three_point_from_canonical_tree` uses those same ordered vertices to
+apply the nonlinear basis change after canonical evolution.
 
 The $A$ evaluator includes the symmetrized covariant potential derivative
 $V_{;(IJK)}$, field-space curvature, and the required covariant curvature
@@ -260,8 +272,9 @@ calculation.
 The full formulas for $A_{IJK}$, $B_{IJK}$, $C_{IJK}$, their simultaneous
 index/momentum symmetrizations, the canonical eight-block $u^a{}_{bc}$ table,
 and the resolved $P$--$\Pi$ type boundary are recorded in
-[`cubic-kernel-conventions.md`](cubic-kernel-conventions.md). That document is
-the implementation gate for the next P3d slice.
+[`cubic-kernel-conventions.md`](cubic-kernel-conventions.md). The remaining
+scientific gates are the quantum initial condition, combined sourced
+integration, and an independent numerical benchmark.
 
 ## Initial conditions
 
@@ -298,6 +311,10 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
   equilateral triangle in every block and field component;
 - a scalar complex regression independently reproduces all three ordered
   $u\Sigma\Sigma$ terms;
+- a nonlinear scalar regression reproduces the $B\Sigma\Sigma$ and
+  $C\Sigma\Sigma$ canonical-to-velocity corrections, while `QQQ` is unchanged;
+- the two-point linear basis conversion round-trips all four blocks, and a
+  non-equilateral model verifies that output-leg vertices are distinct;
 - compile-fail tests reject both a mismatched $\alpha$ block and an incorrectly
   dimensioned $u^P{}_{QQ}$ block.
 
@@ -309,14 +326,17 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
    the eight ordered e-fold-time $u^a{}_{bc}$ blocks;
 3. **Completed:** evaluate $A$, $B$, and $C$ from the model, background,
    geometry, and triangle, and assemble the canonical e-fold kernel;
-4. test flat-space, single-field, and field-coordinate covariance limits; the
+4. **Completed:** evaluate the three output-leg orderings and implement the
+   typed linear/two-point and nonlinear/tree-level $V\leftrightarrow\Pi$
+   conversion boundary;
+5. test flat-space, single-field, and field-coordinate covariance limits; the
    first two are covered for all coefficients, the $A/B$ Riemann contributions
    and the $A$ rank-five $\nabla R$ routing are checked independently, while
    general coordinate covariance remains;
-5. implement the quantum initial condition for all eight blocks;
-6. combine homogeneous and sourced terms into one adaptive transport system;
-7. verify general-triangle permutation and reality identities;
-8. demonstrate convergence in integration tolerance and start depth.
+6. implement the quantum initial condition for all eight blocks;
+7. combine homogeneous and sourced terms into one adaptive transport system;
+8. verify general-triangle permutation and reality identities;
+9. demonstrate convergence in integration tolerance and start depth.
 
 Only after these items pass does P3e project $\alpha^{abc}$ to the observable
 curvature bispectrum $B_\zeta$.
