@@ -84,18 +84,21 @@ pub use state::{State, StateDelta, StateDerivative};
 pub use time::ConformalTime;
 pub use transport::{
     AnyPhaseSpaceIndex, CanonicalCubicACoefficients, CanonicalCubicBCoefficients,
-    CanonicalCubicCCoefficients, CanonicalCubicHamiltonianCoefficients, CanonicalKernelError,
-    CanonicalMomentumPerturbation, CanonicalQuadraticPhaseSpaceKernel,
-    CanonicalThreePointPhaseSpaceCorrelation, CanonicalTwoPointPhaseSpaceCovariance,
-    CubicCoefficientError, DEFAULT_TRIANGLE_CLOSURE_TOLERANCE, FieldPerturbation, FourierLeg,
-    MomentumPerturbation, MomentumTriangle, MomentumTriangleError, PhaseSpaceIndex,
-    PhaseSpaceIndexError, PhaseSpaceSlot, PhaseSpaceSlotKind, QuadraticPhaseSpaceKernel,
-    ThreePointBlock, ThreePointHomogeneousTransportSystem, ThreePointPhaseSpaceCorrelation,
+    CanonicalCubicCCoefficients, CanonicalCubicHamiltonianCoefficients,
+    CanonicalCubicHamiltonianVertices, CanonicalKernelError, CanonicalMomentumPerturbation,
+    CanonicalQuadraticPhaseSpaceKernel, CanonicalThreePointPhaseSpaceCorrelation,
+    CanonicalTwoPointPhaseSpaceCovariance, CubicCoefficientError,
+    DEFAULT_TRIANGLE_CLOSURE_TOLERANCE, FieldPerturbation, FourierLeg, MomentumPerturbation,
+    MomentumTriangle, MomentumTriangleError, PhaseSpaceIndex, PhaseSpaceIndexError, PhaseSpaceSlot,
+    PhaseSpaceSlotKind, QuadraticPhaseSpaceKernel, ThreePointBlock,
+    ThreePointHomogeneousTransportSystem, ThreePointPhaseSpaceCorrelation,
     TwoFieldBackgroundProvider, TwoPointBlock, TwoPointPhaseSpaceCovariance,
     TwoPointTransportSystem, TwoPointTransportTolerance, canonical_cubic_a_coefficients,
     canonical_cubic_b_coefficients, canonical_cubic_c_coefficients,
-    canonical_cubic_hamiltonian_coefficients, three_point_source_from_kernels,
-    two_point_covariance_from_mode_state,
+    canonical_cubic_hamiltonian_coefficients, canonical_cubic_hamiltonian_vertices,
+    canonical_two_point_from_velocity_linear, three_point_source_from_kernels,
+    two_point_covariance_from_mode_state, velocity_three_point_from_canonical_tree,
+    velocity_two_point_from_canonical_linear,
 };
 
 /// A dimensionless quantity, such as the scale factor.

@@ -5,7 +5,7 @@ detailed mathematical contracts remain in the design documents linked below;
 this page records what is implemented, what is only designed, and the order in
 which unfinished work should proceed.
 
-## Status on 2026-09-24
+## Status on 2026-09-26
 
 The first scientific milestone is complete: `phys-type` can evolve a
 covariant two-field inflationary background and its linear quantum
@@ -45,8 +45,8 @@ The repository currently has two distinct scientific boundaries:
 | --- | --- | --- |
 | Two-field background and linear perturbations | complete | produces validated adiabatic, entropy, cross, and curvature power spectra |
 | Direct two-point phase-space transport | complete | reproduces the independent mode solver for all complex covariance blocks |
-| Three-point transport infrastructure | in progress | state, homogeneous flow, typed quadratic kernel, and source contraction exist |
-| Primordial bispectrum prediction | not yet available | physical cubic kernel, quantum initial condition, sourced benchmark, and curvature projection remain |
+| Three-point transport infrastructure | in progress | model-derived ordered cubic kernels and the canonical--velocity conversion now exist |
+| Primordial bispectrum prediction | not yet available | quantum initial condition, sourced benchmark, and curvature projection remain |
 
 Consequently, the crate can presently make power-spectrum predictions within
 its documented inflation/no-reheating scope. It must not yet describe its
@@ -160,7 +160,9 @@ turn and the complete 41-point benchmark.
   symmetrization. The $A/B$ regressions isolate their Riemann contributions;
   $A$ additionally checks the symmetrized third potential derivative and the
   rank-five $\nabla R$ index routing. A single public entry point constructs all
-  five raised tensors and feeds the eight-block e-fold kernel. Quantum initial
+  five raised tensors and feeds the eight-block e-fold kernel. A second public
+  entry point constructs all three output-leg orderings required by the cyclic
+  source, with input legs $(2,3)$, $(1,3)$, and $(1,2)$. Quantum initial
   conditions and sourced evolution remain.
   The source derivation has exposed a required semantic decision: the
   published cubic-Hamiltonian kernel evolves rescaled canonical momentum
@@ -171,6 +173,12 @@ turn and the complete 41-point benchmark.
   kernel with velocity covariances. A typed five-tensor container now also
   distinguishes first- and third-index raising for $B$ and $C$, and maps the
   cosmic-time $A/B/C$ coefficients into all eight e-fold-time kernel blocks.
+  Explicit linear two-point conversion relabels $V^I=\Pi^I$ only at linear
+  order. The tree-level three-point conversion implements
+  $V^I=\Pi^I-\tfrac12B_{JK}{}^IQ^JQ^K-C^I{}_{JK}\Pi^JQ^K$ and adds the
+  corresponding ordered $B\Sigma\Sigma$ and $C\Sigma\Sigma$ terms. Typed tests
+  cover the two-point round trip, preservation of `QQQ`, and exact scalar
+  nonlinear corrections.
   A Fourier-normalization audit corrected the stripped three-point dimensions
   to $M^{-3}$, $M^{-2}$, $M^{-1}$, and $M^0$ for zero through three momentum
   slots. Accordingly $A$, $B$, and $C$ carry $M^1$, $M^0$, and $M^{-1}$.
@@ -179,9 +187,8 @@ turn and the complete 41-point benchmark.
   Canonical triangle helpers now supply the dimensioned all-incoming dot
   products, cosines, and transverse factors used repeatedly by the cubic
   coefficients, with general, equilateral, and folded tests.
-  The next code change moves beyond coefficient construction to the remaining
-  canonical $V\leftrightarrow\Pi$ boundary and quantum three-point initial
-  condition. See
+  The next code change is the quantum three-point initial condition, followed
+  by the combined sourced adaptive system. See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
   [`three-point-transport.md`](three-point-transport.md), with the detailed
   derivation in

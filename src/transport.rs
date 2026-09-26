@@ -500,6 +500,34 @@ pub struct TwoPointPhaseSpaceCovariance<const N: usize, P: PhaseSpaceSlot = Mome
 pub type CanonicalTwoPointPhaseSpaceCovariance<const N: usize> =
     TwoPointPhaseSpaceCovariance<N, CanonicalMomentumPerturbation>;
 
+/// Relabels a velocity covariance as canonical at linear perturbative order.
+///
+/// Since `Pi^I = V^I + O(X^2)`, all four two-point blocks are numerically
+/// identical at the order used to source tree-level three-point transport.
+/// The explicit function keeps this perturbative boundary visible in the API.
+pub fn canonical_two_point_from_velocity_linear<const N: usize>(
+    covariance: TwoPointPhaseSpaceCovariance<N>,
+) -> CanonicalTwoPointPhaseSpaceCovariance<N> {
+    CanonicalTwoPointPhaseSpaceCovariance {
+        qq: covariance.qq,
+        qp: TwoPointBlock::new(covariance.qp.components),
+        pq: TwoPointBlock::new(covariance.pq.components),
+        pp: TwoPointBlock::new(covariance.pp.components),
+    }
+}
+
+/// Relabels a canonical covariance as velocity at linear perturbative order.
+pub fn velocity_two_point_from_canonical_linear<const N: usize>(
+    covariance: CanonicalTwoPointPhaseSpaceCovariance<N>,
+) -> TwoPointPhaseSpaceCovariance<N> {
+    TwoPointPhaseSpaceCovariance {
+        qq: covariance.qq,
+        qp: TwoPointBlock::new(covariance.qp.components),
+        pq: TwoPointBlock::new(covariance.pq.components),
+        pp: TwoPointBlock::new(covariance.pp.components),
+    }
+}
+
 impl<const N: usize, P: PhaseSpaceSlot> Add for TwoPointPhaseSpaceCovariance<N, P> {
     type Output = Self;
 
@@ -1071,6 +1099,48 @@ pub struct CanonicalCubicHamiltonianCoefficients<const N: usize> {
         ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>,
 }
 
+/// Cubic-Hamiltonian coefficients ordered for each possible output leg.
+///
+/// For output legs `1`, `2`, and `3`, the two input legs are respectively
+/// `(2, 3)`, `(1, 3)`, and `(1, 2)`. Keeping this ordering in a dedicated type
+/// prevents a single `(1, 2, 3)` vertex from being reused incorrectly in all
+/// three cyclic source terms.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CanonicalCubicHamiltonianVertices<const N: usize> {
+    coefficients: [CanonicalCubicHamiltonianCoefficients<N>; 3],
+}
+
+impl<const N: usize> CanonicalCubicHamiltonianVertices<N> {
+    /// Returns the coefficients whose first slot is the requested output leg.
+    pub const fn for_output(
+        &self,
+        output: FourierLeg,
+    ) -> &CanonicalCubicHamiltonianCoefficients<N> {
+        &self.coefficients[output.index()]
+    }
+
+    /// Converts all three ordered vertices to e-fold quadratic-flow kernels.
+    pub fn e_fold_kernels(
+        self,
+        hubble: Hubble,
+    ) -> Result<[CanonicalQuadraticPhaseSpaceKernel<N>; 3], CanonicalKernelError> {
+        Ok([
+            CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian(
+                self.coefficients[0],
+                hubble,
+            )?,
+            CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian(
+                self.coefficients[1],
+                hubble,
+            )?,
+            CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian(
+                self.coefficients[2],
+                hubble,
+            )?,
+        ])
+    }
+}
+
 /// The raised form of the fully symmetrized cubic coefficient `A_IJK`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CanonicalCubicACoefficients<const N: usize> {
@@ -1141,10 +1211,11 @@ impl std::error::Error for CubicCoefficientError {}
 /// capabilities: the symmetrized covariant potential derivative, the Riemann
 /// tensor, and its covariant derivative. Each permutation moves a field index
 /// and its attached canonical Fourier leg together.
-pub fn canonical_cubic_a_coefficients<P, G, const N: usize>(
+fn canonical_cubic_a_coefficients_for_legs<P, G, const N: usize>(
     system: &CovariantMultifieldSystem<P, G, N>,
     state: &MultifieldState<N>,
     triangle: MomentumTriangle,
+    legs: [FourierLeg; 3],
 ) -> Result<CanonicalCubicACoefficients<N>, CubicCoefficientError>
 where
     P: ThriceDifferentiableMultifieldPotential<N>,
@@ -1184,8 +1255,6 @@ where
         -(lowered_velocity.components()[i] * hubble * 3.0) - gradient[i]
             + lowered_velocity.components()[i] * velocity_squared / (hubble * planck_squared * 2.0)
     });
-    let legs = [FourierLeg::One, FourierLeg::Two, FourierLeg::Three];
-
     let unsymmetrized = |i: usize,
                          j: usize,
                          k: usize,
@@ -1262,6 +1331,24 @@ where
     Ok(CanonicalCubicACoefficients { first_raised })
 }
 
+/// Evaluates `A` in canonical Fourier-leg order `(k_1, k_2, k_3)`.
+pub fn canonical_cubic_a_coefficients<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    state: &MultifieldState<N>,
+    triangle: MomentumTriangle,
+) -> Result<CanonicalCubicACoefficients<N>, CubicCoefficientError>
+where
+    P: ThriceDifferentiableMultifieldPotential<N>,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N>,
+{
+    canonical_cubic_a_coefficients_for_legs(
+        system,
+        state,
+        triangle,
+        [FourierLeg::One, FourierLeg::Two, FourierLeg::Three],
+    )
+}
+
 /// Evaluates the symmetrized curved-field-space coefficient `B_IJK` and
 /// returns the two raised forms required by the canonical phase-space kernel.
 ///
@@ -1269,10 +1356,11 @@ where
 /// `Z_I = D_t dot(phi)_I + dot(phi)_I dot(phi)^2 / (2 H M_pl^2)`.
 /// Field indices and their attached canonical Fourier legs are symmetrized
 /// together.
-pub fn canonical_cubic_b_coefficients<P, G, const N: usize>(
+fn canonical_cubic_b_coefficients_for_legs<P, G, const N: usize>(
     system: &CovariantMultifieldSystem<P, G, N>,
     state: &MultifieldState<N>,
     triangle: MomentumTriangle,
+    legs: [FourierLeg; 3],
 ) -> Result<CanonicalCubicBCoefficients<N>, CubicCoefficientError>
 where
     P: MultifieldPotential<N>,
@@ -1301,7 +1389,6 @@ where
         -(lowered_velocity.components()[i] * hubble * 3.0) - gradient[i]
             + lowered_velocity.components()[i] * velocity_squared / (hubble * planck_squared * 2.0)
     });
-    let legs = [FourierLeg::One, FourierLeg::Two, FourierLeg::Three];
     let wavenumbers = triangle.canonical_wavenumbers();
 
     let unsymmetrized = |i: usize,
@@ -1337,22 +1424,39 @@ where
                 * first_second_ratio
     };
 
-    let lower: [[[Quantity<M0, f64>; N]; N]; N] = core::array::from_fn(|i| {
-        core::array::from_fn(|j| {
-            core::array::from_fn(|k| {
-                (unsymmetrized(i, j, k, legs[0], legs[1], legs[2])
-                    + unsymmetrized(j, i, k, legs[1], legs[0], legs[2]))
-                    * 0.5
+    let lower_for_legs = |coefficient_legs: [FourierLeg; 3]| {
+        core::array::from_fn(|i| {
+            core::array::from_fn(|j| {
+                core::array::from_fn(|k| {
+                    (unsymmetrized(
+                        i,
+                        j,
+                        k,
+                        coefficient_legs[0],
+                        coefficient_legs[1],
+                        coefficient_legs[2],
+                    ) + unsymmetrized(
+                        j,
+                        i,
+                        k,
+                        coefficient_legs[1],
+                        coefficient_legs[0],
+                        coefficient_legs[2],
+                    )) * 0.5
+                })
             })
         })
-    });
+    };
+    let first_lower: [[[Quantity<M0, f64>; N]; N]; N] = lower_for_legs(legs);
+    let third_lower: [[[Quantity<M0, f64>; N]; N]; N] = lower_for_legs([legs[1], legs[2], legs[0]]);
 
     let first_raised = ThreePointBlock::new(core::array::from_fn(|i| {
         core::array::from_fn(|j| {
             core::array::from_fn(|k| {
                 (0..N)
                     .map(|contracted| {
-                        lower[contracted][j][k] * inverse.components()[i][contracted].into_value()
+                        first_lower[contracted][j][k]
+                            * inverse.components()[i][contracted].into_value()
                     })
                     .fold(Quantity::new(0.0), Add::add)
             })
@@ -1363,7 +1467,8 @@ where
             core::array::from_fn(|k| {
                 (0..N)
                     .map(|contracted| {
-                        lower[j][k][contracted] * inverse.components()[i][contracted].into_value()
+                        third_lower[j][k][contracted]
+                            * inverse.components()[i][contracted].into_value()
                     })
                     .fold(Quantity::new(0.0), Add::add)
             })
@@ -1376,6 +1481,24 @@ where
     })
 }
 
+/// Evaluates `B` in canonical Fourier-leg order `(k_1, k_2, k_3)`.
+pub fn canonical_cubic_b_coefficients<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    state: &MultifieldState<N>,
+    triangle: MomentumTriangle,
+) -> Result<CanonicalCubicBCoefficients<N>, CubicCoefficientError>
+where
+    P: MultifieldPotential<N>,
+    G: CurvedFieldSpaceGeometry<N>,
+{
+    canonical_cubic_b_coefficients_for_legs(
+        system,
+        state,
+        triangle,
+        [FourierLeg::One, FourierLeg::Two, FourierLeg::Three],
+    )
+}
+
 /// Evaluates the symmetrized curved-field-space coefficient `C_IJK` and
 /// returns the two raised forms required by the canonical phase-space kernel.
 ///
@@ -1383,10 +1506,11 @@ where
 /// together. All arithmetic that carries physical dimension remains inside
 /// [`Quantity`]; only metric components and momentum ratios are raw
 /// dimensionless factors.
-pub fn canonical_cubic_c_coefficients<P, G, const N: usize>(
+fn canonical_cubic_c_coefficients_for_legs<P, G, const N: usize>(
     system: &CovariantMultifieldSystem<P, G, N>,
     state: &MultifieldState<N>,
     triangle: MomentumTriangle,
+    legs: [FourierLeg; 3],
 ) -> Result<CanonicalCubicCCoefficients<N>, CubicCoefficientError>
 where
     P: MultifieldPotential<N>,
@@ -1407,7 +1531,6 @@ where
     let velocity = ContravariantField::new(state.pi);
     let lowered_velocity = metric.lower(&velocity);
     let planck = Mass::new(planck_value);
-    let legs = [FourierLeg::One, FourierLeg::Two, FourierLeg::Three];
     let wavenumbers = triangle.canonical_wavenumbers();
 
     let unsymmetrized = |i: usize,
@@ -1433,22 +1556,40 @@ where
                 * first_third_ratio
     };
 
-    let lower: [[[Quantity<MMinus1, f64>; N]; N]; N] = core::array::from_fn(|i| {
-        core::array::from_fn(|j| {
-            core::array::from_fn(|k| {
-                (unsymmetrized(i, j, k, legs[0], legs[1], legs[2])
-                    + unsymmetrized(j, i, k, legs[1], legs[0], legs[2]))
-                    * 0.5
+    let lower_for_legs = |coefficient_legs: [FourierLeg; 3]| {
+        core::array::from_fn(|i| {
+            core::array::from_fn(|j| {
+                core::array::from_fn(|k| {
+                    (unsymmetrized(
+                        i,
+                        j,
+                        k,
+                        coefficient_legs[0],
+                        coefficient_legs[1],
+                        coefficient_legs[2],
+                    ) + unsymmetrized(
+                        j,
+                        i,
+                        k,
+                        coefficient_legs[1],
+                        coefficient_legs[0],
+                        coefficient_legs[2],
+                    )) * 0.5
+                })
             })
         })
-    });
+    };
+    let first_lower: [[[Quantity<MMinus1, f64>; N]; N]; N] = lower_for_legs(legs);
+    let third_lower: [[[Quantity<MMinus1, f64>; N]; N]; N] =
+        lower_for_legs([legs[1], legs[2], legs[0]]);
 
     let first_raised = ThreePointBlock::new(core::array::from_fn(|i| {
         core::array::from_fn(|j| {
             core::array::from_fn(|k| {
                 (0..N)
                     .map(|contracted| {
-                        lower[contracted][j][k] * inverse.components()[i][contracted].into_value()
+                        first_lower[contracted][j][k]
+                            * inverse.components()[i][contracted].into_value()
                     })
                     .fold(Quantity::new(0.0), Add::add)
             })
@@ -1459,7 +1600,8 @@ where
             core::array::from_fn(|k| {
                 (0..N)
                     .map(|contracted| {
-                        lower[j][k][contracted] * inverse.components()[i][contracted].into_value()
+                        third_lower[j][k][contracted]
+                            * inverse.components()[i][contracted].into_value()
                     })
                     .fold(Quantity::new(0.0), Add::add)
             })
@@ -1472,11 +1614,53 @@ where
     })
 }
 
+/// Evaluates `C` in canonical Fourier-leg order `(k_1, k_2, k_3)`.
+pub fn canonical_cubic_c_coefficients<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    state: &MultifieldState<N>,
+    triangle: MomentumTriangle,
+) -> Result<CanonicalCubicCCoefficients<N>, CubicCoefficientError>
+where
+    P: MultifieldPotential<N>,
+    G: FieldSpaceGeometry<N>,
+{
+    canonical_cubic_c_coefficients_for_legs(
+        system,
+        state,
+        triangle,
+        [FourierLeg::One, FourierLeg::Two, FourierLeg::Three],
+    )
+}
+
 /// Evaluates all model-derived cubic Hamiltonian coefficients for one
 /// background state and canonical momentum triangle.
 ///
 /// The returned tensors can be passed directly to
 /// [`CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian`].
+fn canonical_cubic_hamiltonian_coefficients_for_legs<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    state: &MultifieldState<N>,
+    triangle: MomentumTriangle,
+    legs: [FourierLeg; 3],
+) -> Result<CanonicalCubicHamiltonianCoefficients<N>, CubicCoefficientError>
+where
+    P: ThriceDifferentiableMultifieldPotential<N>,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N>,
+{
+    let a = canonical_cubic_a_coefficients_for_legs(system, state, triangle, legs)?;
+    let b = canonical_cubic_b_coefficients_for_legs(system, state, triangle, legs)?;
+    let c = canonical_cubic_c_coefficients_for_legs(system, state, triangle, legs)?;
+
+    Ok(CanonicalCubicHamiltonianCoefficients {
+        a_first_raised: a.first_raised,
+        b_first_raised: b.first_raised,
+        b_third_raised: b.third_raised,
+        c_first_raised: c.first_raised,
+        c_third_raised: c.third_raised,
+    })
+}
+
+/// Evaluates all cubic coefficients in canonical Fourier-leg order.
 pub fn canonical_cubic_hamiltonian_coefficients<P, G, const N: usize>(
     system: &CovariantMultifieldSystem<P, G, N>,
     state: &MultifieldState<N>,
@@ -1486,16 +1670,46 @@ where
     P: ThriceDifferentiableMultifieldPotential<N>,
     G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N>,
 {
-    let a = canonical_cubic_a_coefficients(system, state, triangle)?;
-    let b = canonical_cubic_b_coefficients(system, state, triangle)?;
-    let c = canonical_cubic_c_coefficients(system, state, triangle)?;
+    canonical_cubic_hamiltonian_coefficients_for_legs(
+        system,
+        state,
+        triangle,
+        [FourierLeg::One, FourierLeg::Two, FourierLeg::Three],
+    )
+}
 
-    Ok(CanonicalCubicHamiltonianCoefficients {
-        a_first_raised: a.first_raised,
-        b_first_raised: b.first_raised,
-        b_third_raised: b.third_raised,
-        c_first_raised: c.first_raised,
-        c_third_raised: c.third_raised,
+/// Evaluates the three ordered vertices needed by the cyclic three-point
+/// transport source.
+pub fn canonical_cubic_hamiltonian_vertices<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    state: &MultifieldState<N>,
+    triangle: MomentumTriangle,
+) -> Result<CanonicalCubicHamiltonianVertices<N>, CubicCoefficientError>
+where
+    P: ThriceDifferentiableMultifieldPotential<N>,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N>,
+{
+    Ok(CanonicalCubicHamiltonianVertices {
+        coefficients: [
+            canonical_cubic_hamiltonian_coefficients_for_legs(
+                system,
+                state,
+                triangle,
+                [FourierLeg::One, FourierLeg::Two, FourierLeg::Three],
+            )?,
+            canonical_cubic_hamiltonian_coefficients_for_legs(
+                system,
+                state,
+                triangle,
+                [FourierLeg::Two, FourierLeg::One, FourierLeg::Three],
+            )?,
+            canonical_cubic_hamiltonian_coefficients_for_legs(
+                system,
+                state,
+                triangle,
+                [FourierLeg::Three, FourierLeg::One, FourierLeg::Two],
+            )?,
+        ],
     })
 }
 
@@ -1762,6 +1976,66 @@ pub fn three_point_source_from_kernels<const N: usize, P: PhaseSpaceSlot>(
             PhaseSpaceSlotKind::Field,
         ])),
         ppp: complex_three_point_block(source_block([PhaseSpaceSlotKind::Momentum; 3])),
+    }
+}
+
+fn canonical_to_velocity_redefinition_kernel<const N: usize>(
+    coefficients: CanonicalCubicHamiltonianCoefficients<N>,
+) -> CanonicalQuadraticPhaseSpaceKernel<N> {
+    CanonicalQuadraticPhaseSpaceKernel {
+        q_qq: zero_real_three_point_block(),
+        q_qp: zero_real_three_point_block(),
+        q_pq: zero_real_three_point_block(),
+        q_pp: zero_real_three_point_block(),
+        p_qq: ThreePointBlock::new(core::array::from_fn(|i| {
+            core::array::from_fn(|j| {
+                core::array::from_fn(|k| -coefficients.b_third_raised.components[i][j][k])
+            })
+        })),
+        p_qp: ThreePointBlock::new(core::array::from_fn(|i| {
+            core::array::from_fn(|j| {
+                core::array::from_fn(|k| -coefficients.c_first_raised.components[i][k][j])
+            })
+        })),
+        p_pq: ThreePointBlock::new(core::array::from_fn(|i| {
+            core::array::from_fn(|j| {
+                core::array::from_fn(|k| -coefficients.c_first_raised.components[i][j][k])
+            })
+        })),
+        p_pp: zero_real_three_point_block(),
+    }
+}
+
+/// Converts a canonical equal-time three-point function to the velocity basis
+/// at tree level.
+///
+/// The nonlinear relation used here is
+/// `V^I = Pi^I - B_JK^I Q^J Q^K / 2 - C^I_JK Pi^J Q^K + O(X^3)`.
+/// Each quadratic insertion is contracted with the two linear covariances on
+/// the other legs. The ordered vertices and covariances must describe the same
+/// background state and canonical momentum triangle.
+pub fn velocity_three_point_from_canonical_tree<const N: usize>(
+    canonical: CanonicalThreePointPhaseSpaceCorrelation<N>,
+    vertices: &CanonicalCubicHamiltonianVertices<N>,
+    covariances: [&CanonicalTwoPointPhaseSpaceCovariance<N>; 3],
+) -> ThreePointPhaseSpaceCorrelation<N> {
+    let kernels = [
+        canonical_to_velocity_redefinition_kernel(*vertices.for_output(FourierLeg::One)),
+        canonical_to_velocity_redefinition_kernel(*vertices.for_output(FourierLeg::Two)),
+        canonical_to_velocity_redefinition_kernel(*vertices.for_output(FourierLeg::Three)),
+    ];
+    let transformed = canonical
+        + three_point_source_from_kernels([&kernels[0], &kernels[1], &kernels[2]], covariances);
+
+    ThreePointPhaseSpaceCorrelation {
+        qqq: transformed.qqq,
+        qqp: ThreePointBlock::new(transformed.qqp.components),
+        qpq: ThreePointBlock::new(transformed.qpq.components),
+        pqq: ThreePointBlock::new(transformed.pqq.components),
+        qpp: ThreePointBlock::new(transformed.qpp.components),
+        pqp: ThreePointBlock::new(transformed.pqp.components),
+        ppq: ThreePointBlock::new(transformed.ppq.components),
+        ppp: ThreePointBlock::new(transformed.ppp.components),
     }
 }
 
@@ -2691,6 +2965,101 @@ mod tests {
     }
 
     #[test]
+    fn linear_two_point_basis_conversion_is_an_explicit_round_trip() {
+        let velocity = TwoPointPhaseSpaceCovariance::<1> {
+            qq: TwoPointBlock::new([[Quantity::new(Complex64::new(1.0, 2.0))]]),
+            qp: TwoPointBlock::new([[Quantity::new(Complex64::new(3.0, 4.0))]]),
+            pq: TwoPointBlock::new([[Quantity::new(Complex64::new(5.0, 6.0))]]),
+            pp: TwoPointBlock::new([[Quantity::new(Complex64::new(7.0, 8.0))]]),
+        };
+
+        let canonical = canonical_two_point_from_velocity_linear(velocity);
+        assert_eq!(canonical.qq, velocity.qq);
+        assert_eq!(canonical.qp.components, velocity.qp.components);
+        assert_eq!(canonical.pq.components, velocity.pq.components);
+        assert_eq!(canonical.pp.components, velocity.pp.components);
+        assert_eq!(
+            velocity_two_point_from_canonical_linear(canonical),
+            velocity
+        );
+    }
+
+    #[test]
+    fn ordered_vertices_keep_the_output_leg_attached_to_its_momentum() {
+        let model = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0), Mass::new(2.0)]),
+            FlatFieldSpace,
+        );
+        let state = MultifieldState::new(
+            [Field::new(2.0), Field::new(3.0)],
+            [FieldVelocity::new(0.5), FieldVelocity::new(-0.25)],
+            ScaleFactor::new(1.0),
+        );
+        let triangle = MomentumTriangle::try_new(3.0, 2.0, 2.0).unwrap();
+
+        let canonical = canonical_cubic_hamiltonian_coefficients(&model, &state, triangle).unwrap();
+        let vertices = canonical_cubic_hamiltonian_vertices(&model, &state, triangle).unwrap();
+
+        assert_eq!(*vertices.for_output(FourierLeg::One), canonical);
+        assert_ne!(
+            vertices.for_output(FourierLeg::One),
+            vertices.for_output(FourierLeg::Two)
+        );
+    }
+
+    #[test]
+    fn canonical_to_velocity_three_point_adds_the_b_and_c_field_redefinition() {
+        fn coefficient(b: f64, c: f64) -> CanonicalCubicHamiltonianCoefficients<1> {
+            CanonicalCubicHamiltonianCoefficients {
+                a_first_raised: zero_real_three_point_block(),
+                b_first_raised: zero_real_three_point_block(),
+                b_third_raised: ThreePointBlock::new([[[Quantity::new(b)]]]),
+                c_first_raised: ThreePointBlock::new([[[Quantity::new(c)]]]),
+                c_third_raised: zero_real_three_point_block(),
+            }
+        }
+        fn covariance(qq: f64, pq: f64) -> CanonicalTwoPointPhaseSpaceCovariance<1> {
+            CanonicalTwoPointPhaseSpaceCovariance {
+                qq: TwoPointBlock::new([[Quantity::new(Complex64::new(qq, 0.0))]]),
+                qp: TwoPointBlock::new([[Quantity::new(Complex64::new(0.0, 0.0))]]),
+                pq: TwoPointBlock::new([[Quantity::new(Complex64::new(pq, 0.0))]]),
+                pp: TwoPointBlock::new([[Quantity::new(Complex64::new(0.0, 0.0))]]),
+            }
+        }
+
+        let vertices = CanonicalCubicHamiltonianVertices {
+            coefficients: [
+                coefficient(2.0, 3.0),
+                coefficient(5.0, 7.0),
+                coefficient(11.0, 13.0),
+            ],
+        };
+        let covariances = [
+            covariance(17.0, 19.0),
+            covariance(23.0, 29.0),
+            covariance(31.0, 37.0),
+        ];
+        let mut canonical = CanonicalThreePointPhaseSpaceCorrelation::<1>::zero();
+        canonical.pqq.components[0][0][0] = Quantity::new(Complex64::new(41.0, 0.0));
+
+        let velocity = velocity_three_point_from_canonical_tree(
+            canonical,
+            &vertices,
+            [&covariances[0], &covariances[1], &covariances[2]],
+        );
+        let expected_pqq = 41.0 - 2.0 * 23.0 * 31.0 - 3.0 * (23.0 * 37.0 + 29.0 * 31.0);
+
+        assert_eq!(
+            velocity.pqq.components[0][0][0].into_value(),
+            Complex64::new(expected_pqq, 0.0)
+        );
+        assert_eq!(
+            velocity.qqq.components[0][0][0].into_value(),
+            Complex64::new(0.0, 0.0)
+        );
+    }
+
+    #[test]
     fn canonical_cubic_c_matches_the_flat_single_field_limit() {
         let model = CovariantMultifieldSystem::in_planck_units(
             QuadraticMultifieldPotential::new([Mass::new(1.0)]),
@@ -2731,12 +3100,19 @@ mod tests {
         let triangle = MomentumTriangle::try_new(4.0, 3.0, 2.0).unwrap();
 
         let coefficients = canonical_cubic_c_coefficients(&model, &state, triangle).unwrap();
+        let rotated = canonical_cubic_c_coefficients_for_legs(
+            &model,
+            &state,
+            triangle,
+            [FourierLeg::Two, FourierLeg::Three, FourierLeg::One],
+        )
+        .unwrap();
 
         for i in 0..2 {
             for j in 0..2 {
                 for k in 0..2 {
                     let actual = coefficients.third_raised.components()[i][j][k].into_value();
-                    let expected = coefficients.first_raised.components()[j][k][i].into_value();
+                    let expected = rotated.first_raised.components()[j][k][i].into_value();
                     let scale = actual.abs().max(expected.abs()).max(1.0);
                     assert!((actual - expected).abs() / scale < 1.0e-14);
                 }
@@ -2844,12 +3220,19 @@ mod tests {
         let triangle = MomentumTriangle::try_new(4.0, 3.0, 2.0).unwrap();
 
         let coefficients = canonical_cubic_b_coefficients(&model, &state, triangle).unwrap();
+        let rotated = canonical_cubic_b_coefficients_for_legs(
+            &model,
+            &state,
+            triangle,
+            [FourierLeg::Two, FourierLeg::Three, FourierLeg::One],
+        )
+        .unwrap();
 
         for i in 0..2 {
             for j in 0..2 {
                 for k in 0..2 {
                     let actual = coefficients.third_raised.components()[i][j][k].into_value();
-                    let expected = coefficients.first_raised.components()[j][k][i].into_value();
+                    let expected = rotated.first_raised.components()[j][k][i].into_value();
                     let scale = actual.abs().max(expected.abs()).max(1.0);
                     assert!((actual - expected).abs() / scale < 1.0e-14);
                 }
