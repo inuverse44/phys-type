@@ -206,12 +206,12 @@ against the mode oracle at four physical epochs. Dimensioned adaptive
 tolerances and initialization-depth convergence complete the P3c validation.
 P3d now provides the complete dimensioned `QQQ`--`PPP` state, homogeneous
 three-leg evolution, the typed quadratic kernel $u^a{}_{bc}$, and the ordered
-$u\Sigma\Sigma$ contraction. Model-derived $C_{IJK}$ evaluation is also
-implemented with typed dimensions and simultaneous field-index/Fourier-leg
-symmetrization. The remaining $A_{IJK}$ and $B_{IJK}$ coefficients, quantum
-three-point initial condition, and observable $B_\zeta$ projection are
-unfinished; the repository therefore does not yet claim a bispectrum
-prediction.
+$u\Sigma\Sigma$ contraction. Model-derived $B_{IJK}$ and $C_{IJK}$ evaluation
+is also implemented with typed dimensions, simultaneous
+field-index/Fourier-leg symmetrization, and an explicit field-space curvature
+regression. The remaining $A_{IJK}$ coefficient, quantum three-point initial
+condition, and observable $B_\zeta$ projection are unfinished; the repository
+therefore does not yet claim a bispectrum prediction.
 
 `CovariantMultifieldSystem<P, G, N>` accepts a `FieldSpaceGeometry<N>` that
 supplies $G_{IJ}$, $G^{IJ}$, and $\Gamma^I{}_{JK}$. `FlatFieldSpace` exactly reproduces

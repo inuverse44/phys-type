@@ -154,10 +154,12 @@ turn and the complete 41-point benchmark.
   propagates all three canonical triangle legs on the shared P2 background and
   commutes with equal-leg permutations. The dimensioned $u^a{}_{bc}$ container and
   ordered three-leg $u\Sigma\Sigma$ contraction are implemented. The first
-  model-derived cubic coefficient, $C_{IJK}$, is now evaluated from the
-  background, field-space metric, and canonical momentum triangle with typed
-  $M^{-1}$ arithmetic and simultaneous index/leg symmetrization. Deriving
-  $B_{IJK}$ and $A_{IJK}$ and adding quantum initial conditions remain.
+  model-derived cubic coefficients $B_{IJK}$ and $C_{IJK}$ are now evaluated
+  from the background, field-space geometry, and canonical momentum triangle
+  with typed $M^0/M^{-1}$ arithmetic and simultaneous index/leg
+  symmetrization. The $B$ regression isolates its Riemann contribution by
+  comparison with a curvature-suppressed geometry. Deriving $A_{IJK}$ and
+  adding quantum initial conditions remain.
   The source derivation has exposed a required semantic decision: the
   published cubic-Hamiltonian kernel evolves rescaled canonical momentum
   $\Pi^I$, while the accepted P3c type means $P^I=D_tQ^I$. They coincide only
@@ -175,13 +177,23 @@ turn and the complete 41-point benchmark.
   Canonical triangle helpers now supply the dimensioned all-incoming dot
   products, cosines, and transverse factors used repeatedly by the cubic
   coefficients, with general, equilateral, and folded tests.
-  The next code change is model-derived evaluation of $B_{IJK}$, followed by
-  $A_{IJK}$; $C_{IJK}$ already has flat single-field and raised-index-layout
-  regression tests. See
+  The next code change is model-derived evaluation of $A_{IJK}$; $B_{IJK}$ and
+  $C_{IJK}$ already have flat single-field and raised-index-layout regression
+  tests. See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
   [`three-point-transport.md`](three-point-transport.md), with the detailed
   derivation in
   [`cubic-kernel-conventions.md`](cubic-kernel-conventions.md);
+- after the original P3d/P3e path is complete, the first external model
+  validation target is [*Nonminimally Assisted Inflation: A General
+  Analysis*](https://arxiv.org/abs/2302.05866).
+  Its Einstein-frame two-field metric and potential will be implemented as
+  ordinary `FieldSpaceGeometry` and potential providers, not as exceptions in
+  the solver. Acceptance requires the existing dimension types, index
+  variance, Riemann identities, and covariant perturbation tests to remain
+  active. The loop-inflation Class-I trajectory is the first reproduction
+  target; Class-II power-law and hybrid cases additionally require a general
+  end-of-inflation event;
 - reheating and post-inflationary transfer;
 - dynamically sized field spaces if a concrete model requires more than the
   current const-generic representation.
