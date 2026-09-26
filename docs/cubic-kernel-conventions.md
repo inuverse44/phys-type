@@ -339,8 +339,8 @@ dimension of a linear mode function after stripping only one three-point
 delta function. The Fourier-operator and convolution-measure accounting is
 given explicitly in [`three-point-transport.md`](three-point-transport.md).
 
-This layer maps already evaluated $A$, $B$, and $C$ tensors. The $B$ and $C$
-physical coefficient evaluators are now implemented:
+This layer maps already evaluated $A$, $B$, and $C$ tensors. All three physical
+coefficient evaluators are now implemented:
 
 - `canonical_cubic_c_coefficients` computes the displayed
   $\widetilde C_{IJK}$ from a `CovariantMultifieldSystem`, `MultifieldState`,
@@ -370,8 +370,27 @@ tests, a curved-space regression compares the result with an otherwise
 identical geometry whose Riemann tensor is suppressed. Their difference is
 checked component by component against the typed curvature contraction.
 
-Model-derived $A$ is the next coefficient slice. Its potential and curvature
-terms require the richer third-order geometry API.
+`canonical_cubic_a_coefficients` evaluates the fully symmetrized $A$ tensor in
+`Quantity<M1, f64>`. Its trait boundary requires both
+`ThirdOrderFieldSpaceGeometry` and `CurvatureDerivativeGeometry`; therefore a
+geometry cannot enter this evaluator without explicitly supplying the
+connection derivative, Riemann tensor, and $\nabla_MR^I{}_{JKL}$. Tests isolate
+the following contributions:
+
+- the flat single-field analytic limit;
+- $V_{;(IJK)}$ using a mixed cubic potential at zero background velocity;
+- the Riemann term by comparison with a curvature-suppressed geometry;
+- the rank-five curvature-derivative index routing using a sparse probe
+  tensor.
+
+Because $A$ contains the physical-wavenumber factor $a^{-2}\mathbf{k}_2\cdot
+\mathbf{k}_3$, its evaluator also rejects non-positive or non-finite scale
+factors before division. All coefficient evaluators reject invalid $H$ and
+$M_{\mathrm{Pl}}$ values.
+
+`canonical_cubic_hamiltonian_coefficients` is the complete model-facing entry
+point. It evaluates $A/B/C$ and produces the five raised tensors consumed by
+`CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian`.
 
 ## Acceptance checklist for implementation
 
@@ -382,18 +401,17 @@ in code and tests:
    or $\Pi$;
 2. **Implemented:** cosmic-time coefficients are converted once, and only
    once, to e-fold coefficients by $H^{-1}$;
-3. **Implemented for $B/C$:** field-index symmetrization moves the attached
-   Fourier legs simultaneously; $A$ remains;
+3. **Implemented:** every field-index symmetrization moves the attached
+   Fourier legs simultaneously;
 4. **Implemented:** triangle dot products use the declared all-incoming
    convention;
-5. **Implemented for $B/C$:** $M_{\mathrm{Pl}}$ is read from the system and
+5. **Implemented:** $M_{\mathrm{Pl}}$ is read from the system and
    Planck units enter only through the system constructor;
-6. **Implemented for $B/C$:** flat-field-space and single-field reductions are
-   checked analytically, and the $B$ curvature term has a componentwise
-   regression; $A$ remains;
-7. **Implemented for the block map and $B/C$:** exchanging the two input legs
-   maps each ordered block to its partner and coefficients are symmetrized with
-   their momentum labels; the $A$ coefficient tests remain;
+6. **Implemented:** flat-field-space and single-field reductions are checked
+   analytically, and the $A/B$ curvature terms plus the $A$ rank-five term have
+   componentwise regressions;
+7. **Implemented:** exchanging the two input legs maps each ordered block to
+   its partner and all coefficients are symmetrized with their momentum labels;
 8. a nonlinear $V\leftrightarrow\Pi$ correlator conversion is tested for the
    selected canonical route;
 9. dimensions, permutation identities, and an independent numerical

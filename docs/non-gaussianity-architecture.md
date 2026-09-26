@@ -338,11 +338,11 @@ the P3c linear flow to all three canonical triangle legs on the shared P2
 background, and is regression-tested for leg-permutation covariance. No
 complete cubic kernel or physical bispectrum is claimed yet. The dimensioned
 eight-block `QuadraticPhaseSpaceKernel` and the three ordered $u\Sigma\Sigma$ contractions
-are implemented separately from the incomplete model-derived kernel. Its
-$B_{IJK}$ and $C_{IJK}$ coefficients are now evaluated from the model,
-background, geometry, and triangle, with typed dimensions, analytic flat
-single-field tests, and an isolated Riemann-contraction regression for $B$;
-$A_{IJK}$ remains. The
+are implemented together with the complete model-derived coefficient layer. Its
+$A_{IJK}$, $B_{IJK}$, and $C_{IJK}$ coefficients are evaluated from the model,
+background, geometry, and triangle with typed dimensions, analytic flat
+single-field tests, isolated Riemann-contraction regressions, and explicit
+rank-five $\nabla R$ index routing. The
 staged contract and next kernel-construction step are documented in
 [`three-point-transport.md`](three-point-transport.md). Source-level
 reconciliation found that the published eight-block cubic-Hamiltonian kernel

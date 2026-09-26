@@ -3,8 +3,8 @@
 //! This module separates Fourier legs, phase-space slots, field coordinates,
 //! and physical dimensions. It provides the linear mode solver's two-point
 //! oracle, direct two-point covariance dynamics, and typed three-point
-//! transport infrastructure. Model-derived cubic coefficients and sourced
-//! end-to-end evolution are not implemented yet.
+//! transport infrastructure. Model-derived cubic coefficients are complete;
+//! sourced end-to-end evolution is not implemented yet.
 
 use core::fmt;
 use core::marker::PhantomData;
@@ -14,10 +14,12 @@ use num_complex::Complex64;
 
 use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
 use crate::{
-    ContravariantField, CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless,
-    FieldSpaceGeometry, Hubble, LowerFirst, M0, M1, M2, M3, MMinus1, MMinus2, MMinus3, Mass,
-    ModeAmplitude, ModeVelocity, MultifieldPotential, MultifieldState, Quantity,
-    TwiceDifferentiableMultifieldPotential, TwoFieldPerturbationState,
+    ContravariantField, CovariantMultifieldSystem, CurvatureDerivativeGeometry,
+    CurvedFieldSpaceGeometry, Dimensionless, FieldSpaceGeometry, Hubble, LowerFirst, M0, M1, M2,
+    M3, MMinus1, MMinus2, MMinus3, Mass, ModeAmplitude, ModeVelocity, MultifieldPotential,
+    MultifieldState, Quantity, ThirdOrderFieldSpaceGeometry,
+    ThriceDifferentiableMultifieldPotential, TwiceDifferentiableMultifieldPotential,
+    TwoFieldPerturbationState,
 };
 
 /// Default relative tolerance for numerical triangle closure.
@@ -1069,6 +1071,14 @@ pub struct CanonicalCubicHamiltonianCoefficients<const N: usize> {
         ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>,
 }
 
+/// The raised form of the fully symmetrized cubic coefficient `A_IJK`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CanonicalCubicACoefficients<const N: usize> {
+    /// `A^I_JK`, stored in output/first-input/second-input order.
+    pub first_raised:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M1, f64, N>,
+}
+
 /// The two raised forms of the symmetrized cubic coefficient `B_IJK`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CanonicalCubicBCoefficients<const N: usize> {
@@ -1098,6 +1108,9 @@ pub enum CubicCoefficientError {
     InvalidPlanckMass(f64),
     /// The expanding-branch Hubble rate was not positive and finite.
     InvalidHubble(f64),
+    /// The scale factor needed by a physical-wavenumber term was not positive
+    /// and finite.
+    InvalidScaleFactor(f64),
 }
 
 impl fmt::Display for CubicCoefficientError {
@@ -1111,11 +1124,143 @@ impl fmt::Display for CubicCoefficientError {
                 formatter,
                 "cubic coefficients require a positive finite Hubble rate, got {value}"
             ),
+            Self::InvalidScaleFactor(value) => write!(
+                formatter,
+                "cubic coefficients require a positive finite scale factor, got {value}"
+            ),
         }
     }
 }
 
 impl std::error::Error for CubicCoefficientError {}
+
+/// Evaluates the fully symmetrized curved-field-space coefficient `A_IJK` and
+/// returns the raised form required by the canonical phase-space kernel.
+///
+/// This is the coefficient that exercises all third-order geometry
+/// capabilities: the symmetrized covariant potential derivative, the Riemann
+/// tensor, and its covariant derivative. Each permutation moves a field index
+/// and its attached canonical Fourier leg together.
+pub fn canonical_cubic_a_coefficients<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    state: &MultifieldState<N>,
+    triangle: MomentumTriangle,
+) -> Result<CanonicalCubicACoefficients<N>, CubicCoefficientError>
+where
+    P: ThriceDifferentiableMultifieldPotential<N>,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N>,
+{
+    let planck_value = system.m_pl.into_value();
+    if !planck_value.is_finite() || planck_value <= 0.0 {
+        return Err(CubicCoefficientError::InvalidPlanckMass(planck_value));
+    }
+    let hubble = system.hubble(state);
+    let hubble_value = hubble.into_value();
+    if !hubble_value.is_finite() || hubble_value <= 0.0 {
+        return Err(CubicCoefficientError::InvalidHubble(hubble_value));
+    }
+    let scale_value = state.a.into_value();
+    if !scale_value.is_finite() || scale_value <= 0.0 {
+        return Err(CubicCoefficientError::InvalidScaleFactor(scale_value));
+    }
+
+    let metric = system.geometry.metric(&state.phi);
+    let inverse = system.geometry.inverse_metric(&state.phi);
+    let lowered_riemann = metric.lower_first(&system.geometry.riemann(&state.phi));
+    let riemann_derivative = system.geometry.covariant_riemann_derivative(&state.phi);
+    let potential_hessian = system.covariant_potential_hessian(state);
+    let potential_third = system.covariant_potential_third_derivative(state);
+    let velocity = ContravariantField::new(state.pi);
+    let lowered_velocity = metric.lower(&velocity);
+    let velocity_squared = lowered_velocity.contract(&velocity);
+    let gradient = system.potential.gradient(state.phi);
+    let planck = Mass::new(planck_value);
+    let planck_squared = planck * planck;
+    let planck_fourth = planck_squared * planck_squared;
+    let planck_sixth = planck_fourth * planck_squared;
+    let scale = crate::ScaleFactor::new(scale_value);
+    let scale_squared = scale * scale;
+    let z: [Quantity<M3, f64>; N] = core::array::from_fn(|i| {
+        -(lowered_velocity.components()[i] * hubble * 3.0) - gradient[i]
+            + lowered_velocity.components()[i] * velocity_squared / (hubble * planck_squared * 2.0)
+    });
+    let legs = [FourierLeg::One, FourierLeg::Two, FourierLeg::Three];
+
+    let unsymmetrized = |i: usize,
+                         j: usize,
+                         k: usize,
+                         _first_leg: FourierLeg,
+                         second_leg: FourierLeg,
+                         third_leg: FourierLeg| {
+        let velocity_i = lowered_velocity.components()[i];
+        let velocity_j = lowered_velocity.components()[j];
+        let velocity_k = lowered_velocity.components()[k];
+        let riemann_term = (0..N)
+            .flat_map(|l| (0..N).map(move |m| (l, m)))
+            .map(|(l, m)| {
+                velocity_k
+                    * velocity.components()[l]
+                    * velocity.components()[m]
+                    * (lowered_riemann.components()[l][i][j][m]
+                        + lowered_riemann.components()[l][j][i][m])
+                    / (hubble * planck_squared)
+                    * -0.25
+            })
+            .fold(Quantity::new(0.0), Add::add);
+        let riemann_derivative_term = (0..N)
+            .flat_map(|upper| (0..N).flat_map(move |l| (0..N).map(move |m| (upper, l, m))))
+            .map(|(upper, l, m)| {
+                riemann_derivative.components()[upper][l][m][j][k]
+                    * metric.components()[i][upper].into_value()
+                    * velocity.components()[l]
+                    * velocity.components()[m]
+                    / 3.0
+            })
+            .fold(Quantity::new(0.0), Add::add);
+        let physical_dot = triangle.wavevector_dot(second_leg, third_leg) / scale_squared;
+
+        -(potential_third.components()[i][j][k] / 3.0)
+            - velocity_i * potential_hessian.components()[j][k] / (hubble * planck_squared * 2.0)
+            + velocity_i * velocity_j * z[k] / (hubble * hubble * planck_fourth * 4.0)
+            + velocity_i * z[j] * z[k] / (hubble * hubble * hubble * planck_fourth)
+                * (triangle.transverse_factor(second_leg, third_leg) / 8.0)
+            + velocity_i * velocity_j * velocity_k / (hubble * hubble * hubble * planck_sixth)
+                * (hubble * hubble * planck_squared * 6.0 - velocity_squared)
+                / 8.0
+            + riemann_term
+            + riemann_derivative_term
+            + velocity_i * physical_dot * metric.components()[j][k].into_value()
+                / (hubble * planck_squared * 2.0)
+    };
+
+    let lower: [[[Quantity<M1, f64>; N]; N]; N] = core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            core::array::from_fn(|k| {
+                (unsymmetrized(i, j, k, legs[0], legs[1], legs[2])
+                    + unsymmetrized(i, k, j, legs[0], legs[2], legs[1])
+                    + unsymmetrized(j, i, k, legs[1], legs[0], legs[2])
+                    + unsymmetrized(j, k, i, legs[1], legs[2], legs[0])
+                    + unsymmetrized(k, i, j, legs[2], legs[0], legs[1])
+                    + unsymmetrized(k, j, i, legs[2], legs[1], legs[0]))
+                    / 6.0
+            })
+        })
+    });
+
+    let first_raised = ThreePointBlock::new(core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            core::array::from_fn(|k| {
+                (0..N)
+                    .map(|contracted| {
+                        lower[contracted][j][k] * inverse.components()[i][contracted].into_value()
+                    })
+                    .fold(Quantity::new(0.0), Add::add)
+            })
+        })
+    }));
+
+    Ok(CanonicalCubicACoefficients { first_raised })
+}
 
 /// Evaluates the symmetrized curved-field-space coefficient `B_IJK` and
 /// returns the two raised forms required by the canonical phase-space kernel.
@@ -1324,6 +1469,33 @@ where
     Ok(CanonicalCubicCCoefficients {
         first_raised,
         third_raised,
+    })
+}
+
+/// Evaluates all model-derived cubic Hamiltonian coefficients for one
+/// background state and canonical momentum triangle.
+///
+/// The returned tensors can be passed directly to
+/// [`CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian`].
+pub fn canonical_cubic_hamiltonian_coefficients<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    state: &MultifieldState<N>,
+    triangle: MomentumTriangle,
+) -> Result<CanonicalCubicHamiltonianCoefficients<N>, CubicCoefficientError>
+where
+    P: ThriceDifferentiableMultifieldPotential<N>,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N>,
+{
+    let a = canonical_cubic_a_coefficients(system, state, triangle)?;
+    let b = canonical_cubic_b_coefficients(system, state, triangle)?;
+    let c = canonical_cubic_c_coefficients(system, state, triangle)?;
+
+    Ok(CanonicalCubicHamiltonianCoefficients {
+        a_first_raised: a.first_raised,
+        b_first_raised: b.first_raised,
+        b_third_raised: b.third_raised,
+        c_first_raised: c.first_raised,
+        c_third_raised: c.third_raised,
     })
 }
 
@@ -1990,8 +2162,9 @@ fn homogeneous_three_point_block<A, B, C, D>(
 mod tests {
     use super::*;
     use crate::{
-        Field, FieldVelocity, FlatFieldSpace, HyperbolicFieldSpace, M0, Mass, MultifieldState,
-        QuadraticMultifieldPotential, ScaleFactor, TwoFieldPerturbationSystem,
+        EnergyDensity, Field, FieldVelocity, FlatFieldSpace, HyperbolicFieldSpace, M0, Mass,
+        MultifieldPotentialValue, MultifieldState, QuadraticMultifieldPotential, ScaleFactor,
+        TwoFieldPerturbationSystem,
     };
 
     #[derive(Clone, Copy)]
@@ -2591,6 +2764,10 @@ mod tests {
             canonical_cubic_b_coefficients(&invalid_planck, &state, triangle),
             Err(CubicCoefficientError::InvalidPlanckMass(0.0))
         );
+        assert_eq!(
+            canonical_cubic_a_coefficients(&invalid_planck, &state, triangle),
+            Err(CubicCoefficientError::InvalidPlanckMass(0.0))
+        );
 
         let model = CovariantMultifieldSystem::in_planck_units(potential, FlatFieldSpace);
         let zero_energy = MultifieldState::new(
@@ -2605,6 +2782,20 @@ mod tests {
         assert_eq!(
             canonical_cubic_b_coefficients(&model, &zero_energy, triangle),
             Err(CubicCoefficientError::InvalidHubble(0.0))
+        );
+        assert_eq!(
+            canonical_cubic_a_coefficients(&model, &zero_energy, triangle),
+            Err(CubicCoefficientError::InvalidHubble(0.0))
+        );
+
+        let zero_scale = MultifieldState::new(
+            [Field::new(1.0)],
+            [FieldVelocity::new(0.0)],
+            ScaleFactor::new(0.0),
+        );
+        assert_eq!(
+            canonical_cubic_a_coefficients(&model, &zero_scale, triangle),
+            Err(CubicCoefficientError::InvalidScaleFactor(0.0))
         );
     }
 
@@ -2733,5 +2924,310 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn canonical_cubic_a_matches_the_flat_single_field_limit() {
+        let model = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0)]),
+            FlatFieldSpace,
+        );
+        let state = MultifieldState::new(
+            [Field::new(2.0)],
+            [FieldVelocity::new(0.5)],
+            ScaleFactor::new(1.0),
+        );
+        let triangle = MomentumTriangle::try_new(1.0, 1.0, 1.0).unwrap();
+
+        let coefficients = canonical_cubic_a_coefficients(&model, &state, triangle).unwrap();
+        let hubble = model.hubble(&state).into_value();
+        let velocity: f64 = 0.5;
+        let gradient = 2.0;
+        let hessian = 1.0;
+        let z = -3.0 * hubble * velocity - gradient + velocity.powi(3) / (2.0 * hubble);
+        let expected = -velocity * hessian / (2.0 * hubble)
+            + velocity.powi(2) * z / (4.0 * hubble.powi(2))
+            + 3.0 * velocity * z.powi(2) / (32.0 * hubble.powi(3))
+            + velocity.powi(3) * (6.0 * hubble.powi(2) - velocity.powi(2)) / (8.0 * hubble.powi(3))
+            - velocity / (4.0 * hubble);
+        let actual = coefficients.first_raised.components()[0][0][0].into_value();
+        let scale = actual.abs().max(expected.abs()).max(1.0);
+
+        assert!((actual - expected).abs() / scale < 1.0e-14);
+    }
+
+    #[test]
+    fn canonical_cubic_a_contains_the_symmetrized_covariant_third_potential_derivative() {
+        struct MixedCubicPotential;
+
+        impl<V> MultifieldPotentialValue<V, 3> for MixedCubicPotential
+        where
+            V: Clone + Mul<V, Output = V>,
+        {
+            fn value(&self, phi: [Field<V>; 3]) -> EnergyDensity<V> {
+                let [x, y, z] = phi.map(Field::into_value);
+                EnergyDensity::new(x * y * z)
+            }
+        }
+
+        let model = CovariantMultifieldSystem::in_planck_units(MixedCubicPotential, FlatFieldSpace);
+        let state = MultifieldState::new(
+            [Field::new(2.0), Field::new(3.0), Field::new(5.0)],
+            [FieldVelocity::new(0.0); 3],
+            ScaleFactor::new(1.0),
+        );
+        let triangle = MomentumTriangle::try_new(3.0, 2.0, 2.0).unwrap();
+
+        let coefficients = canonical_cubic_a_coefficients(&model, &state, triangle).unwrap();
+
+        for permutation in [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ] {
+            assert_eq!(
+                coefficients.first_raised.components()[permutation[0]][permutation[1]]
+                    [permutation[2]]
+                    .into_value(),
+                -1.0 / 3.0
+            );
+        }
+        assert_eq!(
+            coefficients.first_raised.components()[0][0][0].into_value(),
+            0.0
+        );
+    }
+
+    #[test]
+    fn canonical_cubic_a_contains_the_covariant_field_space_curvature_term() {
+        #[derive(Clone, Copy)]
+        struct WithoutCurvature(HyperbolicFieldSpace);
+
+        impl FieldSpaceGeometry<2> for WithoutCurvature {
+            fn metric(&self, position: &[Field; 2]) -> crate::FieldMetric<2> {
+                self.0.metric(position)
+            }
+
+            fn inverse_metric(&self, position: &[Field; 2]) -> crate::InverseFieldMetric<2> {
+                self.0.inverse_metric(position)
+            }
+
+            fn christoffel(&self, position: &[Field; 2]) -> crate::ChristoffelSymbols<2> {
+                self.0.christoffel(position)
+            }
+        }
+
+        impl CurvedFieldSpaceGeometry<2> for WithoutCurvature {
+            fn riemann(&self, _position: &[Field; 2]) -> crate::RiemannTensor<2> {
+                crate::RiemannTensor::zero()
+            }
+        }
+
+        impl ThirdOrderFieldSpaceGeometry<2> for WithoutCurvature {
+            fn christoffel_derivative(
+                &self,
+                position: &[Field; 2],
+            ) -> crate::ChristoffelDerivatives<2> {
+                self.0.christoffel_derivative(position)
+            }
+        }
+
+        impl CurvatureDerivativeGeometry<2> for WithoutCurvature {
+            fn covariant_riemann_derivative(
+                &self,
+                _position: &[Field; 2],
+            ) -> crate::CovariantRiemannDerivative<2> {
+                crate::CovariantRiemannDerivative::zero()
+            }
+        }
+
+        let geometry = HyperbolicFieldSpace::new(Field::new(3.0)).unwrap();
+        let potential = QuadraticMultifieldPotential::new([Mass::new(1.0), Mass::new(0.75)]);
+        let curved = CovariantMultifieldSystem::in_planck_units(potential, geometry);
+        let suppressed =
+            CovariantMultifieldSystem::in_planck_units(potential, WithoutCurvature(geometry));
+        let state = MultifieldState::new(
+            [Field::new(2.0), Field::new(0.5)],
+            [FieldVelocity::new(0.4), FieldVelocity::new(-0.3)],
+            ScaleFactor::new(1.0),
+        );
+        let triangle = MomentumTriangle::try_new(4.0, 3.0, 2.0).unwrap();
+
+        let actual = canonical_cubic_a_coefficients(&curved, &state, triangle).unwrap();
+        let without = canonical_cubic_a_coefficients(&suppressed, &state, triangle).unwrap();
+        let hubble = curved.hubble(&state).into_value();
+        let metric = geometry.metric(&state.phi);
+        let inverse = geometry.inverse_metric(&state.phi);
+        let riemann = metric.lower_first(&geometry.riemann(&state.phi));
+        let lowered_velocity = metric.lower(&ContravariantField::new(state.pi));
+        let raw_curvature = |i: usize, j: usize, k: usize| {
+            (0..2)
+                .flat_map(|l| (0..2).map(move |m| (l, m)))
+                .map(|(l, m)| {
+                    -lowered_velocity.components()[k].into_value()
+                        * state.pi[l].into_value()
+                        * state.pi[m].into_value()
+                        * (riemann.components()[l][i][j][m].into_value()
+                            + riemann.components()[l][j][i][m].into_value())
+                        / (4.0 * hubble)
+                })
+                .sum::<f64>()
+        };
+
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    let expected = (0..2)
+                        .map(|contracted| {
+                            let lower = (raw_curvature(contracted, j, k)
+                                + raw_curvature(contracted, k, j)
+                                + raw_curvature(j, contracted, k)
+                                + raw_curvature(j, k, contracted)
+                                + raw_curvature(k, contracted, j)
+                                + raw_curvature(k, j, contracted))
+                                / 6.0;
+                            inverse.components()[i][contracted].into_value() * lower
+                        })
+                        .sum::<f64>();
+                    let difference = actual.first_raised.components()[i][j][k].into_value()
+                        - without.first_raised.components()[i][j][k].into_value();
+                    let scale = difference.abs().max(expected.abs()).max(1.0);
+                    assert!((difference - expected).abs() / scale < 1.0e-14);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn canonical_cubic_a_routes_the_rank_five_curvature_derivative_indices() {
+        #[derive(Clone, Copy)]
+        struct CurvatureDerivativeProbe;
+
+        impl FieldSpaceGeometry<2> for CurvatureDerivativeProbe {
+            fn metric(&self, _position: &[Field; 2]) -> crate::FieldMetric<2> {
+                crate::FieldMetric::euclidean()
+            }
+
+            fn inverse_metric(&self, _position: &[Field; 2]) -> crate::InverseFieldMetric<2> {
+                crate::InverseFieldMetric::euclidean()
+            }
+
+            fn christoffel(&self, _position: &[Field; 2]) -> crate::ChristoffelSymbols<2> {
+                crate::ChristoffelSymbols::zero()
+            }
+        }
+
+        impl CurvedFieldSpaceGeometry<2> for CurvatureDerivativeProbe {
+            fn riemann(&self, _position: &[Field; 2]) -> crate::RiemannTensor<2> {
+                crate::RiemannTensor::zero()
+            }
+        }
+
+        impl ThirdOrderFieldSpaceGeometry<2> for CurvatureDerivativeProbe {
+            fn christoffel_derivative(
+                &self,
+                _position: &[Field; 2],
+            ) -> crate::ChristoffelDerivatives<2> {
+                crate::ChristoffelDerivatives::zero()
+            }
+        }
+
+        impl CurvatureDerivativeGeometry<2> for CurvatureDerivativeProbe {
+            fn covariant_riemann_derivative(
+                &self,
+                _position: &[Field; 2],
+            ) -> crate::CovariantRiemannDerivative<2> {
+                crate::CovariantRiemannDerivative::new(core::array::from_fn(|upper| {
+                    core::array::from_fn(|second| {
+                        core::array::from_fn(|third| {
+                            core::array::from_fn(|fourth| {
+                                core::array::from_fn(|derivative| {
+                                    Quantity::new(
+                                        if [upper, second, third, fourth, derivative]
+                                            == [0, 0, 1, 1, 0]
+                                        {
+                                            0.75
+                                        } else {
+                                            0.0
+                                        },
+                                    )
+                                })
+                            })
+                        })
+                    })
+                }))
+            }
+        }
+
+        let potential = QuadraticMultifieldPotential::new([Mass::new(1.0), Mass::new(0.75)]);
+        let probe = CovariantMultifieldSystem::in_planck_units(potential, CurvatureDerivativeProbe);
+        let baseline = CovariantMultifieldSystem::in_planck_units(potential, FlatFieldSpace);
+        let state = MultifieldState::new(
+            [Field::new(2.0), Field::new(0.5)],
+            [FieldVelocity::new(0.4), FieldVelocity::new(-0.3)],
+            ScaleFactor::new(1.0),
+        );
+        let triangle = MomentumTriangle::try_new(4.0, 3.0, 2.0).unwrap();
+        let actual = canonical_cubic_a_coefficients(&probe, &state, triangle).unwrap();
+        let without = canonical_cubic_a_coefficients(&baseline, &state, triangle).unwrap();
+        let derivative = CurvatureDerivativeProbe.covariant_riemann_derivative(&state.phi);
+        let raw = |i: usize, j: usize, k: usize| {
+            (0..2)
+                .flat_map(|l| (0..2).map(move |m| (l, m)))
+                .map(|(l, m)| {
+                    derivative.components()[i][l][m][j][k].into_value()
+                        * state.pi[l].into_value()
+                        * state.pi[m].into_value()
+                        / 3.0
+                })
+                .sum::<f64>()
+        };
+
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    let expected = (raw(i, j, k)
+                        + raw(i, k, j)
+                        + raw(j, i, k)
+                        + raw(j, k, i)
+                        + raw(k, i, j)
+                        + raw(k, j, i))
+                        / 6.0;
+                    let difference = actual.first_raised.components()[i][j][k].into_value()
+                        - without.first_raised.components()[i][j][k].into_value();
+                    let scale = difference.abs().max(expected.abs()).max(1.0);
+                    assert!((difference - expected).abs() / scale < 1.0e-14);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn model_derived_cubic_coefficients_feed_the_e_fold_kernel() {
+        let model = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0)]),
+            FlatFieldSpace,
+        );
+        let state = MultifieldState::new(
+            [Field::new(2.0)],
+            [FieldVelocity::new(0.5)],
+            ScaleFactor::new(1.0),
+        );
+        let triangle = MomentumTriangle::try_new(1.0, 1.0, 1.0).unwrap();
+        let coefficients =
+            canonical_cubic_hamiltonian_coefficients(&model, &state, triangle).unwrap();
+
+        let kernel = CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian(
+            coefficients,
+            model.hubble(&state),
+        )
+        .unwrap();
+
+        assert!(kernel.q_qq.components()[0][0][0].into_value().is_finite());
+        assert!(kernel.p_qq.components()[0][0][0].into_value().is_finite());
+        assert!(kernel.p_pp.components()[0][0][0].into_value().is_finite());
     }
 }

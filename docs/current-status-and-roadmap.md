@@ -154,12 +154,14 @@ turn and the complete 41-point benchmark.
   propagates all three canonical triangle legs on the shared P2 background and
   commutes with equal-leg permutations. The dimensioned $u^a{}_{bc}$ container and
   ordered three-leg $u\Sigma\Sigma$ contraction are implemented. The first
-  model-derived cubic coefficients $B_{IJK}$ and $C_{IJK}$ are now evaluated
-  from the background, field-space geometry, and canonical momentum triangle
-  with typed $M^0/M^{-1}$ arithmetic and simultaneous index/leg
-  symmetrization. The $B$ regression isolates its Riemann contribution by
-  comparison with a curvature-suppressed geometry. Deriving $A_{IJK}$ and
-  adding quantum initial conditions remain.
+  model-derived cubic coefficients $A_{IJK}$, $B_{IJK}$, and $C_{IJK}$ are now
+  evaluated from the background, field-space geometry, and canonical momentum
+  triangle with typed $M^1/M^0/M^{-1}$ arithmetic and simultaneous index/leg
+  symmetrization. The $A/B$ regressions isolate their Riemann contributions;
+  $A$ additionally checks the symmetrized third potential derivative and the
+  rank-five $\nabla R$ index routing. A single public entry point constructs all
+  five raised tensors and feeds the eight-block e-fold kernel. Quantum initial
+  conditions and sourced evolution remain.
   The source derivation has exposed a required semantic decision: the
   published cubic-Hamiltonian kernel evolves rescaled canonical momentum
   $\Pi^I$, while the accepted P3c type means $P^I=D_tQ^I$. They coincide only
@@ -177,9 +179,9 @@ turn and the complete 41-point benchmark.
   Canonical triangle helpers now supply the dimensioned all-incoming dot
   products, cosines, and transverse factors used repeatedly by the cubic
   coefficients, with general, equilateral, and folded tests.
-  The next code change is model-derived evaluation of $A_{IJK}$; $B_{IJK}$ and
-  $C_{IJK}$ already have flat single-field and raised-index-layout regression
-  tests. See
+  The next code change moves beyond coefficient construction to the remaining
+  canonical $V\leftrightarrow\Pi$ boundary and quantum three-point initial
+  condition. See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
   [`three-point-transport.md`](three-point-transport.md), with the detailed
   derivation in
