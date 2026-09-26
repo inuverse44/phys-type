@@ -339,9 +339,24 @@ dimension of a linear mode function after stripping only one three-point
 delta function. The Fourier-operator and convolution-measure accounting is
 given explicitly in [`three-point-transport.md`](three-point-transport.md).
 
-This layer maps already evaluated $A$, $B$, and $C$ tensors. Computing those
-tensors from a background state, field-space geometry, potential derivatives,
-and a momentum triangle remains the next physical implementation step.
+This layer maps already evaluated $A$, $B$, and $C$ tensors. The first physical
+coefficient evaluator is now implemented:
+
+- `canonical_cubic_c_coefficients` computes the displayed
+  $\widetilde C_{IJK}$ from a `CovariantMultifieldSystem`, `MultifieldState`,
+  and `MomentumTriangle`;
+- it performs $\operatorname{Sym}_{IJ}$ by exchanging the field indices and
+  their attached Fourier legs together;
+- it returns both $C^I{}_{JK}$ and $C_{JK}{}^I$ in the storage order required
+  by the eight-block map;
+- dimensionful arithmetic remains in `Quantity<MMinus1, f64>`, while only
+  metric components and momentum ratios are raw dimensionless scalars;
+- tests cover the analytic flat single-field equilateral result, the two
+  raised-index layouts in flat two-field space, and invalid $H$ or
+  $M_{\mathrm{Pl}}$ boundaries.
+
+Model-derived $B$ is the next coefficient slice, followed by $A$, whose
+potential and curvature terms require the richer third-order geometry API.
 
 ## Acceptance checklist for implementation
 
@@ -352,14 +367,17 @@ in code and tests:
    or $\Pi$;
 2. **Implemented:** cosmic-time coefficients are converted once, and only
    once, to e-fold coefficients by $H^{-1}$;
-3. all field-index symmetrizations move their Fourier legs simultaneously;
+3. **Implemented for $C$:** field-index symmetrization moves the attached
+   Fourier legs simultaneously; $A$ and $B$ remain;
 4. **Implemented:** triangle dot products use the declared all-incoming
    convention;
-5. $M_{\mathrm{Pl}}=1$ is applied only at the system boundary;
-6. flat-field-space and single-field reductions are checked analytically;
-7. **Implemented for the block map:** exchanging the two input legs maps each
-   ordered block to its partner; the model-derived coefficient symmetry tests
-   remain;
+5. **Implemented for $C$:** $M_{\mathrm{Pl}}$ is read from the system and
+   Planck units enter only through the system constructor;
+6. **Implemented for $C$:** flat-field-space and single-field reductions are
+   checked analytically; $A$ and $B$ remain;
+7. **Implemented for the block map and $C$:** exchanging the two input legs
+   maps each ordered block to its partner and $C$ is symmetrized with its
+   momentum labels; the $A/B$ coefficient tests remain;
 8. a nonlinear $V\leftrightarrow\Pi$ correlator conversion is tested for the
    selected canonical route;
 9. dimensions, permutation identities, and an independent numerical

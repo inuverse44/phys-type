@@ -83,16 +83,16 @@ pub use spectrum_run::{
 pub use state::{State, StateDelta, StateDerivative};
 pub use time::ConformalTime;
 pub use transport::{
-    AnyPhaseSpaceIndex, CanonicalCubicHamiltonianCoefficients, CanonicalKernelError,
-    CanonicalMomentumPerturbation, CanonicalQuadraticPhaseSpaceKernel,
+    AnyPhaseSpaceIndex, CanonicalCubicCCoefficients, CanonicalCubicHamiltonianCoefficients,
+    CanonicalKernelError, CanonicalMomentumPerturbation, CanonicalQuadraticPhaseSpaceKernel,
     CanonicalThreePointPhaseSpaceCorrelation, CanonicalTwoPointPhaseSpaceCovariance,
-    DEFAULT_TRIANGLE_CLOSURE_TOLERANCE, FieldPerturbation, FourierLeg, MomentumPerturbation,
-    MomentumTriangle, MomentumTriangleError, PhaseSpaceIndex, PhaseSpaceIndexError, PhaseSpaceSlot,
-    PhaseSpaceSlotKind, QuadraticPhaseSpaceKernel, ThreePointBlock,
-    ThreePointHomogeneousTransportSystem, ThreePointPhaseSpaceCorrelation,
+    CubicCoefficientError, DEFAULT_TRIANGLE_CLOSURE_TOLERANCE, FieldPerturbation, FourierLeg,
+    MomentumPerturbation, MomentumTriangle, MomentumTriangleError, PhaseSpaceIndex,
+    PhaseSpaceIndexError, PhaseSpaceSlot, PhaseSpaceSlotKind, QuadraticPhaseSpaceKernel,
+    ThreePointBlock, ThreePointHomogeneousTransportSystem, ThreePointPhaseSpaceCorrelation,
     TwoFieldBackgroundProvider, TwoPointBlock, TwoPointPhaseSpaceCovariance,
-    TwoPointTransportSystem, TwoPointTransportTolerance, three_point_source_from_kernels,
-    two_point_covariance_from_mode_state,
+    TwoPointTransportSystem, TwoPointTransportTolerance, canonical_cubic_c_coefficients,
+    three_point_source_from_kernels, two_point_covariance_from_mode_state,
 };
 
 /// A dimensionless quantity, such as the scale factor.
