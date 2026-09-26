@@ -339,9 +339,10 @@ background, and is regression-tested for leg-permutation covariance. No
 complete cubic kernel or physical bispectrum is claimed yet. The dimensioned
 eight-block `QuadraticPhaseSpaceKernel` and the three ordered $u\Sigma\Sigma$ contractions
 are implemented separately from the incomplete model-derived kernel. Its
-$C_{IJK}$ coefficient is now evaluated from the model, background, geometry,
-and triangle, with typed dimensions and analytic flat single-field tests;
-$B_{IJK}$ and $A_{IJK}$ remain. The
+$B_{IJK}$ and $C_{IJK}$ coefficients are now evaluated from the model,
+background, geometry, and triangle, with typed dimensions, analytic flat
+single-field tests, and an isolated Riemann-contraction regression for $B$;
+$A_{IJK}$ remains. The
 staged contract and next kernel-construction step are documented in
 [`three-point-transport.md`](three-point-transport.md). Source-level
 reconciliation found that the published eight-block cubic-Hamiltonian kernel

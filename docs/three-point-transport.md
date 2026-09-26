@@ -16,14 +16,14 @@ P3d is in progress. The following pieces are implemented:
 - a dimensioned container for the quadratic flow $u^a{}_{bc}$;
 - a dimensioned canonical $A/B/C$ container and its ordered conversion to all
   eight e-fold-time $u^a{}_{bc}$ blocks;
-- model-derived evaluation of the symmetrized $C_{IJK}$ coefficient, including
-  both first- and third-index-raised forms;
+- model-derived evaluation of the symmetrized $B_{IJK}$ and $C_{IJK}$
+  coefficients, including both first- and third-index-raised forms;
 - contraction of three ordered $u\Sigma\Sigma$ source terms.
 
 The following pieces are not implemented:
 
-- the model-derived $A_{IJK}$ and $B_{IJK}$ coefficients needed to complete
-  the curved-field-space $u^a{}_{bc}$ kernel;
+- the model-derived $A_{IJK}$ coefficient needed to complete the
+  curved-field-space $u^a{}_{bc}$ kernel;
 - the in-in/Bunch--Davies initial value for the three-point function;
 - one adaptive system that evolves the sourced state through a physical
   benchmark;
@@ -240,10 +240,10 @@ with a cyclic convention $(3,1)$.
 ## Why the source algebra is not yet the physical kernel
 
 The current contraction accepts correctly dimensioned numerical kernel
-blocks. The library now manufactures the $C_{IJK}$ contribution from a model,
-background state, geometry, and momentum triangle, but $A_{IJK}$ and
-$B_{IJK}$ remain to be evaluated. The canonical route uses a distinct typed
-momentum $\Pi^I$; it is not silently identified with $P^I=D_tQ^I$.
+blocks. The library now manufactures the $B_{IJK}$ and $C_{IJK}$ contributions
+from a model, background state, geometry, and momentum triangle, but $A_{IJK}$
+remains to be evaluated. The canonical route uses a distinct typed momentum
+$\Pi^I$; it is not silently identified with $P^I=D_tQ^I$.
 
 Completing the coefficients must include the terms involving the symmetrized
 covariant potential derivative $V_{;(IJK)}$, field-space curvature, and the
@@ -307,10 +307,11 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
 2. **Completed:** map dimensioned, raised canonical $A/B/C$ coefficients to
    the eight ordered e-fold-time $u^a{}_{bc}$ blocks;
 3. **Partially completed:** evaluate $A$, $B$, and $C$ from the model,
-   background, geometry, and triangle; $C$ is complete, while $B$ and then
-   $A$ are the next ordered implementation slices;
+   background, geometry, and triangle; $B$ and $C$ are complete, while $A$ is
+   the next implementation slice;
 4. test flat-space, single-field, and field-coordinate covariance limits; the
-   first two are covered for $C$, while general coordinate covariance remains;
+   first two are covered for $B/C$, and the $B$ Riemann contribution is checked
+   independently, while general coordinate covariance remains;
 5. implement the quantum initial condition for all eight blocks;
 6. combine homogeneous and sourced terms into one adaptive transport system;
 7. verify general-triangle permutation and reality identities;
