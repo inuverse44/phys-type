@@ -329,14 +329,33 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
 4. **Completed:** evaluate the three output-leg orderings and implement the
    typed linear/two-point and nonlinear/tree-level $V\leftrightarrow\Pi$
    conversion boundary;
-5. test flat-space, single-field, and field-coordinate covariance limits; the
-   first two are covered for all coefficients, the $A/B$ Riemann contributions
-   and the $A$ rank-five $\nabla R$ routing are checked independently, while
-   general coordinate covariance remains;
-6. implement the quantum initial condition for all eight blocks;
-7. combine homogeneous and sourced terms into one adaptive transport system;
+5. implement the quantum initial condition for all eight blocks;
+6. combine homogeneous and sourced terms into one adaptive transport system;
+7. test the remaining general field-coordinate covariance limit; flat-space
+   and single-field limits are covered for all coefficients, and the $A/B$
+   Riemann plus $A$ rank-five $\nabla R$ terms already have independent
+   componentwise checks;
 8. verify general-triangle permutation and reality identities;
 9. demonstrate convergence in integration tolerance and start depth.
 
 Only after these items pass does P3e project $\alpha^{abc}$ to the observable
 curvature bispectrum $B_\zeta$.
+
+## Exact restart point
+
+The next implementation session begins at item 5. It should not modify the
+now-established cubic coefficients or the $V\leftrightarrow\Pi$ boundary
+unless an independent derivation exposes a discrepancy.
+
+The quantum initial-condition slice must first state its Fourier normalization
+and initial-time prescription. All three legs start on one common slice deep
+inside the horizon, so the shortest leg controls whether the whole triangle is
+eligible to initialize. The result must populate the complete canonical
+`QQQ`--`PPP` state; initializing only `QQQ`, or imposing $\alpha=0$ at horizon
+exit, is outside the accepted transport prescription.
+
+The first tests should be algebraic rather than end-to-end: compile-time block
+dimensions, leg-permutation and reality identities, and one independently
+derived scalar or equilateral value. Once these pass, the initial condition can
+be joined to the existing homogeneous flow and ordered $u\Sigma\Sigma$ source
+inside an adaptive system.
