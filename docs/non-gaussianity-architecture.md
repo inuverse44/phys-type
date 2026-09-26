@@ -335,10 +335,13 @@ A compile-fail test fixes the distinct `M^-3`, `M^-2`, `M^-1`, and `M^0`
 dimensions of the delta-function-stripped three-point blocks.
 `ThreePointHomogeneousTransportSystem` now applies
 the P3c linear flow to all three canonical triangle legs on the shared P2
-background, and is regression-tested for leg-permutation covariance. No cubic
-kernel or physical bispectrum is claimed yet. The dimensioned eight-block
-`QuadraticPhaseSpaceKernel` and the three ordered $u\Sigma\Sigma$ contractions
-are implemented separately from the still-missing model-derived kernel. The
+background, and is regression-tested for leg-permutation covariance. No
+complete cubic kernel or physical bispectrum is claimed yet. The dimensioned
+eight-block `QuadraticPhaseSpaceKernel` and the three ordered $u\Sigma\Sigma$ contractions
+are implemented separately from the incomplete model-derived kernel. Its
+$C_{IJK}$ coefficient is now evaluated from the model, background, geometry,
+and triangle, with typed dimensions and analytic flat single-field tests;
+$B_{IJK}$ and $A_{IJK}$ remain. The
 staged contract and next kernel-construction step are documented in
 [`three-point-transport.md`](three-point-transport.md). Source-level
 reconciliation found that the published eight-block cubic-Hamiltonian kernel

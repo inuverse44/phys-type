@@ -16,11 +16,14 @@ P3d is in progress. The following pieces are implemented:
 - a dimensioned container for the quadratic flow $u^a{}_{bc}$;
 - a dimensioned canonical $A/B/C$ container and its ordered conversion to all
   eight e-fold-time $u^a{}_{bc}$ blocks;
+- model-derived evaluation of the symmetrized $C_{IJK}$ coefficient, including
+  both first- and third-index-raised forms;
 - contraction of three ordered $u\Sigma\Sigma$ source terms.
 
 The following pieces are not implemented:
 
-- the model-derived curved-field-space coefficients of $u^a{}_{bc}$;
+- the model-derived $A_{IJK}$ and $B_{IJK}$ coefficients needed to complete
+  the curved-field-space $u^a{}_{bc}$ kernel;
 - the in-in/Bunch--Davies initial value for the three-point function;
 - one adaptive system that evolves the sourced state through a physical
   benchmark;
@@ -237,15 +240,15 @@ with a cyclic convention $(3,1)$.
 ## Why the source algebra is not yet the physical kernel
 
 The current contraction accepts correctly dimensioned numerical kernel
-blocks, but does not manufacture their values. The next implementation must
-derive those values from the curved-field-space cubic Hamiltonian and convert
-them consistently to $P^I=D_tQ^I$, or introduce a distinct typed canonical
-momentum $\Pi^I$ and keep the conversion explicit.
+blocks. The library now manufactures the $C_{IJK}$ contribution from a model,
+background state, geometry, and momentum triangle, but $A_{IJK}$ and
+$B_{IJK}$ remain to be evaluated. The canonical route uses a distinct typed
+momentum $\Pi^I$; it is not silently identified with $P^I=D_tQ^I$.
 
-That conversion must include the terms involving the symmetrized covariant
-potential derivative $V_{;(IJK)}$, field-space curvature, and the required
-covariant curvature derivative. These are the reasons P3b implemented the
-third-order geometry first.
+Completing the coefficients must include the terms involving the symmetrized
+covariant potential derivative $V_{;(IJK)}$, field-space curvature, and the
+required covariant curvature derivative. These are the reasons P3b implemented
+the third-order geometry first.
 
 This boundary is important: compile-time dimensions can reject a kernel in the
 wrong physical slot, but they cannot prove that a coefficient, sign, momentum
@@ -255,7 +258,7 @@ calculation.
 
 The full formulas for $A_{IJK}$, $B_{IJK}$, $C_{IJK}$, their simultaneous
 index/momentum symmetrizations, the canonical eight-block $u^a{}_{bc}$ table,
-and the unresolved $P$--$\Pi$ decision are recorded in
+and the resolved $P$--$\Pi$ type boundary are recorded in
 [`cubic-kernel-conventions.md`](cubic-kernel-conventions.md). That document is
 the implementation gate for the next P3d slice.
 
@@ -282,6 +285,9 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
 - all eight $\alpha$ blocks have compile-time slot and dimension checks;
 - canonical triangle dot products carry dimension $M^2$, are symmetric, and
   reproduce equilateral and folded transverse-factor limits;
+- the model-derived $C_{IJK}$ evaluator preserves physical dimensions, moves
+  field indices with their Fourier legs during symmetrization, rejects invalid
+  $H$ and $M_{\mathrm{Pl}}$, and reproduces the flat single-field limit;
 - addition and multiplication by dimensionless Runge--Kutta coefficients
   preserve every block type;
 - $(12)^2=(23)^2=1$ and complex conjugation squares to the identity;
@@ -300,9 +306,11 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
    route while preserving the velocity types used by P3c;
 2. **Completed:** map dimensioned, raised canonical $A/B/C$ coefficients to
    the eight ordered e-fold-time $u^a{}_{bc}$ blocks;
-3. evaluate $A$, $B$, and $C$ from the model, background, geometry, and
-   triangle;
-4. test flat-space, single-field, and field-coordinate covariance limits;
+3. **Partially completed:** evaluate $A$, $B$, and $C$ from the model,
+   background, geometry, and triangle; $C$ is complete, while $B$ and then
+   $A$ are the next ordered implementation slices;
+4. test flat-space, single-field, and field-coordinate covariance limits; the
+   first two are covered for $C$, while general coordinate covariance remains;
 5. implement the quantum initial condition for all eight blocks;
 6. combine homogeneous and sourced terms into one adaptive transport system;
 7. verify general-triangle permutation and reality identities;

@@ -206,8 +206,10 @@ against the mode oracle at four physical epochs. Dimensioned adaptive
 tolerances and initialization-depth convergence complete the P3c validation.
 P3d now provides the complete dimensioned `QQQ`--`PPP` state, homogeneous
 three-leg evolution, the typed quadratic kernel $u^a{}_{bc}$, and the ordered
-$u\Sigma\Sigma$ contraction. The model-derived cubic coefficients, quantum
-three-point initial condition, and observable $B_\zeta$ projection remain
+$u\Sigma\Sigma$ contraction. Model-derived $C_{IJK}$ evaluation is also
+implemented with typed dimensions and simultaneous field-index/Fourier-leg
+symmetrization. The remaining $A_{IJK}$ and $B_{IJK}$ coefficients, quantum
+three-point initial condition, and observable $B_\zeta$ projection are
 unfinished; the repository therefore does not yet claim a bispectrum
 prediction.
 

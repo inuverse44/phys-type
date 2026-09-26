@@ -14,8 +14,9 @@ use num_complex::Complex64;
 
 use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
 use crate::{
-    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless, Hubble, M0, M1, M2,
-    MMinus1, MMinus2, MMinus3, Mass, ModeAmplitude, ModeVelocity, MultifieldState, Quantity,
+    ContravariantField, CovariantMultifieldSystem, CurvedFieldSpaceGeometry, Dimensionless,
+    FieldSpaceGeometry, Hubble, M0, M1, M2, MMinus1, MMinus2, MMinus3, Mass, ModeAmplitude,
+    ModeVelocity, MultifieldPotential, MultifieldState, Quantity,
     TwiceDifferentiableMultifieldPotential, TwoFieldPerturbationState,
 };
 
@@ -1066,6 +1067,139 @@ pub struct CanonicalCubicHamiltonianCoefficients<const N: usize> {
     /// `C_JK^I`, with the third original index raised, stored as `[I][J][K]`.
     pub c_third_raised:
         ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>,
+}
+
+/// The two raised forms of the symmetrized cubic coefficient `C_IJK`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CanonicalCubicCCoefficients<const N: usize> {
+    /// `C^I_JK`, stored in output/first-input/second-input order.
+    pub first_raised:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>,
+    /// `C_JK^I`, also stored in output/first-input/second-input order.
+    pub third_raised:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>,
+}
+
+/// Invalid background data supplied while evaluating a cubic coefficient.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CubicCoefficientError {
+    /// The reduced Planck mass was not positive and finite.
+    InvalidPlanckMass(f64),
+    /// The expanding-branch Hubble rate was not positive and finite.
+    InvalidHubble(f64),
+}
+
+impl fmt::Display for CubicCoefficientError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidPlanckMass(value) => write!(
+                formatter,
+                "cubic coefficients require a positive finite reduced Planck mass, got {value}"
+            ),
+            Self::InvalidHubble(value) => write!(
+                formatter,
+                "cubic coefficients require a positive finite Hubble rate, got {value}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CubicCoefficientError {}
+
+/// Evaluates the symmetrized curved-field-space coefficient `C_IJK` and
+/// returns the two raised forms required by the canonical phase-space kernel.
+///
+/// Field indices and their attached canonical Fourier legs are symmetrized
+/// together. All arithmetic that carries physical dimension remains inside
+/// [`Quantity`]; only metric components and momentum ratios are raw
+/// dimensionless factors.
+pub fn canonical_cubic_c_coefficients<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    state: &MultifieldState<N>,
+    triangle: MomentumTriangle,
+) -> Result<CanonicalCubicCCoefficients<N>, CubicCoefficientError>
+where
+    P: MultifieldPotential<N>,
+    G: FieldSpaceGeometry<N>,
+{
+    let planck_value = system.m_pl.into_value();
+    if !planck_value.is_finite() || planck_value <= 0.0 {
+        return Err(CubicCoefficientError::InvalidPlanckMass(planck_value));
+    }
+    let hubble = system.hubble(state);
+    let hubble_value = hubble.into_value();
+    if !hubble_value.is_finite() || hubble_value <= 0.0 {
+        return Err(CubicCoefficientError::InvalidHubble(hubble_value));
+    }
+
+    let metric = system.geometry.metric(&state.phi);
+    let inverse = system.geometry.inverse_metric(&state.phi);
+    let velocity = ContravariantField::new(state.pi);
+    let lowered_velocity = metric.lower(&velocity);
+    let planck = Mass::new(planck_value);
+    let legs = [FourierLeg::One, FourierLeg::Two, FourierLeg::Three];
+    let wavenumbers = triangle.canonical_wavenumbers();
+
+    let unsymmetrized = |i: usize,
+                         j: usize,
+                         k: usize,
+                         first_leg: FourierLeg,
+                         second_leg: FourierLeg,
+                         third_leg: FourierLeg| {
+        let velocity_i = lowered_velocity.components()[i];
+        let velocity_j = lowered_velocity.components()[j];
+        let velocity_k = lowered_velocity.components()[k];
+        let planck_squared = planck * planck;
+        let first_wavenumber = wavenumbers[first_leg.index()];
+        let first_third_ratio =
+            triangle.wavevector_dot(first_leg, third_leg).into_value() / first_wavenumber.powi(2);
+
+        -(velocity_k / (hubble * planck_squared) * metric.components()[i][j].into_value() * 0.5)
+            + velocity_i * velocity_j * velocity_k
+                / (hubble * hubble * hubble * planck_squared * planck_squared)
+                * (triangle.transverse_factor(first_leg, second_leg) / 8.0)
+            + velocity_i / (hubble * planck_squared)
+                * metric.components()[j][k].into_value()
+                * first_third_ratio
+    };
+
+    let lower: [[[Quantity<MMinus1, f64>; N]; N]; N] = core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            core::array::from_fn(|k| {
+                (unsymmetrized(i, j, k, legs[0], legs[1], legs[2])
+                    + unsymmetrized(j, i, k, legs[1], legs[0], legs[2]))
+                    * 0.5
+            })
+        })
+    });
+
+    let first_raised = ThreePointBlock::new(core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            core::array::from_fn(|k| {
+                (0..N)
+                    .map(|contracted| {
+                        lower[contracted][j][k] * inverse.components()[i][contracted].into_value()
+                    })
+                    .fold(Quantity::new(0.0), Add::add)
+            })
+        })
+    }));
+    let third_raised = ThreePointBlock::new(core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            core::array::from_fn(|k| {
+                (0..N)
+                    .map(|contracted| {
+                        lower[j][k][contracted] * inverse.components()[i][contracted].into_value()
+                    })
+                    .fold(Quantity::new(0.0), Add::add)
+            })
+        })
+    }));
+
+    Ok(CanonicalCubicCCoefficients {
+        first_raised,
+        third_raised,
+    })
 }
 
 /// An invalid Hubble rate supplied while converting a cosmic-time cubic flow.
@@ -2256,5 +2390,88 @@ mod tests {
                 .is_err()
             );
         }
+    }
+
+    #[test]
+    fn canonical_cubic_c_matches_the_flat_single_field_limit() {
+        let model = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0)]),
+            FlatFieldSpace,
+        );
+        let state = MultifieldState::new(
+            [Field::new(2.0)],
+            [FieldVelocity::new(0.5)],
+            ScaleFactor::new(1.0),
+        );
+        let triangle = MomentumTriangle::try_new(1.0, 1.0, 1.0).unwrap();
+
+        let coefficients = canonical_cubic_c_coefficients(&model, &state, triangle).unwrap();
+        let hubble = model.hubble(&state).into_value();
+        let velocity: f64 = 0.5;
+        let expected = -velocity / hubble + 3.0 * velocity.powi(3) / (32.0 * hubble.powi(3));
+
+        for actual in [
+            coefficients.first_raised.components()[0][0][0].into_value(),
+            coefficients.third_raised.components()[0][0][0].into_value(),
+        ] {
+            let scale = actual.abs().max(expected.abs()).max(1.0);
+            assert!((actual - expected).abs() / scale < 1.0e-14);
+        }
+    }
+
+    #[test]
+    fn canonical_cubic_c_preserves_the_two_raised_index_layouts() {
+        let model = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0), Mass::new(2.0)]),
+            FlatFieldSpace,
+        );
+        let state = MultifieldState::new(
+            [Field::new(2.0), Field::new(1.0)],
+            [FieldVelocity::new(0.5), FieldVelocity::new(-0.25)],
+            ScaleFactor::new(1.0),
+        );
+        let triangle = MomentumTriangle::try_new(4.0, 3.0, 2.0).unwrap();
+
+        let coefficients = canonical_cubic_c_coefficients(&model, &state, triangle).unwrap();
+
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    let actual = coefficients.third_raised.components()[i][j][k].into_value();
+                    let expected = coefficients.first_raised.components()[j][k][i].into_value();
+                    let scale = actual.abs().max(expected.abs()).max(1.0);
+                    assert!((actual - expected).abs() / scale < 1.0e-14);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn canonical_cubic_c_rejects_nonphysical_background_scales() {
+        let potential = QuadraticMultifieldPotential::new([Mass::new(1.0)]);
+        let state = MultifieldState::new(
+            [Field::new(1.0)],
+            [FieldVelocity::new(0.0)],
+            ScaleFactor::new(1.0),
+        );
+        let triangle = MomentumTriangle::try_new(1.0, 1.0, 1.0).unwrap();
+        let invalid_planck =
+            CovariantMultifieldSystem::new(potential, FlatFieldSpace, Mass::new(0.0));
+
+        assert_eq!(
+            canonical_cubic_c_coefficients(&invalid_planck, &state, triangle),
+            Err(CubicCoefficientError::InvalidPlanckMass(0.0))
+        );
+
+        let model = CovariantMultifieldSystem::in_planck_units(potential, FlatFieldSpace);
+        let zero_energy = MultifieldState::new(
+            [Field::new(0.0)],
+            [FieldVelocity::new(0.0)],
+            ScaleFactor::new(1.0),
+        );
+        assert_eq!(
+            canonical_cubic_c_coefficients(&model, &zero_energy, triangle),
+            Err(CubicCoefficientError::InvalidHubble(0.0))
+        );
     }
 }
