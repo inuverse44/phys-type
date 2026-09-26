@@ -16,14 +16,15 @@ P3d is in progress. The following pieces are implemented:
 - a dimensioned container for the quadratic flow $u^a{}_{bc}$;
 - a dimensioned canonical $A/B/C$ container and its ordered conversion to all
   eight e-fold-time $u^a{}_{bc}$ blocks;
-- model-derived evaluation of the symmetrized $B_{IJK}$ and $C_{IJK}$
-  coefficients, including both first- and third-index-raised forms;
+- model-derived evaluation of the fully symmetrized $A_{IJK}$ and the
+  symmetrized $B_{IJK}$ and $C_{IJK}$ coefficients, including every raised
+  form required by the block map;
+- one model-to-kernel entry point that evaluates $A/B/C$ and feeds the eight
+  canonical e-fold-time blocks;
 - contraction of three ordered $u\Sigma\Sigma$ source terms.
 
 The following pieces are not implemented:
 
-- the model-derived $A_{IJK}$ coefficient needed to complete the
-  curved-field-space $u^a{}_{bc}$ kernel;
 - the in-in/Bunch--Davies initial value for the three-point function;
 - one adaptive system that evolves the sourced state through a physical
   benchmark;
@@ -240,15 +241,15 @@ with a cyclic convention $(3,1)$.
 ## Why the source algebra is not yet the physical kernel
 
 The current contraction accepts correctly dimensioned numerical kernel
-blocks. The library now manufactures the $B_{IJK}$ and $C_{IJK}$ contributions
-from a model, background state, geometry, and momentum triangle, but $A_{IJK}$
-remains to be evaluated. The canonical route uses a distinct typed momentum
-$\Pi^I$; it is not silently identified with $P^I=D_tQ^I$.
+blocks. The library now manufactures all $A_{IJK}$, $B_{IJK}$, and $C_{IJK}$
+contributions from a model, background state, geometry, and momentum triangle.
+The canonical route uses a distinct typed momentum $\Pi^I$; it is not silently
+identified with $P^I=D_tQ^I$.
 
-Completing the coefficients must include the terms involving the symmetrized
-covariant potential derivative $V_{;(IJK)}$, field-space curvature, and the
-required covariant curvature derivative. These are the reasons P3b implemented
-the third-order geometry first.
+The $A$ evaluator includes the symmetrized covariant potential derivative
+$V_{;(IJK)}$, field-space curvature, and the required covariant curvature
+derivative. These are the reasons P3b implemented the third-order geometry
+first.
 
 This boundary is important: compile-time dimensions can reject a kernel in the
 wrong physical slot, but they cannot prove that a coefficient, sign, momentum
@@ -306,12 +307,12 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
    route while preserving the velocity types used by P3c;
 2. **Completed:** map dimensioned, raised canonical $A/B/C$ coefficients to
    the eight ordered e-fold-time $u^a{}_{bc}$ blocks;
-3. **Partially completed:** evaluate $A$, $B$, and $C$ from the model,
-   background, geometry, and triangle; $B$ and $C$ are complete, while $A$ is
-   the next implementation slice;
+3. **Completed:** evaluate $A$, $B$, and $C$ from the model, background,
+   geometry, and triangle, and assemble the canonical e-fold kernel;
 4. test flat-space, single-field, and field-coordinate covariance limits; the
-   first two are covered for $B/C$, and the $B$ Riemann contribution is checked
-   independently, while general coordinate covariance remains;
+   first two are covered for all coefficients, the $A/B$ Riemann contributions
+   and the $A$ rank-five $\nabla R$ routing are checked independently, while
+   general coordinate covariance remains;
 5. implement the quantum initial condition for all eight blocks;
 6. combine homogeneous and sourced terms into one adaptive transport system;
 7. verify general-triangle permutation and reality identities;
