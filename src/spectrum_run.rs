@@ -3263,4 +3263,244 @@ mod tests {
         assert!(text.contains("# k_pivot_internal_over_m_pl: 1.5e-5"));
         assert!(text.lines().all(|line| line.starts_with('#')));
     }
+
+    fn three_point_block_error<A, B, C, D: Copy>(
+        actual: &crate::ThreePointBlock<A, B, C, D, Complex64, 2>,
+        reference: &crate::ThreePointBlock<A, B, C, D, Complex64, 2>,
+    ) -> f64 {
+        let flatten = |block: &crate::ThreePointBlock<A, B, C, D, Complex64, 2>| {
+            block
+                .components()
+                .iter()
+                .flatten()
+                .flatten()
+                .map(|component| *component.value())
+                .collect::<Vec<Complex64>>()
+        };
+        let reference = flatten(reference);
+        let scale = reference
+            .iter()
+            .map(|component| component.norm())
+            .fold(0.0, f64::max)
+            .max(1.0e-300);
+
+        flatten(actual)
+            .into_iter()
+            .zip(reference)
+            .map(|(actual, reference)| (actual - reference).norm() / scale)
+            .fold(0.0, f64::max)
+    }
+
+    /// Largest block-relative difference over the eight three-point blocks.
+    fn three_point_error<P: crate::PhaseSpaceSlot>(
+        actual: &crate::ThreePointPhaseSpaceCorrelation<2, P>,
+        reference: &crate::ThreePointPhaseSpaceCorrelation<2, P>,
+    ) -> [f64; 8] {
+        [
+            three_point_block_error(&actual.qqq, &reference.qqq),
+            three_point_block_error(&actual.qqp, &reference.qqp),
+            three_point_block_error(&actual.qpq, &reference.qpq),
+            three_point_block_error(&actual.pqq, &reference.pqq),
+            three_point_block_error(&actual.qpp, &reference.qpp),
+            three_point_block_error(&actual.pqp, &reference.pqp),
+            three_point_block_error(&actual.ppq, &reference.ppq),
+            three_point_block_error(&actual.ppp, &reference.ppp),
+        ]
+    }
+
+    struct SourcedBenchmark {
+        system: TestSystem,
+        trajectory: BackgroundTrajectory,
+        triangle: crate::MomentumTriangle,
+        output: f64,
+    }
+
+    fn sourced_benchmark(shape: [f64; 3]) -> SourcedBenchmark {
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let settings = quick_settings();
+        let (_, trajectory, e_folds_at_end) = system.survey_background(initial, &settings).unwrap();
+        let pivot_state = trajectory.state_at(e_folds_at_end - settings.pivot_e_folds_before_end);
+        let k = (pivot_state.a * system.hubble(&pivot_state)).into_value();
+        let triangle =
+            crate::MomentumTriangle::try_new(shape[0] * k, shape[1] * k, shape[2] * k).unwrap();
+
+        SourcedBenchmark {
+            system,
+            trajectory,
+            triangle,
+            output: e_folds_at_end - settings.output_e_folds_before_end,
+        }
+    }
+
+    impl SourcedBenchmark {
+        /// Elapsed e-fold at which the shortest leg has `k/(aH) = depth`.
+        fn slice(&self, depth: f64) -> f64 {
+            let shortest = Mass::new(self.triangle.canonical_wavenumbers()[2]);
+            self.trajectory
+                .crossing(|state| {
+                    (shortest / (state.a * self.system.hubble(state))).into_value() - depth
+                })
+                .unwrap()
+        }
+
+        fn evolve(
+            &self,
+            e_folds_before_exit: f64,
+            target: f64,
+            relative_tolerance: f64,
+        ) -> crate::CanonicalThreePointTransportState {
+            let depth = e_folds_before_exit.exp();
+            let start = self.slice(depth);
+            let mut state = crate::canonical_three_point_transport_initial_state(
+                &self.system,
+                &crate::BackgroundNeighborhood::from_trajectory(&self.trajectory, start, 1.0e-3),
+                self.triangle,
+                depth * (1.0 - 1.0e-6),
+            )
+            .unwrap();
+            let transport = crate::CanonicalThreePointTransportSystem::new(
+                &self.system,
+                &self.trajectory,
+                self.triangle,
+            );
+            let tolerances = ErrorTolerances::new(
+                crate::CanonicalThreePointTransportTolerance::pure_relative(),
+                relative_tolerance,
+            );
+            let limits = StepSizeLimits {
+                min: crate::Dimensionless::new(1.0e-9),
+                max: crate::Dimensionless::new(5.0e-2),
+            };
+            let mut e_folds = start;
+            let mut step: crate::Dimensionless = crate::Dimensionless::new(1.0e-3);
+
+            for _ in 0..2_000_000 {
+                let remaining = target - e_folds;
+                if remaining <= 1.0e-13 {
+                    return state;
+                }
+                let attempted = crate::Dimensionless::new(step.into_value().min(remaining));
+                let outcome = adaptive_step(
+                    &transport,
+                    crate::Dimensionless::new(e_folds),
+                    &state,
+                    attempted,
+                    &tolerances,
+                );
+                if outcome.accepted {
+                    state = outcome.state;
+                    e_folds += attempted.into_value();
+                }
+                step = next_step_size(attempted, outcome.error_ratio, &limits);
+            }
+
+            panic!("sourced three-point transport exceeded its adaptive step limit")
+        }
+    }
+
+    /// Largest error over blocks with the given number of momentum slots.
+    fn largest_error_with_momenta(errors: [f64; 8], momenta: usize) -> f64 {
+        const MOMENTA: [usize; 8] = [0, 1, 1, 1, 2, 2, 2, 3];
+        errors
+            .into_iter()
+            .zip(MOMENTA)
+            .filter(|(_, count)| *count == momenta)
+            .map(|(error, _)| error)
+            .fold(0.0, f64::max)
+    }
+
+    #[test]
+    fn sourced_transport_follows_the_subhorizon_initial_condition() {
+        // Evolve half an e-fold inside the horizon and compare with the
+        // analytic initial condition re-evaluated on the later slice. Blocks
+        // with an odd number of momenta keep only their first surviving order,
+        // so their truncation is relative O(aH/k) instead of O((aH/k)^2).
+        let benchmark = sourced_benchmark([1.0, 0.9, 0.7]);
+        let depth = 3.5_f64.exp();
+        let later = benchmark.slice(depth);
+        let evolved = benchmark.evolve(4.0, later, 1.0e-8);
+        let formula = crate::canonical_three_point_initial_condition(
+            &benchmark.system,
+            &crate::BackgroundNeighborhood::from_trajectory(&benchmark.trajectory, later, 1.0e-3),
+            benchmark.triangle,
+            depth * (1.0 - 1.0e-6),
+        )
+        .unwrap();
+        let errors = three_point_error(&evolved.alpha, &formula);
+
+        assert!(largest_error_with_momenta(errors, 0) < 5.0e-3, "{errors:?}");
+        assert!(largest_error_with_momenta(errors, 2) < 5.0e-3, "{errors:?}");
+        assert!(largest_error_with_momenta(errors, 1) < 2.0e-2, "{errors:?}");
+        assert!(largest_error_with_momenta(errors, 3) < 2.0e-1, "{errors:?}");
+
+        // The tree-level velocity output leaves QQQ unchanged.
+        let velocity = crate::velocity_three_point_from_transport_state(
+            &benchmark.system,
+            &benchmark.trajectory.state_at(later),
+            benchmark.triangle,
+            &evolved,
+        )
+        .unwrap();
+        assert_eq!(velocity.qqq, evolved.alpha.qqq);
+    }
+
+    #[test]
+    fn sourced_transport_keeps_equilateral_symmetry_and_reality() {
+        let benchmark = sourced_benchmark([1.0, 1.0, 1.0]);
+        let target = benchmark.slice(3.25_f64.exp());
+        let alpha = benchmark.evolve(3.5, target, 1.0e-8).alpha;
+
+        assert!(
+            three_point_error(&alpha.swap_first_second(), &alpha)
+                .iter()
+                .all(|e| *e < 1.0e-10)
+        );
+        assert!(
+            three_point_error(&alpha.swap_second_third(), &alpha)
+                .iter()
+                .all(|e| *e < 1.0e-10)
+        );
+        // The connected tree-level correlator is real; the complex covariances
+        // must not leak an imaginary part into it.
+        let imaginary = three_point_error(&alpha, &alpha.conjugate())
+            .into_iter()
+            .fold(0.0, f64::max);
+        assert!(imaginary < 1.0e-8, "imaginary part {imaginary:e}");
+    }
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn sourced_transport_converges_with_start_depth() {
+        let benchmark = sourced_benchmark([1.0, 0.9, 0.7]);
+        let reference = benchmark.evolve(8.0, benchmark.output, 1.0e-10).alpha;
+        let error = |depth: f64| {
+            three_point_error(
+                &benchmark.evolve(depth, benchmark.output, 1.0e-10).alpha,
+                &reference,
+            )
+            .into_iter()
+            .fold(0.0, f64::max)
+        };
+        // The error oscillates with the start phase, so compare envelopes over
+        // one e-fold windows rather than neighbouring depths.
+        let shallow = [4.0, 4.5, 5.0].map(error).into_iter().fold(0.0, f64::max);
+        let deep = [6.0, 6.5, 7.0].map(error).into_iter().fold(0.0, f64::max);
+
+        assert!(deep < 1.0e-2, "deep envelope {deep:e}");
+        assert!(deep < 0.5 * shallow, "{shallow:e} then {deep:e}");
+    }
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn sourced_transport_converges_with_tighter_tolerance() {
+        let benchmark = sourced_benchmark([1.0, 0.9, 0.7]);
+        let loose = benchmark.evolve(4.0, benchmark.output, 1.0e-7).alpha;
+        let tight = benchmark.evolve(4.0, benchmark.output, 1.0e-9).alpha;
+        let error = three_point_error(&loose, &tight)
+            .into_iter()
+            .fold(0.0, f64::max);
+
+        assert!(error < 1.0e-5, "tolerance change {error:e}");
+    }
 }

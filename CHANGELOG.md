@@ -8,6 +8,15 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `CanonicalThreePointTransportSystem`, the adaptive sourced three-point
+  evolution in the canonical basis, which co-evolves the three leg
+  covariances and re-evaluates the model-derived vertices at every stage.
+  Its initial state, velocity-basis output, block-wise dimensioned
+  tolerances, and start-depth and tolerance convergence tests are included.
+- First-order e-fold rates of the cubic tensors in the three-point initial
+  condition, evaluated on a `BackgroundNeighborhood` with the covariant
+  connection term. They remove an `O(epsilon)` start-depth floor of the odd
+  momentum blocks.
 - The P3d tree-level quantum initial condition for all eight canonical
   `QQQ`--`PPP` blocks on one common subhorizon slice, with separate fast-`A`,
   slow-`A`, leg-resolved `B`, and leg-resolved `C` contributions, a
@@ -70,6 +79,11 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   geometry conventions, defines every index and momentum argument near first
   use, and separates implemented three-point infrastructure from the missing
   physical cubic kernel, quantum initial condition, and curvature projection.
+- `canonical_three_point_initial_condition` and
+  `canonical_three_point_from_subhorizon_vertices` now take the background
+  neighborhood and the vertex rates, respectively.
+- The linear two-point and homogeneous three-point flows are shared between
+  the velocity and canonical-momentum markers.
 - `k/k_pivot` is the canonical spectrum coordinate. Raw comoving wavenumbers
   are labeled `k_internal_over_m_pl` because they depend on the arbitrary
   scale-factor normalization.
