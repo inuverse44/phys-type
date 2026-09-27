@@ -15,8 +15,10 @@ fn main() {
     let _ = CanonicalCubicHamiltonianCoefficients::<1> {
         a_first_raised: wrong_a,
         b_first_raised: ThreePointBlock::new([[[Quantity::new(0.0)]]]),
+        b_first_raised_input_exchanged: ThreePointBlock::new([[[Quantity::new(0.0)]]]),
         b_third_raised: ThreePointBlock::new([[[Quantity::new(0.0)]]]),
         c_first_raised: ThreePointBlock::new([[[Quantity::new(0.0)]]]),
+        c_first_raised_input_exchanged: ThreePointBlock::new([[[Quantity::new(0.0)]]]),
         c_third_raised: ThreePointBlock::new([[[Quantity::new(0.0)]]]),
     };
 }

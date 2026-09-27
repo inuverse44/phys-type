@@ -3,8 +3,9 @@
 //! This module separates Fourier legs, phase-space slots, field coordinates,
 //! and physical dimensions. It provides the linear mode solver's two-point
 //! oracle, direct two-point covariance dynamics, and typed three-point
-//! transport infrastructure. Model-derived cubic coefficients are complete;
-//! sourced end-to-end evolution is not implemented yet.
+//! transport infrastructure. Model-derived cubic coefficients and the
+//! subhorizon tree-level three-point initial condition are complete; sourced
+//! end-to-end evolution is not implemented yet.
 
 use core::fmt;
 use core::marker::PhantomData;
@@ -16,7 +17,7 @@ use crate::integrate::{AdaptiveSystem, ErrorTolerances, System};
 use crate::{
     ContravariantField, CovariantMultifieldSystem, CurvatureDerivativeGeometry,
     CurvedFieldSpaceGeometry, Dimensionless, FieldSpaceGeometry, Hubble, LowerFirst, M0, M1, M2,
-    M3, MMinus1, MMinus2, MMinus3, Mass, ModeAmplitude, ModeVelocity, MultifieldPotential,
+    M3, M4, MMinus1, MMinus2, MMinus3, Mass, ModeAmplitude, ModeVelocity, MultifieldPotential,
     MultifieldState, Quantity, ThirdOrderFieldSpaceGeometry,
     ThriceDifferentiableMultifieldPotential, TwiceDifferentiableMultifieldPotential,
     TwoFieldPerturbationState,
@@ -1088,11 +1089,21 @@ pub struct CanonicalCubicHamiltonianCoefficients<const N: usize> {
     /// `B^I_JK`, with the first original index raised, dimension `M^0`.
     pub b_first_raised:
         ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M0, f64, N>,
+    /// `B^I_KJ(k_out; k_in2, k_in1)`, stored as `[I][J][K]`.
+    ///
+    /// The second covariant slot carries index `K` and the second input
+    /// momentum, so this is a separate evaluation rather than a transpose of
+    /// `b_first_raised`.
+    pub b_first_raised_input_exchanged:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M0, f64, N>,
     /// `B_JK^I`, with the third original index raised, stored as `[I][J][K]`.
     pub b_third_raised:
         ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M0, f64, N>,
     /// `C^I_JK`, with the first original index raised, dimension `M^-1`.
     pub c_first_raised:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>,
+    /// `C^I_KJ(k_out; k_in2, k_in1)`, stored as `[I][J][K]`.
+    pub c_first_raised_input_exchanged:
         ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>,
     /// `C_JK^I`, with the third original index raised, stored as `[I][J][K]`.
     pub c_third_raised:
@@ -1155,6 +1166,9 @@ pub struct CanonicalCubicBCoefficients<const N: usize> {
     /// `B^I_JK`, stored in output/first-input/second-input order.
     pub first_raised:
         ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M0, f64, N>,
+    /// `B^I_KJ` with its two input momenta exchanged, stored as `[I][J][K]`.
+    pub first_raised_input_exchanged:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M0, f64, N>,
     /// `B_JK^I`, also stored in output/first-input/second-input order.
     pub third_raised:
         ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M0, f64, N>,
@@ -1165,6 +1179,9 @@ pub struct CanonicalCubicBCoefficients<const N: usize> {
 pub struct CanonicalCubicCCoefficients<const N: usize> {
     /// `C^I_JK`, stored in output/first-input/second-input order.
     pub first_raised:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>,
+    /// `C^I_KJ` with its two input momenta exchanged, stored as `[I][J][K]`.
+    pub first_raised_input_exchanged:
         ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>,
     /// `C_JK^I`, also stored in output/first-input/second-input order.
     pub third_raised:
@@ -1448,6 +1465,8 @@ where
         })
     };
     let first_lower: [[[Quantity<M0, f64>; N]; N]; N] = lower_for_legs(legs);
+    let exchanged_lower: [[[Quantity<M0, f64>; N]; N]; N] =
+        lower_for_legs([legs[0], legs[2], legs[1]]);
     let third_lower: [[[Quantity<M0, f64>; N]; N]; N] = lower_for_legs([legs[1], legs[2], legs[0]]);
 
     let first_raised = ThreePointBlock::new(core::array::from_fn(|i| {
@@ -1475,8 +1494,22 @@ where
         })
     }));
 
+    let first_raised_input_exchanged = ThreePointBlock::new(core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            core::array::from_fn(|k| {
+                (0..N)
+                    .map(|contracted| {
+                        exchanged_lower[contracted][k][j]
+                            * inverse.components()[i][contracted].into_value()
+                    })
+                    .fold(Quantity::new(0.0), Add::add)
+            })
+        })
+    }));
+
     Ok(CanonicalCubicBCoefficients {
         first_raised,
+        first_raised_input_exchanged,
         third_raised,
     })
 }
@@ -1580,6 +1613,8 @@ where
         })
     };
     let first_lower: [[[Quantity<MMinus1, f64>; N]; N]; N] = lower_for_legs(legs);
+    let exchanged_lower: [[[Quantity<MMinus1, f64>; N]; N]; N] =
+        lower_for_legs([legs[0], legs[2], legs[1]]);
     let third_lower: [[[Quantity<MMinus1, f64>; N]; N]; N] =
         lower_for_legs([legs[1], legs[2], legs[0]]);
 
@@ -1608,8 +1643,22 @@ where
         })
     }));
 
+    let first_raised_input_exchanged = ThreePointBlock::new(core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            core::array::from_fn(|k| {
+                (0..N)
+                    .map(|contracted| {
+                        exchanged_lower[contracted][k][j]
+                            * inverse.components()[i][contracted].into_value()
+                    })
+                    .fold(Quantity::new(0.0), Add::add)
+            })
+        })
+    }));
+
     Ok(CanonicalCubicCCoefficients {
         first_raised,
+        first_raised_input_exchanged,
         third_raised,
     })
 }
@@ -1654,8 +1703,10 @@ where
     Ok(CanonicalCubicHamiltonianCoefficients {
         a_first_raised: a.first_raised,
         b_first_raised: b.first_raised,
+        b_first_raised_input_exchanged: b.first_raised_input_exchanged,
         b_third_raised: b.third_raised,
         c_first_raised: c.first_raised,
+        c_first_raised_input_exchanged: c.first_raised_input_exchanged,
         c_third_raised: c.third_raised,
     })
 }
@@ -1737,7 +1788,10 @@ impl<const N: usize> QuadraticPhaseSpaceKernel<N, CanonicalMomentumPerturbation>
     /// canonical phase-space blocks.
     ///
     /// The conversion divides every block by `H` exactly once and applies the
-    /// ordered input-index exchanges required by the Hamilton equations.
+    /// ordered input exchanges required by the Hamilton equations. An input
+    /// exchange moves the field index and its Fourier momentum together:
+    /// `q_qp` and `p_pq` read the separately evaluated input-exchanged `C` and
+    /// `B` tensors, while `p_pp` uses `C_KJ^I(k_2, k_1) = C_JK^I(k_1, k_2)`.
     pub fn from_cubic_hamiltonian(
         coefficients: CanonicalCubicHamiltonianCoefficients<N>,
         hubble: Hubble,
@@ -1761,7 +1815,7 @@ impl<const N: usize> QuadraticPhaseSpaceKernel<N, CanonicalMomentumPerturbation>
             q_qp: ThreePointBlock::new(core::array::from_fn(|i| {
                 core::array::from_fn(|j| {
                     core::array::from_fn(|k| {
-                        -(coefficients.c_first_raised.components[i][k][j] / hubble)
+                        -(coefficients.c_first_raised_input_exchanged.components[i][j][k] / hubble)
                     })
                 })
             })),
@@ -1790,14 +1844,14 @@ impl<const N: usize> QuadraticPhaseSpaceKernel<N, CanonicalMomentumPerturbation>
             p_pq: ThreePointBlock::new(core::array::from_fn(|i| {
                 core::array::from_fn(|j| {
                     core::array::from_fn(|k| {
-                        coefficients.b_first_raised.components[i][k][j] / hubble
+                        coefficients.b_first_raised_input_exchanged.components[i][j][k] / hubble
                     })
                 })
             })),
             p_pp: ThreePointBlock::new(core::array::from_fn(|i| {
                 core::array::from_fn(|j| {
                     core::array::from_fn(|k| {
-                        coefficients.c_third_raised.components[i][k][j] / hubble
+                        coefficients.c_third_raised.components[i][j][k] / hubble
                     })
                 })
             })),
@@ -1867,12 +1921,35 @@ impl<const N: usize, P: PhaseSpaceSlot> QuadraticPhaseSpaceKernel<N, P> {
     }
 }
 
+/// Selects the equal-time Wick contraction in operator order.
+///
+/// An external leg standing to the left of the quadratic insertion contracts
+/// as `Sigma^{a d}`; one standing to its right contracts as `Sigma^{d a}`.
+/// The two differ by the commutator carried in the imaginary part.
+fn ordered_covariance<const N: usize, P: PhaseSpaceSlot>(
+    covariance: &TwoPointPhaseSpaceCovariance<N, P>,
+    external_is_left: bool,
+    internal: (PhaseSpaceSlotKind, usize),
+    external: (PhaseSpaceSlotKind, usize),
+) -> Complex64 {
+    if external_is_left {
+        covariance.component([external.0, internal.0], [external.1, internal.1])
+    } else {
+        covariance.component([internal.0, external.0], [internal.1, external.1])
+    }
+}
+
 /// Contracts three ordered quadratic kernels with the three leg covariances.
 ///
 /// `kernels[a]` has output leg `a`. Its two input slots follow the remaining
 /// legs in ascending order: `[1, 2]`, `[0, 2]`, and `[0, 1]`. The returned
 /// value is exactly the three cyclic `u Sigma Sigma` terms in `D_N Alpha`; it
 /// does not include homogeneous propagation or an initial condition.
+///
+/// The covariances keep the operator order of `<X^a X^b X^c>`:
+/// `u^a_de Sigma^db Sigma^ec + u^b_de Sigma^ad Sigma^ec + u^c_de Sigma^ad
+/// Sigma^be`. Transposing a covariance on a leg to the left of the insertion
+/// would conjugate its commutator part.
 pub fn three_point_source_from_kernels<const N: usize, P: PhaseSpaceSlot>(
     kernels: [&QuadraticPhaseSpaceKernel<N, P>; 3],
     covariances: [&TwoPointPhaseSpaceCovariance<N, P>; 3],
@@ -1926,12 +2003,22 @@ pub fn three_point_source_from_kernels<const N: usize, P: PhaseSpaceSlot>(
                                                 first_input_index,
                                                 second_input_index,
                                             ],
-                                        ) * covariances[input_legs[0]].component(
-                                            [first_input_slot, output_slots[input_legs[0]]],
-                                            [first_input_index, output_indices[input_legs[0]]],
-                                        ) * covariances[input_legs[1]].component(
-                                            [second_input_slot, output_slots[input_legs[1]]],
-                                            [second_input_index, output_indices[input_legs[1]]],
+                                        ) * ordered_covariance(
+                                            covariances[input_legs[0]],
+                                            input_legs[0] < output_leg,
+                                            (first_input_slot, first_input_index),
+                                            (
+                                                output_slots[input_legs[0]],
+                                                output_indices[input_legs[0]],
+                                            ),
+                                        ) * ordered_covariance(
+                                            covariances[input_legs[1]],
+                                            input_legs[1] < output_leg,
+                                            (second_input_slot, second_input_index),
+                                            (
+                                                output_slots[input_legs[1]],
+                                                output_indices[input_legs[1]],
+                                            ),
                                         )
                                     },
                                 )
@@ -1994,7 +2081,9 @@ fn canonical_to_velocity_redefinition_kernel<const N: usize>(
         })),
         p_qp: ThreePointBlock::new(core::array::from_fn(|i| {
             core::array::from_fn(|j| {
-                core::array::from_fn(|k| -coefficients.c_first_raised.components[i][k][j])
+                core::array::from_fn(|k| {
+                    -coefficients.c_first_raised_input_exchanged.components[i][j][k]
+                })
             })
         })),
         p_pq: ThreePointBlock::new(core::array::from_fn(|i| {
@@ -2037,6 +2126,417 @@ pub fn velocity_three_point_from_canonical_tree<const N: usize>(
         ppq: ThreePointBlock::new(transformed.ppq.components),
         ppp: ThreePointBlock::new(transformed.ppp.components),
     }
+}
+
+/// Fully raised cubic tensors consumed by the subhorizon three-point initial
+/// condition.
+///
+/// Every array is stored as `[I][J][K]`, where `I`, `J`, and `K` belong to
+/// Fourier legs one, two, and three of the correlation being initialized. This
+/// is the index order of [`ThreePointPhaseSpaceCorrelation`], not the
+/// output/input order of a quadratic kernel. The leg-resolved `B` and `C`
+/// tensors are the three differently ordered evaluations required by the
+/// symmetrized interaction vertex; they are not index permutations of one
+/// array.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CanonicalSubhorizonInitialVertices<const N: usize> {
+    /// `a^2 A_fast^{IJK}`, the gradient term of `A` with its explicit
+    /// `a^{-2}` removed, dimension `M^1`.
+    pub fast_a_times_scale_squared:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M1, f64, N>,
+    /// `A^{IJK} - A_fast^{IJK}`, every term of `A` without a physical
+    /// wavenumber, dimension `M^1`.
+    pub slow_a:
+        ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M1, f64, N>,
+    /// Entry `r` is `B` with its momentum slot on leg `r`, dimension `M^0`.
+    ///
+    /// For example, entry three is `B^{IJK}(k_1, k_2, k_3)` and entry one is
+    /// `B^{JKI}(k_2, k_3, k_1)`, both stored at `[I][J][K]`.
+    pub b_momentum_on_leg:
+        [ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, M0, f64, N>; 3],
+    /// Entry `r` is `C` with its field slot on leg `r`, dimension `M^-1`.
+    pub c_field_on_leg:
+        [ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, MMinus1, f64, N>;
+            3],
+}
+
+/// Why a subhorizon three-point initial condition could not be formed.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ThreePointInitialConditionError {
+    /// The required minimum `k/(aH)` was not finite and greater than one.
+    InvalidSubhorizonRequirement(f64),
+    /// The shortest canonical leg is not deep enough inside the horizon.
+    InsufficientSubhorizonDepth {
+        /// Canonical leg that failed the requirement.
+        leg: FourierLeg,
+        /// Its `k/(aH)` on the requested slice.
+        k_over_ah: f64,
+        /// The requested minimum.
+        required: f64,
+    },
+    /// The scale factor was not positive and finite.
+    InvalidScaleFactor(f64),
+    /// The Hubble rate was not positive and finite.
+    InvalidHubble(f64),
+    /// A wavenumber was not positive and finite.
+    InvalidWavenumber {
+        /// Leg carrying the rejected value.
+        leg: FourierLeg,
+        /// Rejected value in reduced Planck units.
+        value: f64,
+    },
+    /// Evaluating the model-derived cubic coefficients failed.
+    Coefficient(CubicCoefficientError),
+}
+
+impl fmt::Display for ThreePointInitialConditionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidSubhorizonRequirement(value) => write!(
+                formatter,
+                "a subhorizon initial slice requires a finite minimum k/(aH) above one, got {value}"
+            ),
+            Self::InsufficientSubhorizonDepth {
+                leg,
+                k_over_ah,
+                required,
+            } => write!(
+                formatter,
+                "leg {leg:?} has k/(aH)={k_over_ah:e}, below the required {required:e}"
+            ),
+            Self::InvalidScaleFactor(value) => write!(
+                formatter,
+                "the initial slice requires a positive finite scale factor, got {value}"
+            ),
+            Self::InvalidHubble(value) => write!(
+                formatter,
+                "the initial slice requires a positive finite Hubble rate, got {value}"
+            ),
+            Self::InvalidWavenumber { leg, value } => write!(
+                formatter,
+                "leg {leg:?} requires a positive finite wavenumber, got {value}"
+            ),
+            Self::Coefficient(error) => write!(formatter, "{error}"),
+        }
+    }
+}
+
+impl std::error::Error for ThreePointInitialConditionError {}
+
+impl From<CubicCoefficientError> for ThreePointInitialConditionError {
+    fn from(error: CubicCoefficientError) -> Self {
+        Self::Coefficient(error)
+    }
+}
+
+fn raise_second_and_third<D: Copy, const N: usize>(
+    components: &[[[Quantity<D, f64>; N]; N]; N],
+    inverse: &[[Dimensionless; N]; N],
+) -> [[[Quantity<D, f64>; N]; N]; N] {
+    core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            core::array::from_fn(|k| {
+                (0..N)
+                    .flat_map(|l| (0..N).map(move |m| (l, m)))
+                    .map(|(l, m)| {
+                        components[i][l][m]
+                            * inverse[j][l].into_value()
+                            * inverse[k][m].into_value()
+                    })
+                    .fold(Quantity::new(0.0), Add::add)
+            })
+        })
+    })
+}
+
+/// Reorders a vertex stored as `[output][input one][input two]` into the
+/// `[leg 1][leg 2][leg 3]` order of a three-point correlation.
+fn vertex_to_leg_order<D: Copy, const N: usize>(
+    output: FourierLeg,
+    components: &[[[Quantity<D, f64>; N]; N]; N],
+) -> [[[Quantity<D, f64>; N]; N]; N] {
+    core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            core::array::from_fn(|k| match output {
+                FourierLeg::One => components[i][j][k],
+                FourierLeg::Two => components[j][i][k],
+                FourierLeg::Three => components[k][i][j],
+            })
+        })
+    })
+}
+
+/// Evaluates the fully raised tensors used by the subhorizon initial
+/// condition on one background state and canonical momentum triangle.
+///
+/// The fast part of `A` is the only cubic term proportional to a physical
+/// wavenumber squared,
+/// `A_fast_IJK = Sym[dot(phi)_I G_JK (k_J . k_K)] / (2 H M_pl^2 a^2)`.
+/// It is separated because its explicit `a^{-2}` changes the time integral.
+/// The `B` and `C` tensors reuse the output-leg vertices of
+/// [`canonical_cubic_hamiltonian_vertices`], so every field index still moves
+/// with its Fourier leg.
+pub fn canonical_subhorizon_initial_vertices<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    state: &MultifieldState<N>,
+    triangle: MomentumTriangle,
+) -> Result<CanonicalSubhorizonInitialVertices<N>, CubicCoefficientError>
+where
+    P: ThriceDifferentiableMultifieldPotential<N>,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N>,
+{
+    let vertices = canonical_cubic_hamiltonian_vertices(system, state, triangle)?;
+    let hubble = system.hubble(state);
+    let planck = Mass::new(system.m_pl.into_value());
+    let scale = crate::ScaleFactor::new(state.a.into_value());
+    let inverse = *system.geometry.inverse_metric(&state.phi).components();
+    let velocity = state.pi;
+    let legs = [FourierLeg::One, FourierLeg::Two, FourierLeg::Three];
+
+    let fast_unsymmetrized =
+        |i: usize, j: usize, k: usize, second: FourierLeg, third: FourierLeg| {
+            velocity[i] * triangle.wavevector_dot(second, third) * inverse[j][k].into_value()
+                / (hubble * planck * planck * 2.0)
+        };
+    let fast: [[[Quantity<M1, f64>; N]; N]; N] = core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            core::array::from_fn(|k| {
+                (fast_unsymmetrized(i, j, k, legs[1], legs[2])
+                    + fast_unsymmetrized(i, k, j, legs[2], legs[1])
+                    + fast_unsymmetrized(j, i, k, legs[0], legs[2])
+                    + fast_unsymmetrized(j, k, i, legs[2], legs[0])
+                    + fast_unsymmetrized(k, i, j, legs[0], legs[1])
+                    + fast_unsymmetrized(k, j, i, legs[1], legs[0]))
+                    / 6.0
+            })
+        })
+    });
+    let full_a = raise_second_and_third(
+        vertices
+            .for_output(FourierLeg::One)
+            .a_first_raised
+            .components(),
+        &inverse,
+    );
+    let slow_a = core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            core::array::from_fn(|k| full_a[i][j][k] - fast[i][j][k] / (scale * scale))
+        })
+    });
+    let b_momentum_on_leg = legs.map(|leg| {
+        ThreePointBlock::new(vertex_to_leg_order(
+            leg,
+            &raise_second_and_third(
+                vertices.for_output(leg).b_third_raised.components(),
+                &inverse,
+            ),
+        ))
+    });
+    let c_field_on_leg = legs.map(|leg| {
+        ThreePointBlock::new(vertex_to_leg_order(
+            leg,
+            &raise_second_and_third(
+                vertices.for_output(leg).c_third_raised.components(),
+                &inverse,
+            ),
+        ))
+    });
+
+    Ok(CanonicalSubhorizonInitialVertices {
+        fast_a_times_scale_squared: ThreePointBlock::new(fast),
+        slow_a: ThreePointBlock::new(slow_a),
+        b_momentum_on_leg,
+        c_field_on_leg,
+    })
+}
+
+/// Assembles the tree-level Bunch--Davies three-point function on one early
+/// slice from fully raised cubic tensors.
+///
+/// `wavenumbers` are comoving and follow the leg order of `vertices`. The
+/// result keeps, separately for each block and for each of the fast-`A`,
+/// slow-`A`, `B`, and `C` contributions, the highest power of `k/(aH)` that
+/// survives in the in-in integral with massless de Sitter mode functions and
+/// background coefficients frozen on the slice. Blocks with an odd number of
+/// momentum slots vanish at the naive leading order; their first surviving
+/// order is retained. Every component is real.
+pub fn canonical_three_point_from_subhorizon_vertices<const N: usize>(
+    vertices: &CanonicalSubhorizonInitialVertices<N>,
+    wavenumbers: [Mass; 3],
+    scale_factor: crate::ScaleFactor,
+    hubble: Hubble,
+) -> Result<CanonicalThreePointPhaseSpaceCorrelation<N>, ThreePointInitialConditionError> {
+    for (index, wavenumber) in wavenumbers.into_iter().enumerate() {
+        let value = wavenumber.into_value();
+        if !value.is_finite() || value <= 0.0 {
+            return Err(ThreePointInitialConditionError::InvalidWavenumber {
+                leg: FourierLeg::from_index(index),
+                value,
+            });
+        }
+    }
+    let scale_value = scale_factor.into_value();
+    if !scale_value.is_finite() || scale_value <= 0.0 {
+        return Err(ThreePointInitialConditionError::InvalidScaleFactor(
+            scale_value,
+        ));
+    }
+    let hubble_value = hubble.into_value();
+    if !hubble_value.is_finite() || hubble_value <= 0.0 {
+        return Err(ThreePointInitialConditionError::InvalidHubble(hubble_value));
+    }
+
+    let k = wavenumbers;
+    let perimeter = k[0] + k[1] + k[2];
+    let product = k[0] * k[1] * k[2];
+    let pair_sum = k[0] * k[1] + k[0] * k[2] + k[1] * k[2];
+    let normalization = Quantity::<M0, f64>::new(0.25) / (product * perimeter);
+    let a2 = scale_value * scale_value;
+    let a4 = a2 * a2;
+    let a6 = a4 * a2;
+    let fast = vertices.fast_a_times_scale_squared.components();
+    let slow = vertices.slow_a.components();
+    let b = vertices.b_momentum_on_leg.map(|block| *block.components());
+    let c = vertices.c_field_on_leg.map(|block| *block.components());
+    let others = |leg: usize| match leg {
+        0 => (1, 2),
+        1 => (0, 2),
+        _ => (0, 1),
+    };
+
+    let qqq_bracket = |i: usize, j: usize, l: usize| -> Quantity<M1, f64> {
+        fast[i][j][l] * 3.0 / a4 + slow[i][j][l] * 3.0 / a2
+            - hubble * (b[0][i][j][l] + b[1][i][j][l] + b[2][i][j][l]) / a2
+            - (k[1] * k[2] * c[0][i][j][l]
+                + k[0] * k[2] * c[1][i][j][l]
+                + k[0] * k[1] * c[2][i][j][l])
+                / a4
+    };
+    // One momentum slot on leg `p`; `u` and `v` are the two field legs.
+    let one_momentum_bracket = |p: usize, i: usize, j: usize, l: usize| -> Quantity<M2, f64> {
+        let (u, v) = others(p);
+        let fast_weight = hubble * (perimeter + k[p]) / perimeter * -3.0;
+        let slow_weight = hubble * (perimeter - k[p]) / perimeter * -3.0;
+        let b_term = (0..3)
+            .map(|s| k[p] * k[s] * b[s][i][j][l])
+            .fold(Quantity::new(0.0), Add::add);
+        let same_leg_c_weight = -(hubble
+            * (k[p] * k[p] * (k[u] + k[v]) + k[p] * (k[u] * k[u] + k[v] * k[v])
+                - k[u] * k[v] * (k[u] + k[v]))
+            / perimeter);
+        let other_leg_c_weight = |s: usize| -(hubble * k[p] * k[p] * (k[p] + k[s]) / perimeter);
+
+        fast[i][j][l] * fast_weight / a4
+            + slow[i][j][l] * slow_weight / a2
+            + b_term / a4
+            + (c[p][i][j][l] * same_leg_c_weight
+                + c[u][i][j][l] * other_leg_c_weight(u)
+                + c[v][i][j][l] * other_leg_c_weight(v))
+                / a4
+    };
+    // Two momentum slots; `q` is the remaining field leg.
+    let two_momentum_bracket = |q: usize, i: usize, j: usize, l: usize| -> Quantity<M3, f64> {
+        let (u, v) = others(q);
+        let momentum_pair = k[u] * k[v];
+        fast[i][j][l] * momentum_pair * -3.0 / a6 + slow[i][j][l] * momentum_pair * -3.0 / a4
+            - hubble
+                * (k[u] * k[u] * b[u][i][j][l]
+                    + k[v] * k[v] * b[v][i][j][l]
+                    + (k[q] * (k[u] + k[v]) - momentum_pair) * b[q][i][j][l])
+                / a4
+            + (product * (k[v] * c[u][i][j][l] + k[u] * c[v][i][j][l])
+                + momentum_pair * momentum_pair * c[q][i][j][l])
+                / a6
+    };
+    let ppp_bracket = |i: usize, j: usize, l: usize| -> Quantity<M4, f64> {
+        let c_term = (0..3)
+            .map(|s| {
+                let (u, v) = others(s);
+                c[s][i][j][l] * k[u] * k[u] * k[v] * k[v] * (perimeter + k[s]) / perimeter
+            })
+            .fold(Quantity::new(0.0), Add::add);
+        fast[i][j][l] * hubble * (pair_sum + product / perimeter) * 3.0 / a6
+            + slow[i][j][l] * hubble * (pair_sum - product / perimeter) * 3.0 / a4
+            - product * (k[0] * b[0][i][j][l] + k[1] * b[1][i][j][l] + k[2] * b[2][i][j][l]) / a6
+            - hubble * c_term / a6
+    };
+
+    fn real_block<A, B, C, D: Copy, const N: usize>(
+        value: impl Fn(usize, usize, usize) -> Quantity<D, f64>,
+    ) -> ThreePointBlock<A, B, C, D, Complex64, N> {
+        ThreePointBlock::new(core::array::from_fn(|i| {
+            core::array::from_fn(|j| {
+                core::array::from_fn(|l| {
+                    Quantity::new(Complex64::new(value(i, j, l).into_value(), 0.0))
+                })
+            })
+        }))
+    }
+
+    Ok(ThreePointPhaseSpaceCorrelation {
+        qqq: real_block(|i, j, l| normalization * qqq_bracket(i, j, l)),
+        qqp: real_block(|i, j, l| normalization * one_momentum_bracket(2, i, j, l)),
+        qpq: real_block(|i, j, l| normalization * one_momentum_bracket(1, i, j, l)),
+        pqq: real_block(|i, j, l| normalization * one_momentum_bracket(0, i, j, l)),
+        qpp: real_block(|i, j, l| normalization * two_momentum_bracket(0, i, j, l)),
+        pqp: real_block(|i, j, l| normalization * two_momentum_bracket(1, i, j, l)),
+        ppq: real_block(|i, j, l| normalization * two_momentum_bracket(2, i, j, l)),
+        ppp: real_block(|i, j, l| normalization * ppp_bracket(i, j, l)),
+    })
+}
+
+/// Evaluates the canonical `(Q, Pi)` three-point initial condition on one
+/// common early slice for all three legs.
+///
+/// The slice is accepted only if every canonical leg satisfies
+/// `k_r/(aH) >= minimum_k_over_ah`; the shortest leg therefore decides
+/// whether the whole triangle may start. The returned blocks use the
+/// triangle's canonical leg order and the stripped Fourier normalization of
+/// [`ThreePointPhaseSpaceCorrelation`]. They are canonical-momentum
+/// correlations: convert them with [`velocity_three_point_from_canonical_tree`]
+/// only at an explicit velocity-output boundary.
+pub fn canonical_three_point_initial_condition<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    state: &MultifieldState<N>,
+    triangle: MomentumTriangle,
+    minimum_k_over_ah: f64,
+) -> Result<CanonicalThreePointPhaseSpaceCorrelation<N>, ThreePointInitialConditionError>
+where
+    P: ThriceDifferentiableMultifieldPotential<N>,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N>,
+{
+    if !minimum_k_over_ah.is_finite() || minimum_k_over_ah <= 1.0 {
+        return Err(
+            ThreePointInitialConditionError::InvalidSubhorizonRequirement(minimum_k_over_ah),
+        );
+    }
+    let hubble = system.hubble(state);
+    let hubble_value = hubble.into_value();
+    if !hubble_value.is_finite() || hubble_value <= 0.0 {
+        return Err(ThreePointInitialConditionError::InvalidHubble(hubble_value));
+    }
+    let scale_value = state.a.into_value();
+    if !scale_value.is_finite() || scale_value <= 0.0 {
+        return Err(ThreePointInitialConditionError::InvalidScaleFactor(
+            scale_value,
+        ));
+    }
+    let wavenumbers = triangle.canonical_wavenumbers().map(Mass::new);
+    for (index, wavenumber) in wavenumbers.into_iter().enumerate() {
+        let k_over_ah = (wavenumber / (state.a * hubble)).into_value();
+        if k_over_ah < minimum_k_over_ah {
+            return Err(
+                ThreePointInitialConditionError::InsufficientSubhorizonDepth {
+                    leg: FourierLeg::from_index(index),
+                    k_over_ah,
+                    required: minimum_k_over_ah,
+                },
+            );
+        }
+    }
+    let vertices = canonical_subhorizon_initial_vertices(system, state, triangle)?;
+
+    canonical_three_point_from_subhorizon_vertices(&vertices, wavenumbers, state.a, hubble)
 }
 
 fn complex_three_point_block<A, B, C, D, const N: usize>(
@@ -2887,6 +3387,38 @@ mod tests {
     }
 
     #[test]
+    fn source_keeps_left_external_operators_on_the_left_of_the_insertion() {
+        let first_leg = TwoPointPhaseSpaceCovariance::<1> {
+            qq: TwoPointBlock::new([[Quantity::new(Complex64::new(0.0, 0.0))]]),
+            qp: TwoPointBlock::new([[Quantity::new(Complex64::new(2.0, 3.0))]]),
+            pq: TwoPointBlock::new([[Quantity::new(Complex64::new(2.0, -3.0))]]),
+            pp: TwoPointBlock::new([[Quantity::new(Complex64::new(0.0, 0.0))]]),
+        };
+        let third_leg = TwoPointPhaseSpaceCovariance::<1> {
+            qq: TwoPointBlock::new([[Quantity::new(Complex64::new(5.0, 0.0))]]),
+            qp: TwoPointBlock::new([[Quantity::new(Complex64::new(0.0, 0.0))]]),
+            pq: TwoPointBlock::new([[Quantity::new(Complex64::new(0.0, 0.0))]]),
+            pp: TwoPointBlock::new([[Quantity::new(Complex64::new(0.0, 0.0))]]),
+        };
+        let zero_kernel = QuadraticPhaseSpaceKernel::<1>::zero();
+        let middle_kernel = QuadraticPhaseSpaceKernel::<1> {
+            q_pq: ThreePointBlock::new([[[Quantity::new(1.0)]]]),
+            ..QuadraticPhaseSpaceKernel::zero()
+        };
+
+        let source = three_point_source_from_kernels(
+            [&zero_kernel, &middle_kernel, &zero_kernel],
+            [&first_leg, &third_leg, &third_leg],
+        );
+
+        // <Q_1 (u Pi_1 Q_3) Q_3> contracts as Sigma^{QP}(k_1) Sigma^{QQ}(k_3).
+        assert_eq!(
+            source.qqq.components()[0][0][0].into_value(),
+            Complex64::new(10.0, 15.0)
+        );
+    }
+
+    #[test]
     fn canonical_kernel_contracts_only_with_canonical_covariances() {
         let kernel = CanonicalQuadraticPhaseSpaceKernel::<1>::zero();
         let covariance = CanonicalTwoPointPhaseSpaceCovariance {
@@ -2920,8 +3452,10 @@ mod tests {
         let coefficients = CanonicalCubicHamiltonianCoefficients {
             a_first_raised: block::<M1>(1_000.0),
             b_first_raised: block::<M0>(2_000.0),
+            b_first_raised_input_exchanged: block::<M0>(6_000.0),
             b_third_raised: block::<M0>(3_000.0),
             c_first_raised: block::<MMinus1>(4_000.0),
+            c_first_raised_input_exchanged: block::<MMinus1>(7_000.0),
             c_third_raised: block::<MMinus1>(5_000.0),
         };
         let kernel = CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian(
@@ -2931,7 +3465,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(*kernel.q_qq.components()[1][0][1].value(), -3_101.0 / 2.0);
-        assert_eq!(*kernel.q_qp.components()[1][0][1].value(), -4_110.0 / 2.0);
+        assert_eq!(*kernel.q_qp.components()[1][0][1].value(), -7_101.0 / 2.0);
         assert_eq!(*kernel.q_pq.components()[1][0][1].value(), -4_101.0 / 2.0);
         assert_eq!(*kernel.q_pp.components()[1][0][1].value(), 0.0);
         assert_eq!(
@@ -2939,8 +3473,8 @@ mod tests {
             3.0 * 1_101.0 / 2.0
         );
         assert_eq!(*kernel.p_qp.components()[1][0][1].value(), 2_101.0 / 2.0);
-        assert_eq!(*kernel.p_pq.components()[1][0][1].value(), 2_110.0 / 2.0);
-        assert_eq!(*kernel.p_pp.components()[1][0][1].value(), 5_110.0 / 2.0);
+        assert_eq!(*kernel.p_pq.components()[1][0][1].value(), 6_101.0 / 2.0);
+        assert_eq!(*kernel.p_pp.components()[1][0][1].value(), 5_101.0 / 2.0);
     }
 
     #[test]
@@ -2948,8 +3482,10 @@ mod tests {
         let coefficients = CanonicalCubicHamiltonianCoefficients::<1> {
             a_first_raised: zero_real_three_point_block(),
             b_first_raised: zero_real_three_point_block(),
+            b_first_raised_input_exchanged: zero_real_three_point_block(),
             b_third_raised: zero_real_three_point_block(),
             c_first_raised: zero_real_three_point_block(),
+            c_first_raised_input_exchanged: zero_real_three_point_block(),
             c_third_raised: zero_real_three_point_block(),
         };
 
@@ -3013,8 +3549,10 @@ mod tests {
             CanonicalCubicHamiltonianCoefficients {
                 a_first_raised: zero_real_three_point_block(),
                 b_first_raised: zero_real_three_point_block(),
+                b_first_raised_input_exchanged: zero_real_three_point_block(),
                 b_third_raised: ThreePointBlock::new([[[Quantity::new(b)]]]),
                 c_first_raised: ThreePointBlock::new([[[Quantity::new(c)]]]),
+                c_first_raised_input_exchanged: ThreePointBlock::new([[[Quantity::new(10.0 * c)]]]),
                 c_third_raised: zero_real_three_point_block(),
             }
         }
@@ -3047,7 +3585,7 @@ mod tests {
             &vertices,
             [&covariances[0], &covariances[1], &covariances[2]],
         );
-        let expected_pqq = 41.0 - 2.0 * 23.0 * 31.0 - 3.0 * (23.0 * 37.0 + 29.0 * 31.0);
+        let expected_pqq = 41.0 - 2.0 * 23.0 * 31.0 - (30.0 * 23.0 * 37.0 + 3.0 * 29.0 * 31.0);
 
         assert_eq!(
             velocity.pqq.components[0][0][0].into_value(),
@@ -3612,5 +4150,488 @@ mod tests {
         assert!(kernel.q_qq.components()[0][0][0].into_value().is_finite());
         assert!(kernel.p_qq.components()[0][0][0].into_value().is_finite());
         assert!(kernel.p_pp.components()[0][0][0].into_value().is_finite());
+    }
+
+    const SCALAR_FAST_A: f64 = 1.3;
+    const SCALAR_SLOW_A: f64 = -0.7;
+    const SCALAR_B: [f64; 3] = [0.11, -0.23, 0.37];
+    const SCALAR_C: [f64; 3] = [1.9, -2.9, 0.53];
+
+    fn scalar_block<D>(
+        value: f64,
+    ) -> ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, D, f64, 1> {
+        ThreePointBlock::new([[[Quantity::new(value)]]])
+    }
+
+    fn scalar_initial_vertices() -> CanonicalSubhorizonInitialVertices<1> {
+        CanonicalSubhorizonInitialVertices {
+            fast_a_times_scale_squared: scalar_block(SCALAR_FAST_A),
+            slow_a: scalar_block(SCALAR_SLOW_A),
+            b_momentum_on_leg: SCALAR_B.map(scalar_block),
+            c_field_on_leg: SCALAR_C.map(scalar_block),
+        }
+    }
+
+    /// Scalar vertex for one output leg. Its inputs are the remaining legs in
+    /// ascending order, and every tensor slot keeps the momentum of its leg.
+    fn scalar_output_vertex(output: usize, scale: f64) -> CanonicalCubicHamiltonianCoefficients<1> {
+        let [first_input, second_input] = match output {
+            0 => [1, 2],
+            1 => [0, 2],
+            _ => [0, 1],
+        };
+        CanonicalCubicHamiltonianCoefficients {
+            a_first_raised: scalar_block(SCALAR_FAST_A / (scale * scale) + SCALAR_SLOW_A),
+            b_first_raised: scalar_block(SCALAR_B[second_input]),
+            b_first_raised_input_exchanged: scalar_block(SCALAR_B[first_input]),
+            b_third_raised: scalar_block(SCALAR_B[output]),
+            c_first_raised: scalar_block(SCALAR_C[second_input]),
+            c_first_raised_input_exchanged: scalar_block(SCALAR_C[first_input]),
+            c_third_raised: scalar_block(SCALAR_C[output]),
+        }
+    }
+
+    fn massless_de_sitter_covariance(
+        wavenumber: f64,
+        scale: f64,
+        hubble: f64,
+    ) -> CanonicalTwoPointPhaseSpaceCovariance<1> {
+        let tau = -1.0 / (scale * hubble);
+        let normalization = hubble / (2.0 * wavenumber.powi(3)).sqrt();
+        let phase = Complex64::from_polar(1.0, -wavenumber * tau);
+        let q = normalization * Complex64::new(1.0, wavenumber * tau) * phase;
+        let p = -normalization * hubble * wavenumber.powi(2) * tau.powi(2) * phase;
+        CanonicalTwoPointPhaseSpaceCovariance {
+            qq: TwoPointBlock::new([[Quantity::new(q * q.conj())]]),
+            qp: TwoPointBlock::new([[Quantity::new(q * p.conj())]]),
+            pq: TwoPointBlock::new([[Quantity::new(p * q.conj())]]),
+            pp: TwoPointBlock::new([[Quantity::new(p * p.conj())]]),
+        }
+    }
+
+    const ALL_BLOCK_SLOTS: [[PhaseSpaceSlotKind; 3]; 8] = {
+        use PhaseSpaceSlotKind::{Field as F, Momentum as P};
+        [
+            [F, F, F],
+            [F, F, P],
+            [F, P, F],
+            [P, F, F],
+            [F, P, P],
+            [P, F, P],
+            [P, P, F],
+            [P, P, P],
+        ]
+    };
+
+    /// Largest block-relative residual of the canonical transport equation
+    /// for the scalar initial condition on massless de Sitter.
+    fn de_sitter_transport_residual(depth: f64) -> f64 {
+        let (scale, hubble): (f64, f64) = (1.3, 0.7);
+        let shape = [1.0, 0.8, 0.5];
+        let wavenumbers = shape.map(|ratio| ratio * depth * scale * hubble);
+        let initial = |a: f64| {
+            canonical_three_point_from_subhorizon_vertices(
+                &scalar_initial_vertices(),
+                wavenumbers.map(Mass::new),
+                ScaleFactor::new(a),
+                Hubble::new(hubble),
+            )
+            .unwrap()
+        };
+        let step: f64 = 1.0e-5;
+        let alpha = initial(scale);
+        let forward = initial(scale * step.exp());
+        let backward = initial(scale * (-step).exp());
+        let covariances =
+            wavenumbers.map(|wavenumber| massless_de_sitter_covariance(wavenumber, scale, hubble));
+        let kernels = [0, 1, 2].map(|output| {
+            CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian(
+                scalar_output_vertex(output, scale),
+                Hubble::new(hubble),
+            )
+            .unwrap()
+        });
+        let source = three_point_source_from_kernels(
+            [&kernels[0], &kernels[1], &kernels[2]],
+            [&covariances[0], &covariances[1], &covariances[2]],
+        );
+
+        ALL_BLOCK_SLOTS
+            .into_iter()
+            .map(|slots| {
+                let derivative = (forward.component(slots, [0; 3])
+                    - backward.component(slots, [0; 3]))
+                    / (2.0 * step);
+                let mut magnitude = derivative.norm() + source.component(slots, [0; 3]).norm();
+                let mut linear = Complex64::new(0.0, 0.0);
+                for leg in 0..3 {
+                    let mut moved = slots;
+                    let term = match slots[leg] {
+                        PhaseSpaceSlotKind::Field => {
+                            moved[leg] = PhaseSpaceSlotKind::Momentum;
+                            alpha.component(moved, [0; 3]) / hubble
+                        }
+                        PhaseSpaceSlotKind::Momentum => {
+                            moved[leg] = PhaseSpaceSlotKind::Field;
+                            -3.0 * alpha.component(slots, [0; 3])
+                                - (wavenumbers[leg] / scale).powi(2) / hubble
+                                    * alpha.component(moved, [0; 3])
+                        }
+                    };
+                    magnitude += term.norm();
+                    linear += term;
+                }
+                (derivative - linear - source.component(slots, [0; 3])).norm() / magnitude
+            })
+            .fold(0.0, f64::max)
+    }
+
+    #[test]
+    fn subhorizon_initial_condition_solves_de_sitter_transport_to_retained_order() {
+        let shallow = de_sitter_transport_residual(1.0e3);
+        let deep = de_sitter_transport_residual(1.0e4);
+
+        assert!(shallow < 2.0e-5, "residual {shallow:e} at k/(aH) ~ 1e3");
+        assert!(deep < 2.0e-7, "residual {deep:e} at k/(aH) ~ 1e4");
+    }
+
+    #[test]
+    fn subhorizon_initial_condition_matches_the_independent_in_in_values() {
+        // Exact rational values from the tree-level in-in integral with
+        // massless de Sitter mode functions, evaluated at k = (3, 2, 3/2),
+        // a = 2, H = 1/2, using the scalar vertex values above.
+        let expected = [
+            -83.0 / 374_400.0,
+            743.0 / 1_622_400.0,
+            5_801.0 / 9_734_400.0,
+            943.0 / 1_081_600.0,
+            -97.0 / 2_995_200.0,
+            -1.0 / 166_400.0,
+            73.0 / 1_497_600.0,
+            -6_659.0 / 8_652_800.0,
+        ];
+        let alpha = canonical_three_point_from_subhorizon_vertices(
+            &scalar_initial_vertices(),
+            [Mass::new(3.0), Mass::new(2.0), Mass::new(1.5)],
+            ScaleFactor::new(2.0),
+            Hubble::new(0.5),
+        )
+        .unwrap();
+
+        for (slots, expected) in ALL_BLOCK_SLOTS.into_iter().zip(expected) {
+            let actual = alpha.component(slots, [0; 3]);
+            assert_eq!(actual.im, 0.0);
+            assert!(
+                (actual.re - expected).abs() <= 1.0e-12 * expected.abs(),
+                "{slots:?}: {} != {expected}",
+                actual.re
+            );
+        }
+    }
+
+    fn generic_block<D>(
+        offset: f64,
+    ) -> ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, D, f64, 2> {
+        ThreePointBlock::new(core::array::from_fn(|i| {
+            core::array::from_fn(|j| {
+                core::array::from_fn(|k| Quantity::new((offset + (7 * i + 3 * j + k) as f64).sin()))
+            })
+        }))
+    }
+
+    fn generic_initial_vertices() -> CanonicalSubhorizonInitialVertices<2> {
+        CanonicalSubhorizonInitialVertices {
+            fast_a_times_scale_squared: generic_block(0.1),
+            slow_a: generic_block(1.7),
+            b_momentum_on_leg: [generic_block(2.3), generic_block(3.1), generic_block(4.9)],
+            c_field_on_leg: [generic_block(5.3), generic_block(6.7), generic_block(7.1)],
+        }
+    }
+
+    /// Relabels vertices after exchanging two Fourier legs, moving each leg's
+    /// field index and its leg-resolved `B` and `C` entry together.
+    fn exchange_vertex_legs(
+        vertices: &CanonicalSubhorizonInitialVertices<2>,
+        exchange: [usize; 2],
+    ) -> CanonicalSubhorizonInitialVertices<2> {
+        fn relabel<D: Copy>(
+            block: &ThreePointBlock<
+                FieldPerturbation,
+                FieldPerturbation,
+                FieldPerturbation,
+                D,
+                f64,
+                2,
+            >,
+            exchange: [usize; 2],
+        ) -> ThreePointBlock<FieldPerturbation, FieldPerturbation, FieldPerturbation, D, f64, 2>
+        {
+            ThreePointBlock::new(core::array::from_fn(|i| {
+                core::array::from_fn(|j| {
+                    core::array::from_fn(|k| {
+                        let mut indices = [i, j, k];
+                        indices.swap(exchange[0], exchange[1]);
+                        block.components()[indices[0]][indices[1]][indices[2]]
+                    })
+                })
+            }))
+        }
+        let leg = |r: usize| {
+            if r == exchange[0] {
+                exchange[1]
+            } else if r == exchange[1] {
+                exchange[0]
+            } else {
+                r
+            }
+        };
+        CanonicalSubhorizonInitialVertices {
+            fast_a_times_scale_squared: relabel(&vertices.fast_a_times_scale_squared, exchange),
+            slow_a: relabel(&vertices.slow_a, exchange),
+            b_momentum_on_leg: [0, 1, 2]
+                .map(|r| relabel(&vertices.b_momentum_on_leg[leg(r)], exchange)),
+            c_field_on_leg: [0, 1, 2].map(|r| relabel(&vertices.c_field_on_leg[leg(r)], exchange)),
+        }
+    }
+
+    fn assert_three_point_close<P: PhaseSpaceSlot>(
+        actual: &ThreePointPhaseSpaceCorrelation<2, P>,
+        expected: &ThreePointPhaseSpaceCorrelation<2, P>,
+        tolerance: f64,
+    ) {
+        for slots in ALL_BLOCK_SLOTS {
+            let scale = (0..8)
+                .map(|n| {
+                    expected
+                        .component(slots, [n / 4, (n / 2) % 2, n % 2])
+                        .norm()
+                })
+                .fold(0.0, f64::max);
+            for n in 0..8 {
+                let indices = [n / 4, (n / 2) % 2, n % 2];
+                let difference =
+                    (actual.component(slots, indices) - expected.component(slots, indices)).norm();
+                assert!(
+                    difference <= tolerance * scale,
+                    "{slots:?} {indices:?}: difference {difference:e}, scale {scale:e}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn subhorizon_initial_condition_is_covariant_under_fourier_leg_exchange() {
+        let vertices = generic_initial_vertices();
+        let wavenumbers = [Mass::new(4.0e3), Mass::new(3.0e3), Mass::new(2.0e3)];
+        let (scale, hubble) = (ScaleFactor::new(1.5), Hubble::new(0.8));
+        let alpha =
+            canonical_three_point_from_subhorizon_vertices(&vertices, wavenumbers, scale, hubble)
+                .unwrap();
+
+        let first_second = canonical_three_point_from_subhorizon_vertices(
+            &exchange_vertex_legs(&vertices, [0, 1]),
+            [wavenumbers[1], wavenumbers[0], wavenumbers[2]],
+            scale,
+            hubble,
+        )
+        .unwrap();
+        assert_three_point_close(&first_second, &alpha.swap_first_second(), 1.0e-14);
+
+        let second_third = canonical_three_point_from_subhorizon_vertices(
+            &exchange_vertex_legs(&vertices, [1, 2]),
+            [wavenumbers[0], wavenumbers[2], wavenumbers[1]],
+            scale,
+            hubble,
+        )
+        .unwrap();
+        assert_three_point_close(&second_third, &alpha.swap_second_third(), 1.0e-14);
+        assert_eq!(alpha.conjugate(), alpha);
+    }
+
+    fn curved_initial_condition_model() -> (
+        CovariantMultifieldSystem<QuadraticMultifieldPotential<2>, HyperbolicFieldSpace, 2>,
+        MultifieldState<2>,
+    ) {
+        let model = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0e-5), Mass::new(0.75e-5)]),
+            HyperbolicFieldSpace::new(Field::new(3.0)).unwrap(),
+        );
+        let state = MultifieldState::new(
+            [Field::new(2.0), Field::new(0.5)],
+            [FieldVelocity::new(4.0e-6), FieldVelocity::new(-3.0e-6)],
+            ScaleFactor::new(1.0),
+        );
+        (model, state)
+    }
+
+    #[test]
+    fn subhorizon_vertices_evaluate_each_leg_ordering_before_raising() {
+        let (model, state) = curved_initial_condition_model();
+        let triangle = MomentumTriangle::try_new(4.0, 3.0, 2.0).unwrap();
+        let vertices = canonical_subhorizon_initial_vertices(&model, &state, triangle).unwrap();
+        let inverse = *model.geometry.inverse_metric(&state.phi).components();
+        let legs_with_momentum_last = [
+            [FourierLeg::Two, FourierLeg::Three, FourierLeg::One],
+            [FourierLeg::One, FourierLeg::Three, FourierLeg::Two],
+            [FourierLeg::One, FourierLeg::Two, FourierLeg::Three],
+        ];
+
+        for (leg, coefficient_legs) in legs_with_momentum_last.into_iter().enumerate() {
+            // `first_raised` in coefficient order (x, y | z) raises x; raise y, z.
+            let b = raise_second_and_third(
+                canonical_cubic_b_coefficients_for_legs(&model, &state, triangle, coefficient_legs)
+                    .unwrap()
+                    .first_raised
+                    .components(),
+                &inverse,
+            );
+            let c = raise_second_and_third(
+                canonical_cubic_c_coefficients_for_legs(&model, &state, triangle, coefficient_legs)
+                    .unwrap()
+                    .first_raised
+                    .components(),
+                &inverse,
+            );
+            let position = coefficient_legs.map(FourierLeg::index);
+            for i in 0..2 {
+                for j in 0..2 {
+                    for k in 0..2 {
+                        let leg_indices = [i, j, k];
+                        let [x, y, z] = position.map(|p| leg_indices[p]);
+                        let actual_b = vertices.b_momentum_on_leg[leg].components()[i][j][k];
+                        let actual_c = vertices.c_field_on_leg[leg].components()[i][j][k];
+                        let expected_b = b[x][y][z];
+                        let expected_c = c[x][y][z];
+                        assert!(
+                            (actual_b - expected_b).into_value().abs()
+                                <= 1.0e-13 * expected_b.into_value().abs().max(1.0e-30)
+                        );
+                        assert!(
+                            (actual_c - expected_c).into_value().abs()
+                                <= 1.0e-13 * expected_c.into_value().abs().max(1.0e-30)
+                        );
+                    }
+                }
+            }
+        }
+
+        let full_a = raise_second_and_third(
+            canonical_cubic_a_coefficients(&model, &state, triangle)
+                .unwrap()
+                .first_raised
+                .components(),
+            &inverse,
+        );
+        for n in 0..8 {
+            let [i, j, k] = [n / 4, (n / 2) % 2, n % 2];
+            let expected = full_a[i][j][k];
+            let reconstructed = vertices.slow_a.components()[i][j][k]
+                + vertices.fast_a_times_scale_squared.components()[i][j][k];
+            let difference = (reconstructed - expected).into_value().abs();
+            assert!(difference <= 1.0e-13 * expected.into_value().abs().max(1.0e-30));
+        }
+
+        // At fixed shape, only the fast part carries physical wavenumbers.
+        let doubled = canonical_subhorizon_initial_vertices(
+            &model,
+            &state,
+            MomentumTriangle::try_new(8.0, 6.0, 4.0).unwrap(),
+        )
+        .unwrap();
+        for n in 0..8 {
+            let [i, j, k] = [n / 4, (n / 2) % 2, n % 2];
+            let slow = vertices.slow_a.components()[i][j][k].into_value();
+            let fast = vertices.fast_a_times_scale_squared.components()[i][j][k].into_value();
+            let doubled_slow = doubled.slow_a.components()[i][j][k].into_value();
+            let doubled_fast =
+                doubled.fast_a_times_scale_squared.components()[i][j][k].into_value();
+            assert!((doubled_slow - slow).abs() <= 1.0e-12 * slow.abs().max(fast.abs()));
+            assert!((doubled_fast - 4.0 * fast).abs() <= 1.0e-13 * fast.abs().max(1.0e-30));
+        }
+    }
+
+    #[test]
+    fn input_exchanged_coefficients_move_momenta_with_indices() {
+        let (model, state) = curved_initial_condition_model();
+        let triangle = MomentumTriangle::try_new(4.0, 3.0, 2.0).unwrap();
+        let canonical = canonical_cubic_hamiltonian_coefficients(&model, &state, triangle).unwrap();
+        let exchanged_legs = [FourierLeg::One, FourierLeg::Three, FourierLeg::Two];
+        let b = canonical_cubic_b_coefficients_for_legs(&model, &state, triangle, exchanged_legs)
+            .unwrap();
+        let c = canonical_cubic_c_coefficients_for_legs(&model, &state, triangle, exchanged_legs)
+            .unwrap();
+
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    assert_eq!(
+                        canonical.b_first_raised_input_exchanged.components()[i][j][k],
+                        b.first_raised.components()[i][k][j]
+                    );
+                    assert_eq!(
+                        canonical.c_first_raised_input_exchanged.components()[i][j][k],
+                        c.first_raised.components()[i][k][j]
+                    );
+                }
+            }
+        }
+        assert_ne!(
+            canonical.c_first_raised_input_exchanged.components()[0][0][1],
+            canonical.c_first_raised.components()[0][1][0]
+        );
+    }
+
+    #[test]
+    fn equilateral_model_initial_condition_is_invariant_under_leg_exchange() {
+        let (model, state) = curved_initial_condition_model();
+        let hubble = model.hubble(&state).into_value();
+        let k = 50.0 * hubble;
+        let triangle = MomentumTriangle::try_new(k, k, k).unwrap();
+        let alpha =
+            canonical_three_point_initial_condition(&model, &state, triangle, 20.0).unwrap();
+
+        assert_three_point_close(&alpha.swap_first_second(), &alpha, 1.0e-13);
+        assert_three_point_close(&alpha.swap_second_third(), &alpha, 1.0e-13);
+        assert_eq!(alpha.conjugate(), alpha);
+    }
+
+    #[test]
+    fn initial_condition_requires_every_leg_inside_the_requested_depth() {
+        let (model, state) = curved_initial_condition_model();
+        let hubble = model.hubble(&state).into_value();
+        let triangle =
+            MomentumTriangle::try_new(80.0 * hubble, 60.0 * hubble, 30.0 * hubble).unwrap();
+
+        assert!(canonical_three_point_initial_condition(&model, &state, triangle, 25.0).is_ok());
+        match canonical_three_point_initial_condition(&model, &state, triangle, 40.0) {
+            Err(ThreePointInitialConditionError::InsufficientSubhorizonDepth {
+                leg,
+                k_over_ah,
+                required,
+            }) => {
+                assert_eq!(leg, FourierLeg::Three);
+                assert!((k_over_ah - 30.0).abs() < 1.0e-9);
+                assert_eq!(required, 40.0);
+            }
+            other => panic!("unexpected result {other:?}"),
+        }
+        for invalid in [1.0, 0.5, f64::NAN, f64::INFINITY] {
+            assert!(matches!(
+                canonical_three_point_initial_condition(&model, &state, triangle, invalid),
+                Err(ThreePointInitialConditionError::InvalidSubhorizonRequirement(_))
+            ));
+        }
+        assert!(matches!(
+            canonical_three_point_from_subhorizon_vertices(
+                &scalar_initial_vertices(),
+                [Mass::new(1.0), Mass::new(0.0), Mass::new(1.0)],
+                ScaleFactor::new(1.0),
+                Hubble::new(1.0),
+            ),
+            Err(ThreePointInitialConditionError::InvalidWavenumber {
+                leg: FourierLeg::Two,
+                ..
+            })
+        ));
     }
 }
