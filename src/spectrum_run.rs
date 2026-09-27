@@ -3308,8 +3308,8 @@ mod tests {
         ]
     }
 
-    struct SourcedBenchmark {
-        system: TestSystem,
+    struct SourcedBenchmark<P = QuadraticMultifieldPotential<2>, G = FlatFieldSpace> {
+        system: CovariantMultifieldSystem<P, G, 2>,
         trajectory: BackgroundTrajectory,
         triangle: crate::MomentumTriangle,
         output: f64,
@@ -3318,10 +3318,25 @@ mod tests {
     fn sourced_benchmark(shape: [f64; 3]) -> SourcedBenchmark {
         let system = system([1.0e-6, 1.5e-6]);
         let initial = slow_roll_start(&system, [12.0, 8.0]);
+        sourced_benchmark_with(system, initial, shape, None)
+    }
+
+    /// Surveys `system` from `initial`. The triangle is `shape` times the
+    /// pivot wavenumber, or times `pivot` when one is supplied.
+    fn sourced_benchmark_with<P, G>(
+        system: CovariantMultifieldSystem<P, G, 2>,
+        initial: MultifieldState<2>,
+        shape: [f64; 3],
+        pivot: Option<f64>,
+    ) -> SourcedBenchmark<P, G>
+    where
+        P: crate::ThriceDifferentiableMultifieldPotential<2> + Copy,
+        G: crate::ThirdOrderFieldSpaceGeometry<2> + crate::CurvatureDerivativeGeometry<2> + Copy,
+    {
         let settings = quick_settings();
         let (_, trajectory, e_folds_at_end) = system.survey_background(initial, &settings).unwrap();
         let pivot_state = trajectory.state_at(e_folds_at_end - settings.pivot_e_folds_before_end);
-        let k = (pivot_state.a * system.hubble(&pivot_state)).into_value();
+        let k = pivot.unwrap_or((pivot_state.a * system.hubble(&pivot_state)).into_value());
         let triangle =
             crate::MomentumTriangle::try_new(shape[0] * k, shape[1] * k, shape[2] * k).unwrap();
 
@@ -3333,7 +3348,11 @@ mod tests {
         }
     }
 
-    impl SourcedBenchmark {
+    impl<P, G> SourcedBenchmark<P, G>
+    where
+        P: crate::ThriceDifferentiableMultifieldPotential<2> + Copy,
+        G: crate::ThirdOrderFieldSpaceGeometry<2> + crate::CurvatureDerivativeGeometry<2> + Copy,
+    {
         /// Elapsed e-fold at which the shortest leg has `k/(aH) = depth`.
         fn slice(&self, depth: f64) -> f64 {
             let shortest = Mass::new(self.triangle.canonical_wavenumbers()[2]);
@@ -3443,6 +3462,244 @@ mod tests {
         )
         .unwrap();
         assert_eq!(velocity.qqq, evolved.alpha.qqq);
+    }
+
+    /// Flat field space in sheared coordinates `chi`, related to Cartesian
+    /// `phi` by `phi^1 = chi^1` and `phi^2 = chi^2 + c (chi^1)^2`.
+    ///
+    /// The metric is position dependent and `Gamma^2_11 = 2c` is the only
+    /// nonzero connection component, while the curvature vanishes. Running
+    /// the same physical model in these coordinates exercises every
+    /// connection term of the transport without changing the physics.
+    #[derive(Clone, Copy, Debug)]
+    struct ShearedFlatFieldSpace {
+        shear: f64,
+    }
+
+    impl crate::FieldSpaceGeometry<2> for ShearedFlatFieldSpace {
+        fn metric(&self, position: &[Field; 2]) -> crate::FieldMetric<2> {
+            let slope = 2.0 * self.shear * position[0].into_value();
+            crate::FieldMetric::new([
+                [
+                    crate::Quantity::new(1.0 + slope * slope),
+                    crate::Quantity::new(slope),
+                ],
+                [crate::Quantity::new(slope), crate::Quantity::new(1.0)],
+            ])
+        }
+
+        fn inverse_metric(&self, position: &[Field; 2]) -> crate::InverseFieldMetric<2> {
+            let slope = 2.0 * self.shear * position[0].into_value();
+            crate::InverseFieldMetric::new([
+                [crate::Quantity::new(1.0), crate::Quantity::new(-slope)],
+                [
+                    crate::Quantity::new(-slope),
+                    crate::Quantity::new(1.0 + slope * slope),
+                ],
+            ])
+        }
+
+        fn christoffel(&self, _position: &[Field; 2]) -> crate::ChristoffelSymbols<2> {
+            let mut components = [[[crate::Quantity::<crate::MMinus1, f64>::new(0.0); 2]; 2]; 2];
+            components[1][0][0] = crate::Quantity::new(2.0 * self.shear);
+            crate::ChristoffelSymbols::new(components)
+        }
+    }
+
+    impl crate::CurvedFieldSpaceGeometry<2> for ShearedFlatFieldSpace {
+        fn riemann(&self, _position: &[Field; 2]) -> crate::RiemannTensor<2> {
+            crate::RiemannTensor::zero()
+        }
+    }
+
+    impl crate::ThirdOrderFieldSpaceGeometry<2> for ShearedFlatFieldSpace {
+        fn christoffel_derivative(
+            &self,
+            _position: &[Field; 2],
+        ) -> crate::ChristoffelDerivatives<2> {
+            crate::ChristoffelDerivatives::zero()
+        }
+    }
+
+    impl crate::CurvatureDerivativeGeometry<2> for ShearedFlatFieldSpace {
+        fn covariant_riemann_derivative(
+            &self,
+            _position: &[Field; 2],
+        ) -> crate::CovariantRiemannDerivative<2> {
+            crate::CovariantRiemannDerivative::zero()
+        }
+    }
+
+    /// The double-quadratic potential written in the sheared coordinates.
+    #[derive(Clone, Copy, Debug)]
+    struct ShearedQuadraticPotential {
+        masses: [f64; 2],
+        shear: f64,
+    }
+
+    impl<V> crate::MultifieldPotentialValue<V, 2> for ShearedQuadraticPotential
+    where
+        V: From<f64>
+            + Clone
+            + core::ops::Add<V, Output = V>
+            + core::ops::Mul<V, Output = V>
+            + core::ops::Mul<f64, Output = V>,
+    {
+        fn value(&self, chi: [Field<V>; 2]) -> crate::EnergyDensity<V> {
+            let [first, second] = chi.map(crate::Quantity::into_value);
+            let cartesian_second = second + first.clone() * first.clone() * self.shear;
+            let [m1, m2] = self.masses;
+            crate::EnergyDensity::new(
+                first.clone() * first * (0.5 * m1 * m1)
+                    + cartesian_second.clone() * cartesian_second * (0.5 * m2 * m2),
+            )
+        }
+    }
+
+    const SHEAR: f64 = 0.05;
+
+    /// Cartesian and sheared descriptions of the same benchmark.
+    fn coordinate_pair() -> (
+        SourcedBenchmark,
+        SourcedBenchmark<ShearedQuadraticPotential, ShearedFlatFieldSpace>,
+    ) {
+        let masses = [1.0e-6, 1.5e-6];
+        let cartesian = sourced_benchmark([1.0, 0.9, 0.7]);
+        let start = slow_roll_start(&cartesian.system, [12.0, 8.0]);
+        let [phi1, phi2] = start.phi.map(Field::into_value);
+        let [pi1, pi2] = start.pi.map(FieldVelocity::into_value);
+        let sheared_system = CovariantMultifieldSystem::in_planck_units(
+            ShearedQuadraticPotential {
+                masses,
+                shear: SHEAR,
+            },
+            ShearedFlatFieldSpace { shear: SHEAR },
+        );
+        let sheared_start = MultifieldState::new(
+            [Field::new(phi1), Field::new(phi2 - SHEAR * phi1 * phi1)],
+            [
+                FieldVelocity::new(pi1),
+                FieldVelocity::new(pi2 - 2.0 * SHEAR * phi1 * pi1),
+            ],
+            start.a,
+        );
+        let pivot = cartesian.triangle.canonical_wavenumbers()[0];
+        let sheared =
+            sourced_benchmark_with(sheared_system, sheared_start, [1.0, 0.9, 0.7], Some(pivot));
+        (cartesian, sheared)
+    }
+
+    /// Jacobian `d chi^I / d phi^J` at a Cartesian background state.
+    fn shear_jacobian(state: &MultifieldState<2>) -> [[f64; 2]; 2] {
+        [[1.0, 0.0], [-2.0 * SHEAR * state.phi[0].into_value(), 1.0]]
+    }
+
+    fn transform_three_point_block<A, B, C, D: Copy>(
+        block: &crate::ThreePointBlock<A, B, C, D, Complex64, 2>,
+        jacobian: &[[f64; 2]; 2],
+    ) -> crate::ThreePointBlock<A, B, C, D, Complex64, 2> {
+        let components = block.components();
+        crate::ThreePointBlock::new(core::array::from_fn(|i| {
+            core::array::from_fn(|j| {
+                core::array::from_fn(|k| {
+                    let value: Complex64 = (0..8)
+                        .map(|n| {
+                            let [l, m, q] = [n / 4, (n / 2) % 2, n % 2];
+                            jacobian[i][l]
+                                * jacobian[j][m]
+                                * jacobian[k][q]
+                                * *components[l][m][q].value()
+                        })
+                        .sum();
+                    crate::Quantity::new(value)
+                })
+            })
+        }))
+    }
+
+    /// Transforms every canonical block as a rank-three contravariant tensor.
+    fn transform_three_point(
+        alpha: &crate::CanonicalThreePointPhaseSpaceCorrelation<2>,
+        jacobian: &[[f64; 2]; 2],
+    ) -> crate::CanonicalThreePointPhaseSpaceCorrelation<2> {
+        crate::ThreePointPhaseSpaceCorrelation {
+            qqq: transform_three_point_block(&alpha.qqq, jacobian),
+            qqp: transform_three_point_block(&alpha.qqp, jacobian),
+            qpq: transform_three_point_block(&alpha.qpq, jacobian),
+            pqq: transform_three_point_block(&alpha.pqq, jacobian),
+            qpp: transform_three_point_block(&alpha.qpp, jacobian),
+            pqp: transform_three_point_block(&alpha.pqp, jacobian),
+            ppq: transform_three_point_block(&alpha.ppq, jacobian),
+            ppp: transform_three_point_block(&alpha.ppp, jacobian),
+        }
+    }
+
+    #[test]
+    fn initial_condition_transforms_as_a_tensor_under_a_field_redefinition() {
+        let (cartesian, sheared) = coordinate_pair();
+        let slice = cartesian.slice(4.0_f64.exp());
+        let depth = 4.0_f64.exp() * (1.0 - 1.0e-3);
+        let initial = |benchmark_trajectory: &BackgroundTrajectory| {
+            crate::BackgroundNeighborhood::from_trajectory(benchmark_trajectory, slice, 1.0e-3)
+        };
+        let alpha_cartesian = crate::canonical_three_point_initial_condition(
+            &cartesian.system,
+            &initial(&cartesian.trajectory),
+            cartesian.triangle,
+            depth,
+        )
+        .unwrap();
+        let alpha_sheared = crate::canonical_three_point_initial_condition(
+            &sheared.system,
+            &initial(&sheared.trajectory),
+            sheared.triangle,
+            depth,
+        )
+        .unwrap();
+        let jacobian = shear_jacobian(&cartesian.trajectory.state_at(slice));
+        let errors = three_point_error(
+            &alpha_sheared,
+            &transform_three_point(&alpha_cartesian, &jacobian),
+        );
+
+        assert!(errors.iter().all(|error| *error < 1.0e-8), "{errors:?}");
+        // Comparing components without the Jacobian fails by order one, so the
+        // agreement above is a statement about the transformation.
+        let untransformed = three_point_error(&alpha_sheared, &alpha_cartesian);
+        assert!(
+            untransformed.iter().all(|error| *error > 0.1),
+            "{untransformed:?}"
+        );
+    }
+
+    #[test]
+    fn sourced_transport_transforms_as_a_tensor_under_a_field_redefinition() {
+        let (cartesian, sheared) = coordinate_pair();
+        let target = cartesian.slice(3.5_f64.exp());
+        let evolved_cartesian = cartesian.evolve(4.0, target, 1.0e-8);
+        let evolved_sheared = sheared.evolve(4.0, target, 1.0e-8);
+        let jacobian = shear_jacobian(&cartesian.trajectory.state_at(target));
+        let errors = three_point_error(
+            &evolved_sheared.alpha,
+            &transform_three_point(&evolved_cartesian.alpha, &jacobian),
+        );
+
+        assert!(errors.iter().all(|error| *error < 1.0e-7), "{errors:?}");
+    }
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn sourced_transport_to_output_transforms_as_a_tensor() {
+        let (cartesian, sheared) = coordinate_pair();
+        let output = cartesian.output;
+        let evolved_cartesian = cartesian.evolve(3.0, output, 1.0e-9);
+        let evolved_sheared = sheared.evolve(3.0, output, 1.0e-9);
+        let jacobian = shear_jacobian(&cartesian.trajectory.state_at(output));
+        let errors = three_point_error(
+            &evolved_sheared.alpha,
+            &transform_three_point(&evolved_cartesian.alpha, &jacobian),
+        );
+        assert!(errors.iter().all(|error| *error < 1.0e-8), "{errors:?}");
     }
 
     #[test]

@@ -8,7 +8,7 @@ ends. The immediate input is therefore a background trajectory and three
 complex phase-space covariances, not a curvature bispectrum or an
 $f_{\mathrm{NL}}$ value.
 
-P3d is in progress. The following pieces are implemented:
+P3d is complete. The following pieces are implemented:
 
 - the complete dimensioned three-point state;
 - Fourier-leg permutation and complex-conjugation operations;
@@ -31,12 +31,13 @@ P3d is in progress. The following pieces are implemented:
 
 - one adaptive canonical-basis system that evolves the sourced state and the
   three leg covariances together, with start-depth and tolerance convergence
-  on the reference benchmark.
+  on the reference benchmark;
+- a field-redefinition test showing that the initial condition and the
+  sourced evolution transform as contravariant tensors.
 
-The following pieces are not implemented:
+The following piece is not implemented:
 
-- a general field-coordinate covariance test of the sourced evolution;
-- nonlinear projection to the curvature bispectrum.
+- nonlinear projection to the curvature bispectrum (P3e).
 
 The canonical-momentum type boundary required by the first missing item is
 implemented: canonical and velocity covariances, correlations, and kernels
@@ -591,6 +592,33 @@ suite. The start-depth and tolerance convergence tests are marked as ignored
 because they take about 90 seconds in release mode; run them with
 `cargo test --release -- --ignored`.
 
+### Field-coordinate covariance
+
+The same benchmark is written in coordinates $\chi$ with
+$\phi^1=\chi^1$ and $\phi^2=\chi^2+c(\chi^1)^2$, $c=0.05\,M_{\mathrm{Pl}}^{-1}$.
+The field space is still flat, but the metric
+$G_{IJ}=\begin{pmatrix}1+4c^2(\chi^1)^2&2c\chi^1\\2c\chi^1&1\end{pmatrix}$
+depends on position and $\Gamma^2{}_{11}=2c$. The potential is rewritten in
+$\chi$, and the initial background is mapped with the Jacobian
+$J^I{}_J=\partial\chi^I/\partial\phi^J$. Both descriptions are surveyed and
+evolved independently. Every canonical block must then satisfy
+$\alpha_\chi^{IJK}=J^I{}_LJ^J{}_MJ^K{}_N\alpha_\phi^{LMN}$, because $Q^I$ and
+$\Pi^I$ are both contravariant vectors.
+
+| Comparison | Largest block-relative difference |
+| --- | --- |
+| initial condition at $x=e^4$ | $1.7\times10^{-10}$ |
+| after half an e-fold from $x=e^4$ | $7\times10^{-10}$ (tolerance $10^{-9}$) |
+| from $x=e^3$ to the output slice, through horizon exit | $3.6\times10^{-10}$ |
+| initial condition compared without the Jacobian | 62% |
+
+The first two comparisons run in the regular suite; the third is an ignored
+release-mode test. The agreement tests the covariant potential derivatives,
+the connection terms of the linear flow, the connection term of the vertex
+rates, and the index placement of every cubic tensor at once. A coordinate
+rather than covariant rate, or an index raised with the wrong metric, would
+not survive this change of coordinates.
+
 ## Verification already present
 
 - all eight $\alpha$ blocks have compile-time slot and dimension checks;
@@ -642,30 +670,29 @@ because they take about 90 seconds in release mode; run them with
    blocks;
 6. **Completed:** combine homogeneous and sourced terms into one adaptive
    transport system;
-7. test the remaining general field-coordinate covariance limit; flat-space
-   and single-field limits are covered for all coefficients, and the $A/B$
-   Riemann plus $A$ rank-five $\nabla R$ terms already have independent
-   componentwise checks;
+7. **Completed:** test general field-coordinate covariance. The benchmark is
+   repeated in sheared coordinates of the same flat field space, where the
+   metric depends on position and the connection is nonzero; see below;
 8. **Completed:** verify permutation and reality identities, for arbitrary
    tensors on the initial condition and on an evolved equilateral sourced
    state;
 9. **Completed for the reference benchmark:** demonstrate convergence in
    integration tolerance and start depth.
 
-Only after these items pass does P3e project $\alpha^{abc}$ to the observable
+All items pass, so P3e may now project $\alpha^{abc}$ to the observable
 curvature bispectrum $B_\zeta$.
 
 ## Exact restart point
 
-P3d item 7 remains: a general field-coordinate covariance test of the complete
-sourced evolution, for example by evolving the same physical model in two
-field coordinate systems and comparing tensorially transformed correlations.
-The initial condition, cubic coefficients, operator-ordered source, and
-$V\leftrightarrow\Pi$ boundary should not be modified unless an independent
-derivation exposes a discrepancy.
+P3d is complete for the tree-level canonical transport. The next milestone is
+P3e: the nonlinear projection of $\alpha^{abc}$ to the curvature bispectrum
+$B_\zeta$ described in
+[`non-gaussianity-architecture.md`](non-gaussianity-architecture.md). The
+initial condition, cubic coefficients, operator-ordered source, sourced
+evolution, and $V\leftrightarrow\Pi$ boundary should not be modified unless
+an independent derivation exposes a discrepancy.
 
-After item 7, P3e projects $\alpha^{abc}$ to the curvature bispectrum
-$B_\zeta$. Two limitations of the present evolution are relevant there:
+Two limitations of the present evolution are relevant to P3e:
 
 - the start-depth error falls only as $x_{\mathrm{init}}^{-1}$, because the odd
   blocks keep only their first surviving order. Reaching 0.1% needs a start
