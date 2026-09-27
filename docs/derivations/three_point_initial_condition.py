@@ -15,11 +15,14 @@ SymPy). The script performs four independent checks that are summarized in
    derivatives (our P / H);
 4. checks numerically that the initial condition solves the canonical
    transport equation on massless de Sitter with the operator-ordered source,
-   with a relative residual that decreases as (k/aH)^-2.
+   with a relative residual that decreases as (k/aH)^-2, also when a
+   coefficient drifts in N (rate terms included) and when the linear flow
+   carries a small mass.
 
 Conventions: H_int = -(a^3/2)[A QQQ + B QQ Pi + C Pi Pi Q]; alpha^{abc} is the
 stripped <X^a(k1) X^b(k2) X^c(k3)>; bPi_r is B with its momentum slot on leg r,
-cQ_r is C with its field slot on leg r, a_f = a^2 A_fast, a_s = A - A_fast.
+cQ_r is C with its field slot on leg r, a_f = a^2 A_fast, a_s = A - A_fast;
+d_c is the e-fold rate dc/dN of coefficient c.
 """
 import cmath
 import itertools
@@ -28,7 +31,11 @@ from fractions import Fraction
 
 import sympy as sp
 
-COEFFS = ["a_f", "a_s", "bPi1", "bPi2", "bPi3", "cQ1", "cQ2", "cQ3"]
+STATIC = ["a_f", "a_s", "bPi1", "bPi2", "bPi3", "cQ1", "cQ2", "cQ3"]
+# "d_c" is the e-fold rate dc/dN; the coefficient on the slice is expanded as
+# c(tau') = c + (dc/dN)(N' - N) with N' - N = 1 - tau'/tau.
+RATES = ["d_" + c for c in STATIC]
+COEFFS = STATIC + RATES
 BLOCKS = ["".join(b) for b in itertools.product("QP", repeat=3)]
 TRUNC = 6
 
@@ -83,7 +90,7 @@ def internal(slot, r):
     return [(poly({mono(H=1, **{KN[r]: 2}): -1}), 2)]
 
 
-def vertex(sigma):
+def static_vertex(sigma):
     n_momenta = sigma.count("P")
     if n_momenta == 0:
         # A_fast = a_f H^2 tau'^2 = a_f / a'^2
@@ -93,6 +100,18 @@ def vertex(sigma):
     if n_momenta == 2:
         return {f"cQ{sigma.index('Q') + 1}": [({mono(): Fraction(1, 3)}, 0)]}
     return {}
+
+
+def vertex(sigma):
+    out = {}
+    for c, terms in static_vertex(sigma).items():
+        out[c] = terms
+        rate = []
+        for p, n in terms:
+            rate.append((p, n))
+            rate.append((mul(p, poly({mono(tau=-1): -1})), n + 1))
+        out["d_" + c] = rate
+    return out
 
 
 def laurent_mul(left, right):
@@ -154,13 +173,24 @@ def derive():
             by_degree = defaultdict(dict)
             for kk, v in imaginary.items():
                 by_degree[kk[1] + kk[2] + kk[3] - kk[4]][kk] = v
-            for degree in sorted(by_degree, reverse=True):
+
+            def at(degree):
                 # alpha = -6 Im[...] times prod_r H^2/(2 k_r^3)
-                expr = sp.factor(sp.together(
-                    -6 * to_sym(by_degree[degree]) * H**6 / (8 * k1**3 * k2**3 * k3**3)))
-                if expr != 0:
-                    results[block][c] = expr
-                    break
+                return sp.factor(sp.together(
+                    -6 * to_sym(by_degree.get(degree, {})) * H**6 / (8 * k1**3 * k2**3 * k3**3)))
+
+            if c in STATIC:
+                for degree in sorted(by_degree, reverse=True):
+                    expr = at(degree)
+                    if expr != 0:
+                        results[block][c] = expr
+                        results[block]["degree_" + c] = degree
+                        break
+            else:
+                # Keep the rate term at the power of k/(aH) of the retained
+                # static term of the same contribution: it is a relative
+                # correction of the order of the background-variation rate.
+                results[block][c] = at(results[block]["degree_" + c[2:]])
     return results, (k1, k2, k3, H, a)
 
 
@@ -219,6 +249,38 @@ def implemented(block, c, k, H, a):
     return norm * w
 
 
+def implemented_rate(block, c, k, H, a):
+    """Closed-form rate weights used in the Rust assembly (static name c)."""
+    kt = sum(k)
+    product = k[0] * k[1] * k[2]
+    norm = 1 / (4 * product * kt)
+    others = {0: (1, 2), 1: (0, 2), 2: (0, 1)}
+    moments = [i for i, s in enumerate(block) if s == "P"]
+    kind, leg = c[:-1], (int(c[-1]) - 1 if c[-1].isdigit() else None)
+    w = 0
+    if len(moments) == 0:
+        if kind == "bPi":
+            w = -H * k[leg] / (kt * a**2)
+    elif len(moments) == 1:
+        p = moments[0]
+        w = {"a_f": 3 / a**4, "a_s": 3 / a**2}.get(c, 0)
+        if kind == "cQ":
+            w = -(product / k[leg]) / a**4
+        w *= H * k[p] / kt
+    elif len(moments) == 2:
+        q = block.index("Q")
+        u, v = others[q]
+        if kind == "bPi":
+            w = H * k[u] * k[v] * k[leg] / (kt * a**4)
+    else:
+        w = {"a_f": 3 / a**6, "a_s": 3 / a**4}.get(c, 0)
+        if kind == "cQ":
+            u, v = others[leg]
+            w = -k[u] * k[v] / a**6
+        w *= -H * product / kt
+    return norm * w
+
+
 # ---------------------------------------------------------------------------
 # 3. Dias, Frazer, Mulryne & Seery (2016), Sec. 6 initial conditions.
 # ---------------------------------------------------------------------------
@@ -258,10 +320,30 @@ def dfms(symbols):
 # ---------------------------------------------------------------------------
 # 4. Canonical transport residual on massless de Sitter.
 # ---------------------------------------------------------------------------
-def transport_residual(results, symbols, coefficient, depth):
+def transport_residual(results, symbols, coefficient, depth, drift=0.0, rates=True,
+                       mass_squared_over_h2=0.0):
+    """Residual of the canonical transport equation on de Sitter space.
+
+    The coefficient drifts as c(N) = 1 + drift (N - N_0); ``rates`` selects
+    whether the initial condition includes the rate terms. The linear flow
+    may carry a mass m^2 = mass_squared_over_h2 H^2; the initial condition
+    and the covariances remain massless.
+    """
     k1, k2, k3, H, a = symbols
-    alpha_f = {b: sp.lambdify((k1, k2, k3, a, H), results[b][coefficient]) for b in BLOCKS}
-    dalpha_f = {b: sp.lambdify((k1, k2, k3, a, H), H * a * sp.diff(results[b][coefficient], a))
+    rate_name = "d_" + coefficient
+
+    def alpha_expr(b):
+        e = results[b][coefficient]
+        if rates:
+            e += drift * results[b][rate_name]
+        return e
+
+    alpha_f = {b: sp.lambdify((k1, k2, k3, a, H), alpha_expr(b)) for b in BLOCKS}
+    # Cosmic-time derivative d/dt = H a d/da at fixed coefficients, plus the
+    # explicit drift dc/dt = H dc/dN of the static coefficient.
+    dalpha_f = {b: sp.lambdify((k1, k2, k3, a, H),
+                               H * a * sp.diff(alpha_expr(b), a)
+                               + H * drift * results[b][coefficient])
                 for b in BLOCKS}
     scale, hubble = 1.3, 0.7
     k = [x * depth * scale * hubble for x in (1.0, 0.8, 0.5)]
@@ -297,7 +379,8 @@ def transport_residual(results, symbols, coefficient, depth):
             if b[r] == "Q":
                 term = alpha[b[:r] + "P" + b[r + 1:]]
             else:
-                term = -3 * hubble * alpha[b] - k[r]**2 / scale**2 * alpha[b[:r] + "Q" + b[r + 1:]]
+                restoring = k[r]**2 / scale**2 + mass_squared_over_h2 * hubble**2
+                term = -3 * hubble * alpha[b] - restoring * alpha[b[:r] + "Q" + b[r + 1:]]
             rhs += term
             magnitude += abs(term)
         for out, (i1, i2) in enumerate([(1, 2), (0, 2), (0, 1)]):
@@ -318,25 +401,35 @@ def main():
     k1, k2, k3, H, a = symbols
 
     for block in BLOCKS:
-        for c in COEFFS:
+        for c in STATIC:
             difference = sp.simplify(results[block][c]
                                      - implemented(block, c, [k1, k2, k3], H, a))
             assert difference == 0, (block, c, difference)
+            difference = sp.simplify(results[block]["d_" + c]
+                                     - implemented_rate(block, c, [k1, k2, k3], H, a))
+            assert difference == 0, ("rate", block, c, difference)
     print("closed-form Rust weights reproduce the in-in integral: ok")
 
+    static_only = {b: {c: results[b][c] for c in STATIC} for b in BLOCKS}
     for block, (paper, n_momenta) in dfms(symbols).items():
-        ours = sum(results[block][c] * sp.Symbol(c) for c in COEFFS) / H**n_momenta
+        ours = sum(static_only[block][c] * sp.Symbol(c) for c in STATIC) / H**n_momenta
         difference = sp.expand(sp.together(ours - paper))
-        for c in COEFFS:
+        for c in STATIC:
             term = sp.factor(sp.together(difference.coeff(sp.Symbol(c))))
             status = "agrees" if term == 0 else f"differs by {term}"
             print(f"DFMS {block} {c}: {status}")
 
-    for c in COEFFS:
+    for c in STATIC:
         shallow = transport_residual(results, symbols, c, 1.0e3)
         deep = transport_residual(results, symbols, c, 1.0e4)
-        print(f"transport residual {c}: {shallow:.2e} (k/aH~1e3), {deep:.2e} (k/aH~1e4)")
-        assert shallow < 2.0e-5 and deep < 2.0e-7
+        drift = transport_residual(results, symbols, c, 1.0e4, drift=0.05)
+        frozen = transport_residual(results, symbols, c, 1.0e4, drift=0.05, rates=False)
+        massive = [transport_residual(results, symbols, c, x, mass_squared_over_h2=0.05)
+                   for x in (1.0e3, 1.0e4)]
+        print(f"transport residual {c}: {shallow:.2e} (x~1e3), {deep:.2e} (x~1e4); "
+              f"drift with rates {drift:.2e}, frozen {frozen:.2e}; "
+              f"m^2=0.05H^2: {massive[0]:.2e}, {massive[1]:.2e}")
+        assert shallow < 2.0e-5 and deep < 2.0e-7 and drift < 2.0e-7
 
 
 if __name__ == "__main__":

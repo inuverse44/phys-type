@@ -45,8 +45,8 @@ The repository currently has two distinct scientific boundaries:
 | --- | --- | --- |
 | Two-field background and linear perturbations | complete | produces validated adiabatic, entropy, cross, and curvature power spectra |
 | Direct two-point phase-space transport | complete | reproduces the independent mode solver for all complex covariance blocks |
-| Three-point transport infrastructure | in progress | ordered cubic kernels, the canonical--velocity conversion, and the quantum initial condition now exist |
-| Primordial bispectrum prediction | not yet available | sourced evolution, its convergence, and curvature projection remain |
+| Three-point transport | in progress | sourced canonical evolution converges on the reference benchmark; a general coordinate-covariance test remains |
+| Primordial bispectrum prediction | not yet available | curvature projection (P3e) remains |
 
 Consequently, the crate can presently make power-spectrum predictions within
 its documented inflation/no-reheating scope. It must not yet describe its
@@ -54,40 +54,32 @@ three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
 
 ### Next-session handoff
 
-The implementation boundary is merge commit `1320a1c` (PR #20). The
-validated state is 192 unit tests plus 24 compile-fail cases;
-`cargo test --all-targets`, Clippy with warnings denied, rustfmt, rustdoc,
-and both GitHub CI jobs (`msrv` and `test`) pass.
+The implementation boundary is the branch `feat/sourced-three-point-transport`,
+based on merge commit `ac4bcb6`. The validated state is 197 unit tests (plus
+two expensive ignored convergence tests that pass in release mode) and 24
+compile-fail cases; `cargo test --all-targets`, Clippy with warnings denied,
+rustfmt, and rustdoc pass locally.
 
-This slice implemented the P3d quantum initial condition:
+This slice completed P3d items 6, 8, and 9 for the reference benchmark:
 
-1. `canonical_three_point_initial_condition` fills all eight canonical
-   `QQQ`--`PPP` blocks on one common slice, accepted only if the shortest leg
-   satisfies $k/(aH)\ge x_{\mathrm{init}}>1$;
-2. the blocks come from the tree-level in-in integral with massless de Sitter
-   propagators. For each block and for each fast-$A$, slow-$A$, $B$, and $C$
-   contribution, the highest surviving power of $k/(aH)$ is kept, so blocks
-   with an odd number of momentum slots are not set to zero;
-3. the closed forms are checked against a symbolic in-in derivation, against
-   the published DFMS initial conditions (one typo found), and against the
-   canonical transport equation on de Sitter space.
+1. `CanonicalThreePointTransportSystem` evolves $\alpha_\Pi$ and the three
+   canonical leg covariances together, with the model-derived vertices
+   re-evaluated on the interpolated background at every stage;
+2. `canonical_three_point_transport_initial_state` starts that system on a
+   common slice from the Bunch--Davies covariances and the analytic initial
+   condition, and `velocity_three_point_from_transport_state` converts the
+   result at output;
+3. the start-depth test exposed an $O(\delta)$ floor from freezing the
+   background coefficients, about 2% on the benchmark. The initial condition
+   now includes the first-order e-fold rates of the cubic tensors, evaluated
+   on a `BackgroundNeighborhood`; the floor is gone and the error envelope
+   falls as $x_{\mathrm{init}}^{-1}$ (0.23% from 7 e-folds before exit).
 
-The de Sitter consistency test exposed and fixed two defects in the
-previously accepted source layer:
-
-- the $u\Sigma\Sigma$ source transposed covariances on legs to the left of
-  the quadratic insertion, conjugating their commutator part;
-- the kernel map exchanged the input field indices of `q_qp`, `p_pq`, and
-  `p_pp` without exchanging their momenta. `CanonicalCubicHamiltonianCoefficients`
-  now carries separately evaluated input-exchanged $B$ and $C$ tensors.
-
-Resume P3d at item 6 of
-[`three-point-transport.md`](three-point-transport.md): combine homogeneous
-and sourced terms, with co-evolved canonical covariances, in one adaptive
-canonical-basis system. Its first acceptance tests are the de Sitter
-consistency over the first e-folds, start-depth stability, and tolerance
-convergence. The start-depth test must also measure the odd-block truncation
-estimate recorded in that document.
+Resume at P3d item 7, the general field-coordinate covariance test of the
+sourced evolution, then begin P3e. The limitations recorded in
+[`three-point-transport.md`](three-point-transport.md) are the slow
+$x_{\mathrm{init}}^{-1}$ convergence and the cost of per-stage vertex
+evaluation.
 
 ### Reading order for the active P3 work
 
@@ -98,8 +90,8 @@ estimate recorded in that document.
    phase-space normalization and records why P3c is accepted.
 3. [`three-point-transport.md`](three-point-transport.md) gives the detailed
    P3d equations, maps them to Rust types, and separates the implemented
-   physical cubic kernel, basis conversion, and quantum initial condition
-   from the remaining sourced integration.
+   physical cubic kernel, basis conversion, quantum initial condition, and
+   sourced evolution from the remaining covariance test.
 4. [`field-space-curvature-design.md`](field-space-curvature-design.md) fixes
    the Riemann convention and the higher-rank geometry consumed by that
    kernel.
@@ -201,7 +193,7 @@ turn and the complete 41-point benchmark.
   five raised tensors and feeds the eight-block e-fold kernel. A second public
   entry point constructs all three output-leg orderings required by the cyclic
   source, with input legs $(2,3)$, $(1,3)$, and $(1,2)$. The quantum initial
-  condition is implemented; sourced evolution remains.
+  condition and the sourced adaptive evolution are implemented.
   The source derivation has exposed a required semantic decision: the
   published cubic-Hamiltonian kernel evolves rescaled canonical momentum
   $\Pi^I$, while the accepted P3c type means $P^I=D_tQ^I$. They coincide only
@@ -230,7 +222,11 @@ turn and the complete 41-point benchmark.
   in-in derivation, the published DFMS result, and the de Sitter transport
   equation. That check corrected the operator order of the source
   covariances and the momentum arguments of the input-exchanged kernel
-  blocks. The next code change is the combined sourced adaptive system. See
+  blocks. The combined sourced adaptive system is implemented and converges in start
+  depth and tolerance on the reference benchmark, after adding the e-fold
+  rates of the cubic tensors to the initial condition. The next code change is
+  the general field-coordinate covariance test, then the P3e curvature
+  projection. See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
   [`three-point-transport.md`](three-point-transport.md), with the detailed
   derivation in

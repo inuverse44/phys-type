@@ -29,12 +29,13 @@ P3d is in progress. The following pieces are implemented:
 - the tree-level Bunch--Davies initial value of all eight canonical
   `QQQ`--`PPP` blocks on one common subhorizon slice.
 
+- one adaptive canonical-basis system that evolves the sourced state and the
+  three leg covariances together, with start-depth and tolerance convergence
+  on the reference benchmark.
+
 The following pieces are not implemented:
 
-- one adaptive system that evolves the sourced state through a physical
-  benchmark;
-- general-triangle convergence tests of that system in tolerance and start
-  depth;
+- a general field-coordinate covariance test of the sourced evolution;
 - nonlinear projection to the curvature bispectrum.
 
 The canonical-momentum type boundary required by the first missing item is
@@ -344,8 +345,8 @@ Q_k(\tau)=\frac{H}{\sqrt{2k^3}}(1+ik\tau)e^{-ik\tau},\qquad
 $$
 
 in a parallel-transported orthonormal frame, so the field indices are raised
-with $G^{IJ}$ on the slice. Background coefficients are frozen at the slice,
-except for the explicit $a^{-2}$ of the gradient term
+with $G^{IJ}$ on the slice. The gradient term carries an explicit $a^{-2}$,
+which is kept exactly,
 
 $$
 A^{\mathrm{fast}}_{IJK}
@@ -366,27 +367,34 @@ retained instead, including the $-H$ part of $\Pi_k$ and the $1/k_t^2$ term of
 the time integral. Setting these blocks to zero would violate the transport
 equation below at leading order.
 
-Massless propagators and frozen background coefficients neglect corrections
-proportional to $m^2/H^2$ and to background-variation rates $\delta$, such
-as $\epsilon$. A Taylor expansion of a coefficient around the slice brings
-in an extra factor $i\,\delta\,aH/k_t$ relative to the retained integral.
-In the even blocks this factor is imaginary inside the $\operatorname{Im}$
-and first contributes at order $(aH/k)^2$. In the odd blocks the retained
-term is itself one power of $aH/k$ below its natural size, so the neglected
-correction can be a fraction of order $\delta$ of the retained value. These
-statements were not derived for the mass correction separately.
+Every other background dependence of a coefficient $c$ is expanded to first
+order about the slice,
 
-A simple estimate indicates why this matters. An error in the initial state
-excites homogeneous solutions, which fall like $a^{-3}$ inside the horizon,
-whereas the sourced solution falls like $a^{-4}$. An initial relative error
-$\varepsilon$ can therefore grow to about $\varepsilon\,x_{\mathrm{init}}$
-by horizon exit. The retained truncation error, of relative order
-$x_{\mathrm{init}}^{-2}$, then leaves a final error of order
-$x_{\mathrm{init}}^{-1}$ that vanishes with increasing start depth, while an
-odd-block error of order $\delta/x_{\mathrm{init}}$ could leave a final error
-of order $\delta$ that does not. This is an estimate, not a result: the
-start-depth convergence test of the sourced evolution must measure it, as the
-DFMS numerical examples do.
+$$
+c(\tau')=c+\frac{dc}{dN}\,(N'-N),\qquad N'-N=1-\frac{\tau'}{\tau}
+\quad\text{(de Sitter)},
+$$
+
+where $dc/dN$ is the covariant e-fold derivative in the parallel-transported
+frame. The rate term changes the time integral by a factor of relative size
+$i\,\delta\,aH/k_t$, with $\delta=d\ln c/dN$ of slow-roll size. Inside the
+$\operatorname{Im}$ of the in-in formula this factor is imaginary. It therefore
+first enters at order $(aH/k)^2$ when the static term of that contribution is
+its naive leading order, but at the same order as the static term when the
+static term is itself a first surviving order. The implementation keeps
+exactly these same-order rate terms. They are listed below.
+
+Without them the odd blocks would carry a relative error of order $\delta$ that
+does not decrease with the start depth. This was observed: on the reference
+double-quadratic benchmark, the frozen-coefficient initial condition left a
+final three-point difference of about 2% between start depths of 5 and 6
+e-folds, no smaller than between 4 and 5 e-folds. The rate terms remove that
+floor; see the sourced-evolution results below.
+
+A massive propagator changes the mode functions at relative order
+$m^2/k^2$, beyond the retained order of every block. The symbolic check below
+confirms that a mass $m^2=0.05H^2$ in the transport equation leaves the
+residual of the initial condition unchanged at the retained order.
 
 ### Result
 
@@ -458,36 +466,130 @@ $$
 $$
 
 where in the last sum $u,v$ are the two legs other than $r$.
+
+Let $\dot{\mathcal X}$ denote the e-fold rate of the tensor $\mathcal X$. The
+same-order rate terms add to the brackets above
+
+$$
+\begin{aligned}
+\delta\alpha^{QQQ}&=-\mathcal{N}\frac{H}{k_ta^2}\sum_rk_r\dot{\mathcal{B}}_r,\\
+\delta\alpha^{(\Pi\text{ on }p)}&=\mathcal{N}\frac{Hk_p}{k_t}\Bigl[
+\frac{3\dot{\mathcal{A}}_f}{a^4}+\frac{3\dot{\mathcal{A}}_s}{a^2}
+-\frac{1}{a^4}\sum_r\frac{\kappa}{k_r}\dot{\mathcal{C}}_r\Bigr],\\
+\delta\alpha^{(Q\text{ on }q)}&=\mathcal{N}\frac{Hk_uk_v}{k_ta^4}
+\sum_rk_r\dot{\mathcal{B}}_r,\\
+\delta\alpha^{PPP}&=-\mathcal{N}\frac{H\kappa}{k_t}\Bigl[
+\frac{3\dot{\mathcal{A}}_f}{a^6}+\frac{3\dot{\mathcal{A}}_s}{a^4}
+-\frac{1}{a^6}\sum_rk_uk_v\dot{\mathcal{C}}_r\Bigr].
+\end{aligned}
+$$
+
+The rate terms appear exactly where the static term of a contribution is a
+first surviving order: $B$ in the even blocks, and $A$ and $C$ in the odd
+blocks. `canonical_subhorizon_vertex_rates` evaluates the rates by a central
+difference over a `BackgroundNeighborhood` and adds the connection term
+$\Gamma^I{}_{LM}(d\phi^L/dN)T^{M\cdots}$ for each contravariant index.
 `canonical_three_point_from_subhorizon_vertices` implements these formulas
 with typed intermediate dimensions; the compiler checks that every bracket has
-the dimension required by its block.
+the dimension required by its block. `canonical_three_point_initial_condition`
+takes a `BackgroundNeighborhood`, so the rates always come from the same
+trajectory as the slice.
 
 ### Independent checks
 
 The script
 [`derivations/three_point_initial_condition.py`](derivations/three_point_initial_condition.py)
-performs the in-in integral symbolically and verifies three statements:
+performs the in-in integral symbolically and verifies four statements:
 
-1. the closed forms above reproduce the in-in result for every block and
-   every contribution;
+1. the closed forms above, including the rate terms, reproduce the in-in
+   result for every block and every contribution;
 2. after converting their momenta, which are e-fold derivatives $\Pi/H$,
-   the results agree with the four $B_{\Re}^{abc}(t_{\mathrm{init}})$
-   results in Sec. 6 of Dias, Frazer, Mulryne, and Seery for all blocks and
-   contributions, except the $B$ part of their two-momentum result. Its second prefactor $k_1^2k_3^2$ breaks the exchange of the two
-   momentum legs that `PPQ` must obey; the result above obeys that symmetry;
+   the static results agree with the four
+   $B_{\Re}^{abc}(t_{\mathrm{init}})$ results in Sec. 6 of Dias, Frazer,
+   Mulryne, and Seery for all blocks and contributions, except the $B$ part of
+   their two-momentum result. Its second prefactor $k_1^2k_3^2$ breaks the
+   exchange of the two momentum legs that `PPQ` must obey; the result above
+   obeys that symmetry. DFMS freeze the background coefficients and have no
+   rate terms;
 3. with the operator-ordered source, the initial condition solves the
    canonical transport equation on massless de Sitter space. The residual,
    relative to the magnitudes of the terms in each block equation, is about
-   $3\times10^{-6}$ at $x\sim10^3$ and falls as $x^{-2}$.
+   $3\times10^{-6}$ at $x\sim10^3$ and falls as $x^{-2}$;
+4. when a coefficient drifts linearly in $N$ at 5% per e-fold, the residual
+   with rate terms still falls as $x^{-2}$ (about $3\times10^{-8}$ at
+   $x\sim10^4$), whereas the frozen-coefficient initial condition leaves a
+   residual of 0.4--1.3% at any depth. A mass $m^2=0.05H^2$ leaves the
+   residuals unchanged.
 
-The Rust test
+The Rust tests
 `subhorizon_initial_condition_solves_de_sitter_transport_to_retained_order`
-repeats the third check with the library's own kernel map, source
-contraction, and finite differences in $N$. It exposed two defects in the
+and `subhorizon_rate_terms_solve_de_sitter_transport_with_drifting_coefficients`
+repeat the third and fourth checks with the library's own kernel map, source
+contraction, and finite differences in $N$. The first of them It exposed two defects in the
 already accepted source layer: the covariance ordering described above, and
 input exchanges in the cubic kernel map that moved field indices without their
 momenta. Both are fixed; the second is described in
 [`cubic-kernel-conventions.md`](cubic-kernel-conventions.md).
+
+The rates themselves are checked against the analytic $N$ derivative of the
+flat single-field $A_{\mathrm{fast}}$ and $C$, and, on the hyperbolic
+geometry, through a coordinate scalar
+$T^{IJK}\dot\phi_I\dot\phi_J\dot\phi_K$ whose $N$ derivative requires the
+connection term.
+
+## Sourced evolution
+
+`CanonicalThreePointTransportSystem` evolves one
+`CanonicalThreePointTransportState` in elapsed e-folds on an immutable
+two-field background. The state holds $\alpha_\Pi^{abc}$ together with the
+canonical covariance of each of the three legs, because the source needs all
+three covariances at the same time as $\alpha$. Its derivative is
+
+$$
+D_N\alpha^{abc}=u^a{}_d(k_1)\alpha^{dbc}+u^b{}_d(k_2)\alpha^{adc}
++u^c{}_d(k_3)\alpha^{abd}+S^{abc},
+$$
+
+with the operator-ordered source $S^{abc}$ above. At every Runge--Kutta
+stage the model-derived output-leg vertices are evaluated on the
+interpolated background and converted to e-fold kernels. The covariances
+evolve with the linear flow of P3c; at linear order it is the same for
+$\Pi$ and $V$, so the typed flow is shared between the two markers. Every
+correlation keeps `CanonicalMomentumPerturbation`.
+
+The error norm uses the largest complex modulus in each two-point block and in
+each three-point block as that block's relative scale, with dimensioned
+absolute floors in `CanonicalThreePointTransportTolerance`.
+
+`canonical_three_point_transport_initial_state` builds the initial state on
+the common slice. Each covariance is the Bunch--Davies mode state of the
+linear solver, relabelled to the canonical basis at linear order, and $\alpha$
+is the initial condition above. `velocity_three_point_from_transport_state`
+converts an evolved state to the velocity basis at tree level; the vertices
+must be evaluated on the slice of that state.
+
+### Results on the reference benchmark
+
+The benchmark is the P3c double-quadratic model with masses
+$(1.0,1.5)\times10^{-6}M_{\mathrm{Pl}}$ and the triangle
+$(1.0,0.9,0.7)\,k_{\mathrm{pivot}}$. Start depths refer to the shortest leg,
+and the output slice is the P3c output epoch.
+
+| Check | Result |
+| --- | --- |
+| evolve half an e-fold from $x=e^4$, compare with the initial condition at $x=e^{3.5}$ | even blocks within $2.3\times10^{-3}$; one-momentum blocks within $9\times10^{-3}$; `PPP` within 11% |
+| final state, start depths 3--7 against a start depth of 8 | largest block-relative difference 13%, 1.7%, 1.5%, 0.69%, 0.23% at depths 3, 4, 5, 6, 7 |
+| relative tolerance $10^{-7}$ against $10^{-9}$ from depth 4 | $9\times10^{-7}$ |
+| leg covariances, start depth 5 against 6 | $2.7\times10^{-5}$ |
+
+The start-depth error oscillates with the start phase, but its envelope over
+one e-fold falls roughly as $e^{-\Delta N}$, that is, as $x_{\mathrm{init}}^{-1}$.
+This matches the retained truncation of the odd blocks: relative
+$O(x^{-1})$ of their own size, which the excited homogeneous solutions carry
+to horizon exit. The first half-e-fold comparison runs in the regular test
+suite. The start-depth and tolerance convergence tests are marked as ignored
+because they take about 90 seconds in release mode; run them with
+`cargo test --release -- --ignored`.
 
 ## Verification already present
 
@@ -538,36 +640,37 @@ momenta. Both are fixed; the second is described in
    conversion boundary;
 5. **Completed:** implement the quantum initial condition for all eight
    blocks;
-6. combine homogeneous and sourced terms into one adaptive transport system;
+6. **Completed:** combine homogeneous and sourced terms into one adaptive
+   transport system;
 7. test the remaining general field-coordinate covariance limit; flat-space
    and single-field limits are covered for all coefficients, and the $A/B$
    Riemann plus $A$ rank-five $\nabla R$ terms already have independent
    componentwise checks;
-8. **Completed for the initial condition:** verify general-triangle
-   permutation and reality identities; they must be rechecked on evolved
-   sourced states;
-9. demonstrate convergence in integration tolerance and start depth.
+8. **Completed:** verify permutation and reality identities, for arbitrary
+   tensors on the initial condition and on an evolved equilateral sourced
+   state;
+9. **Completed for the reference benchmark:** demonstrate convergence in
+   integration tolerance and start depth.
 
 Only after these items pass does P3e project $\alpha^{abc}$ to the observable
 curvature bispectrum $B_\zeta$.
 
 ## Exact restart point
 
-The next implementation session begins at item 6. The initial condition,
-cubic coefficients, operator-ordered source, and $V\leftrightarrow\Pi$
-boundary should not be modified unless an independent derivation exposes a
-discrepancy.
+P3d item 7 remains: a general field-coordinate covariance test of the complete
+sourced evolution, for example by evolving the same physical model in two
+field coordinate systems and comparing tensorially transformed correlations.
+The initial condition, cubic coefficients, operator-ordered source, and
+$V\leftrightarrow\Pi$ boundary should not be modified unless an independent
+derivation exposes a discrepancy.
 
-The next slice should combine the homogeneous flow and the three ordered
-$u\Sigma\Sigma$ terms into one adaptive canonical-basis system. The linear
-covariances in the source must be evolved alongside $\alpha$ on the same
-background, starting from the Bunch--Davies mode state on the common slice
-used by `canonical_three_point_initial_condition`. The homogeneous system is
-currently specialized to the velocity marker and $N=2$; the sourced system
-must use `CanonicalMomentumPerturbation` throughout and convert to velocity
-correlations only at output.
+After item 7, P3e projects $\alpha^{abc}$ to the curvature bispectrum
+$B_\zeta$. Two limitations of the present evolution are relevant there:
 
-The first acceptance tests should be: agreement with the de Sitter consistency
-of the initial condition over the first e-folds of evolution, stability of the
-final state when the start depth increases, and convergence under tighter
-tolerances. Only then should a physical benchmark be attempted.
+- the start-depth error falls only as $x_{\mathrm{init}}^{-1}$, because the odd
+  blocks keep only their first surviving order. Reaching 0.1% needs a start
+  about 7--8 e-folds before exit; the next order of the odd blocks would
+  improve this;
+- every derivative re-evaluates the three model-derived vertices, so the
+  sourced evolution is expensive. A start 8 e-folds before exit takes about a
+  minute in release mode for one triangle.
