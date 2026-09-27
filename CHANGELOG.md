@@ -8,6 +8,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A field-redefinition covariance test of the three-point initial condition
+  and sourced evolution, repeating the benchmark in sheared flat coordinates
+  with a position-dependent metric and constant connection.
 - `CanonicalThreePointTransportSystem`, the adaptive sourced three-point
   evolution in the canonical basis, which co-evolves the three leg
   covariances and re-evaluates the model-derived vertices at every stage.

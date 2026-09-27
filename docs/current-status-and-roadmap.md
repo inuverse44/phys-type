@@ -45,7 +45,7 @@ The repository currently has two distinct scientific boundaries:
 | --- | --- | --- |
 | Two-field background and linear perturbations | complete | produces validated adiabatic, entropy, cross, and curvature power spectra |
 | Direct two-point phase-space transport | complete | reproduces the independent mode solver for all complex covariance blocks |
-| Three-point transport | in progress | sourced canonical evolution converges on the reference benchmark; a general coordinate-covariance test remains |
+| Three-point transport (P3d) | complete | sourced canonical evolution converges on the reference benchmark and transforms as a tensor under field redefinitions |
 | Primordial bispectrum prediction | not yet available | curvature projection (P3e) remains |
 
 Consequently, the crate can presently make power-spectrum predictions within
@@ -54,32 +54,29 @@ three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
 
 ### Next-session handoff
 
-The implementation boundary is the branch `feat/sourced-three-point-transport`,
-based on merge commit `ac4bcb6`. The validated state is 197 unit tests (plus
-two expensive ignored convergence tests that pass in release mode) and 24
-compile-fail cases; `cargo test --all-targets`, Clippy with warnings denied,
-rustfmt, and rustdoc pass locally.
+The implementation boundary is the branch `feat/three-point-coordinate-covariance`,
+based on merge commit `019ad42` (PR #22). The validated state is 199 unit
+tests plus 24 compile-fail cases, with three expensive ignored tests that pass
+in release mode (`cargo test --release -- --ignored`, about 95 seconds).
+Clippy with warnings denied, rustfmt, and rustdoc pass locally.
 
-This slice completed P3d items 6, 8, and 9 for the reference benchmark:
+P3d is complete:
 
 1. `CanonicalThreePointTransportSystem` evolves $\alpha_\Pi$ and the three
-   canonical leg covariances together, with the model-derived vertices
-   re-evaluated on the interpolated background at every stage;
-2. `canonical_three_point_transport_initial_state` starts that system on a
-   common slice from the Bunch--Davies covariances and the analytic initial
-   condition, and `velocity_three_point_from_transport_state` converts the
-   result at output;
-3. the start-depth test exposed an $O(\delta)$ floor from freezing the
-   background coefficients, about 2% on the benchmark. The initial condition
-   now includes the first-order e-fold rates of the cubic tensors, evaluated
-   on a `BackgroundNeighborhood`; the floor is gone and the error envelope
-   falls as $x_{\mathrm{init}}^{-1}$ (0.23% from 7 e-folds before exit).
+   canonical leg covariances together, from the subhorizon initial condition
+   with first-order vertex rates;
+2. on the double-quadratic benchmark it converges in start depth as
+   $x_{\mathrm{init}}^{-1}$ (0.23% from 7 e-folds before exit) and in tolerance;
+3. repeating the benchmark in sheared coordinates of the same flat field
+   space, with a position-dependent metric and nonzero connection, reproduces
+   the tensor-transformed initial condition and evolved state to
+   $\lesssim7\times10^{-10}$, while the untransformed comparison differs by 62%.
 
-Resume at P3d item 7, the general field-coordinate covariance test of the
-sourced evolution, then begin P3e. The limitations recorded in
-[`three-point-transport.md`](three-point-transport.md) are the slow
-$x_{\mathrm{init}}^{-1}$ convergence and the cost of per-stage vertex
-evaluation.
+Resume with P3e, the nonlinear projection to $B_\zeta$ in
+[`non-gaussianity-architecture.md`](non-gaussianity-architecture.md). The
+limitations recorded in [`three-point-transport.md`](three-point-transport.md)
+are the slow $x_{\mathrm{init}}^{-1}$ start-depth convergence and the cost of
+re-evaluating the vertices at every stage.
 
 ### Reading order for the active P3 work
 
@@ -91,7 +88,7 @@ evaluation.
 3. [`three-point-transport.md`](three-point-transport.md) gives the detailed
    P3d equations, maps them to Rust types, and separates the implemented
    physical cubic kernel, basis conversion, quantum initial condition, and
-   sourced evolution from the remaining covariance test.
+   sourced evolution, and records their convergence and covariance tests.
 4. [`field-space-curvature-design.md`](field-space-curvature-design.md) fixes
    the Riemann convention and the higher-rank geometry consumed by that
    kernel.
@@ -178,7 +175,7 @@ turn and the complete 41-point benchmark.
   and all-block mode-solver oracle are implemented. Direct covariance evolution
   agrees with the mode solver at subhorizon, horizon-exit, maximum-turn, and
   final epochs, and passes adaptive-tolerance and initialization-depth
-  convergence tests. **P3d is in progress:** its first slice adds the complete
+  convergence tests. **P3d is completed:** its first slice adds the complete
   dimensioned `QQQ`--`PPP` correlation state, permutation-safe Fourier-leg
   operations, and integration arithmetic. Homogeneous $u^a{}_b$ evolution now
   propagates all three canonical triangle legs on the shared P2 background and
@@ -224,9 +221,10 @@ turn and the complete 41-point benchmark.
   covariances and the momentum arguments of the input-exchanged kernel
   blocks. The combined sourced adaptive system is implemented and converges in start
   depth and tolerance on the reference benchmark, after adding the e-fold
-  rates of the cubic tensors to the initial condition. The next code change is
-  the general field-coordinate covariance test, then the P3e curvature
-  projection. See
+  rates of the cubic tensors to the initial condition. A field-redefinition test
+  in sheared flat coordinates confirms that the initial condition and the
+  evolved state transform as tensors. The next code change is the P3e
+  curvature projection. See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
   [`three-point-transport.md`](three-point-transport.md), with the detailed
   derivation in

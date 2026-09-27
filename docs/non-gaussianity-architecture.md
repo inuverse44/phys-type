@@ -327,7 +327,7 @@ two. P3d is the next milestone.
 
 ### P3d implementation status
 
-P3d is in progress. The first slice implements the complete dimensioned
+P3d is complete. The first slice implemented the complete dimensioned
 `ThreePointPhaseSpaceCorrelation` state with separate `QQQ` through `PPP`
 blocks, complex conjugation, Runge--Kutta arithmetic, and Fourier-leg
 transpositions that move their phase-space slots and component axes together.
@@ -354,6 +354,16 @@ is now implemented using the distinct `CanonicalMomentumPerturbation` marker
 and canonical aliases for the covariance, three-point correlation, and
 quadratic kernel. The typed source contraction rejects canonical/velocity
 mixing at compile time.
+
+The final P3d slices added the subhorizon quantum initial condition for all
+eight canonical blocks, including first-order e-fold rates of the cubic
+tensors, and `CanonicalThreePointTransportSystem`, which evolves the sourced
+three-point function together with the three leg covariances. On the
+reference benchmark it converges in start depth as $x_{\mathrm{init}}^{-1}$ and
+in tolerance, and it transforms as a tensor under a nonlinear field
+redefinition to $4\times10^{-10}$. The details and remaining limitations are
+recorded in [`three-point-transport.md`](three-point-transport.md). P3e is the
+next milestone.
 
 ## Acceptance boundary
 
