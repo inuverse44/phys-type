@@ -54,11 +54,10 @@ three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
 
 ### Next-session handoff
 
-The implementation boundary is the branch
-`feat/three-point-initial-condition`, based on merge commit `589cc84`.
-The validated state is 192 unit tests plus 24 compile-fail cases;
-`cargo test --all-targets`, Clippy with warnings denied, rustfmt, and rustdoc
-pass locally.
+The implementation boundary is merge commit `1320a1c` (PR #20). The
+validated state is 192 unit tests plus 24 compile-fail cases;
+`cargo test --all-targets`, Clippy with warnings denied, rustfmt, rustdoc,
+and both GitHub CI jobs (`msrv` and `test`) pass.
 
 This slice implemented the P3d quantum initial condition:
 
