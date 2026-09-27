@@ -22,16 +22,19 @@ P3d is in progress. The following pieces are implemented:
 - one model-to-kernel entry point that evaluates $A/B/C$ and feeds the eight
   canonical e-fold-time blocks;
 - an output-leg-aware vertex set with input orders $(2,3)$, $(1,3)$, and
-  $(1,2)$, plus contraction of the three ordered $u\Sigma\Sigma$ source terms;
+  $(1,2)$, plus contraction of the three operator-ordered $u\Sigma\Sigma$
+  source terms;
 - explicit linear two-point and tree-level nonlinear three-point conversion
-  between the canonical $(Q,\Pi)$ and velocity $(Q,V)$ bases.
+  between the canonical $(Q,\Pi)$ and velocity $(Q,V)$ bases;
+- the tree-level Bunch--Davies initial value of all eight canonical
+  `QQQ`--`PPP` blocks on one common subhorizon slice.
 
 The following pieces are not implemented:
 
-- the in-in/Bunch--Davies initial value for the three-point function;
 - one adaptive system that evolves the sourced state through a physical
   benchmark;
-- general-triangle permutation, reality, and convergence tests;
+- general-triangle convergence tests of that system in tolerance and start
+  depth;
 - nonlinear projection to the curvature bispectrum.
 
 The canonical-momentum type boundary required by the first missing item is
@@ -202,11 +205,23 @@ S^{abc}={}&
 u^a{}_{de}(\mathbf{k}_1;\mathbf{k}_2,\mathbf{k}_3)
   \Sigma^{db}(k_2)\Sigma^{ec}(k_3)\\
 &+u^b{}_{de}(\mathbf{k}_2;\mathbf{k}_1,\mathbf{k}_3)
-  \Sigma^{da}(k_1)\Sigma^{ec}(k_3)\\
+  \Sigma^{ad}(k_1)\Sigma^{ec}(k_3)\\
 &+u^c{}_{de}(\mathbf{k}_3;\mathbf{k}_1,\mathbf{k}_2)
-  \Sigma^{da}(k_1)\Sigma^{eb}(k_2).
+  \Sigma^{ad}(k_1)\Sigma^{be}(k_2).
 \end{aligned}
 $$
+
+The covariance order follows the operator order in
+$\langle X^aX^bX^c\rangle$. When the quadratic insertion replaces
+$X^b$, the external $X^a$ stands to its left, so the Wick contraction is
+$\langle X^aX^d\rangle=\Sigma^{ad}$; an external operator to the right
+contracts as $\Sigma^{db}$. Because
+$\Sigma^{ad}=(\Sigma^{da})^*$ and the imaginary part is the equal-time
+commutator, transposing a covariance on a left leg changes the source. This
+matches the three-point transport equation in Sec. 5 of Dias, Frazer,
+Mulryne, and Seery, [arXiv:1609.00379](https://arxiv.org/abs/1609.00379). An earlier revision of
+this repository used $\Sigma^{da}$ on left legs; the de Sitter consistency
+test below failed with an order-one residual until the ordering was corrected.
 
 The sourced transport equation will be
 
@@ -278,21 +293,201 @@ integration, and an independent numerical benchmark.
 
 ## Initial conditions
 
-All three legs begin at one common time when the triangle is sufficiently deep
-inside the horizon. If
+### Normalization and slice
+
+The initial condition populates the stripped, canonical-basis correlation
 
 $$
-x_r\equiv\frac{k_r}{aH},
+\left\langle X_\Pi^a(\mathbf{k}_1)X_\Pi^b(\mathbf{k}_2)X_\Pi^c(\mathbf{k}_3)
+\right\rangle
+=(2\pi)^3\delta^3(\mathbf{k}_1+\mathbf{k}_2+\mathbf{k}_3)\,
+\alpha_\Pi^{abc}(k_1,k_2,k_3),
 $$
 
-the start criterion must control all three $x_r$, with the smallest $k_r$
-usually setting the most restrictive leg. The initial $\Sigma^{ab}$ values
-come from the validated Bunch--Davies mode state.
+with $X_\Pi=(Q^I,\Pi^I)$, comoving wavenumbers, and the block dimensions
+listed above. All three legs start on one common slice. With
+$x_r\equiv k_r/(aH)$, the slice is accepted only if
 
-The initial $\alpha^{abc}$ is not generally zero. It must be obtained from the
-early-time in-in integral or an analytically equivalent quantum-transport
-initial condition. Setting $\alpha=0$ at horizon exit would discard intrinsic
-horizon-crossing interactions and distort nonlocal triangle shapes.
+$$
+\min_r x_r\ge x_{\mathrm{init}}>1,
+$$
+
+so the shortest leg decides whether the whole triangle may start.
+`canonical_three_point_initial_condition` rejects a slice that fails this
+condition and returns the blocks in the triangle's canonical leg order.
+
+The initial value is obtained from the tree-level in-in formula,
+
+$$
+\alpha_\Pi^{abc}(\tau)
+=i\int_{-\infty(1\mp i\epsilon)}^{\tau}dt'\,
+\left\langle\left[H_{\mathrm{int}}(t'),
+X_\Pi^a X_\Pi^b X_\Pi^c(\tau)\right]\right\rangle',
+\qquad
+H_{\mathrm{int}}=-\frac{a^3}{2}\left(A\,QQQ+B\,QQ\Pi+C\,\Pi\Pi Q\right),
+$$
+
+where the prime removes $(2\pi)^3\delta^3$. In the interaction picture
+$\Pi^I=D_tQ^I$, while the Heisenberg operator on the left is the canonical
+momentum. The result is therefore a canonical-basis correlation; it must not
+be relabelled as a velocity correlation.
+
+### Approximation
+
+Deep inside the horizon the $k^2/a^2$ term dominates the mass matrix, so the
+propagator is that of massless fields in de Sitter space,
+
+$$
+Q_k(\tau)=\frac{H}{\sqrt{2k^3}}(1+ik\tau)e^{-ik\tau},\qquad
+\Pi_k(\tau)=-\frac{H^2k^2\tau^2}{\sqrt{2k^3}}e^{-ik\tau},\qquad
+\tau=-\frac{1}{aH},
+$$
+
+in a parallel-transported orthonormal frame, so the field indices are raised
+with $G^{IJ}$ on the slice. Background coefficients are frozen at the slice,
+except for the explicit $a^{-2}$ of the gradient term
+
+$$
+A^{\mathrm{fast}}_{IJK}
+=\operatorname{Sym}\left[\frac{\dot\phi_IG_{JK}\,
+\mathbf{k}_J\!\cdot\!\mathbf{k}_K}{2HM_{\mathrm{Pl}}^2a^2}\right].
+$$
+
+The remaining terms of $A$ are called slow,
+$A^{\mathrm{slow}}=A-A^{\mathrm{fast}}$.
+
+For every block, and separately for each of the fast-$A$, slow-$A$, $B$, and
+$C$ contributions, the implementation keeps the highest power of $x_r$ that
+survives. For blocks with an even number of momentum slots, this is the naive
+leading order. For blocks with one or three momentum slots, the naive leading
+term is purely imaginary inside the $\operatorname{Im}$ of the in-in formula
+and cancels. Their first surviving order, one power of $aH/k$ lower, is
+retained instead, including the $-H$ part of $\Pi_k$ and the $1/k_t^2$ term of
+the time integral. Setting these blocks to zero would violate the transport
+equation below at leading order.
+
+Massless propagators and frozen background coefficients neglect corrections
+proportional to $m^2/H^2$ and to background-variation rates $\delta$, such
+as $\epsilon$. A Taylor expansion of a coefficient around the slice brings
+in an extra factor $i\,\delta\,aH/k_t$ relative to the retained integral.
+In the even blocks this factor is imaginary inside the $\operatorname{Im}$
+and first contributes at order $(aH/k)^2$. In the odd blocks the retained
+term is itself one power of $aH/k$ below its natural size, so the neglected
+correction can be a fraction of order $\delta$ of the retained value. These
+statements were not derived for the mass correction separately.
+
+A simple estimate indicates why this matters. An error in the initial state
+excites homogeneous solutions, which fall like $a^{-3}$ inside the horizon,
+whereas the sourced solution falls like $a^{-4}$. An initial relative error
+$\varepsilon$ can therefore grow to about $\varepsilon\,x_{\mathrm{init}}$
+by horizon exit. The retained truncation error, of relative order
+$x_{\mathrm{init}}^{-2}$, then leaves a final error of order
+$x_{\mathrm{init}}^{-1}$ that vanishes with increasing start depth, while an
+odd-block error of order $\delta/x_{\mathrm{init}}$ could leave a final error
+of order $\delta$ that does not. This is an estimate, not a result: the
+start-depth convergence test of the sourced evolution must measure it, as the
+DFMS numerical examples do.
+
+### Result
+
+Define $k_t=k_1+k_2+k_3$, $K^2=k_1k_2+k_1k_3+k_2k_3$,
+$\kappa=k_1k_2k_3$, and $\mathcal{N}=1/(4\kappa k_t)$. The fully raised
+tensors entering the result are
+
+| Symbol | Meaning | Dimension |
+| --- | --- | --- |
+| $\mathcal{A}_f^{IJK}$ | $a^2A_{\mathrm{fast}}^{IJK}$ | $M^1$ |
+| $\mathcal{A}_s^{IJK}$ | $A_{\mathrm{slow}}^{IJK}$ | $M^1$ |
+| $\mathcal{B}_r^{IJK}$ | $B$ with its $\Pi$ slot on leg $r$ | $M^0$ |
+| $\mathcal{C}_r^{IJK}$ | $C$ with its $Q$ slot on leg $r$ | $M^{-1}$ |
+
+For example, $\mathcal{B}_3^{IJK}=B^{IJK}(k_1,k_2,k_3)$ and
+$\mathcal{B}_1^{IJK}=B^{JKI}(k_2,k_3,k_1)$. They are three evaluations with
+different Fourier-leg assignments, not index permutations of one array.
+`canonical_subhorizon_initial_vertices` constructs them from the output-leg
+vertices and stores every tensor as `[I][J][K]` with $I,J,K$ on legs
+$1,2,3$. All components below carry these indices and the result is real.
+
+For `QQQ`,
+
+$$
+\alpha^{QQQ}=\mathcal{N}\left[
+\frac{3\mathcal{A}_f}{a^4}+\frac{3\mathcal{A}_s}{a^2}
+-\frac{H}{a^2}\sum_r\mathcal{B}_r
+-\frac{1}{a^4}\sum_r\frac{\kappa}{k_r}\mathcal{C}_r\right].
+$$
+
+With one momentum slot on leg $p$, and the field legs $u,v$,
+
+$$
+\begin{aligned}
+\alpha^{(\Pi\text{ on }p)}=\mathcal{N}\Bigl[&
+-\frac{3H(k_t+k_p)}{k_ta^4}\mathcal{A}_f
+-\frac{3H(k_t-k_p)}{k_ta^2}\mathcal{A}_s
++\frac{k_p}{a^4}\sum_sk_s\mathcal{B}_s\\
+&-\frac{H}{k_ta^4}\Bigl(
+\bigl[k_p^2(k_u+k_v)+k_p(k_u^2+k_v^2)-k_uk_v(k_u+k_v)\bigr]\mathcal{C}_p\\
+&\qquad\qquad+k_p^2(k_p+k_u)\mathcal{C}_u+k_p^2(k_p+k_v)\mathcal{C}_v
+\Bigr)\Bigr].
+\end{aligned}
+$$
+
+With two momentum slots on legs $u,v$ and the field leg $q$,
+
+$$
+\begin{aligned}
+\alpha^{(Q\text{ on }q)}=\mathcal{N}\Bigl[&
+-\frac{3k_uk_v}{a^6}\mathcal{A}_f-\frac{3k_uk_v}{a^4}\mathcal{A}_s
+-\frac{H}{a^4}\Bigl(k_u^2\mathcal{B}_u+k_v^2\mathcal{B}_v
++\bigl[k_q(k_u+k_v)-k_uk_v\bigr]\mathcal{B}_q\Bigr)\\
+&+\frac{1}{a^6}\Bigl(\kappa k_v\mathcal{C}_u+\kappa k_u\mathcal{C}_v
++k_u^2k_v^2\mathcal{C}_q\Bigr)\Bigr].
+\end{aligned}
+$$
+
+For `PPP`,
+
+$$
+\begin{aligned}
+\alpha^{PPP}=\mathcal{N}\Bigl[&
+\frac{3H}{a^6}\Bigl(K^2+\frac{\kappa}{k_t}\Bigr)\mathcal{A}_f
++\frac{3H}{a^4}\Bigl(K^2-\frac{\kappa}{k_t}\Bigr)\mathcal{A}_s
+-\frac{\kappa}{a^6}\sum_rk_r\mathcal{B}_r\\
+&-\frac{H}{k_ta^6}\sum_r k_u^2k_v^2(k_t+k_r)\mathcal{C}_r\Bigr],
+\end{aligned}
+$$
+
+where in the last sum $u,v$ are the two legs other than $r$.
+`canonical_three_point_from_subhorizon_vertices` implements these formulas
+with typed intermediate dimensions; the compiler checks that every bracket has
+the dimension required by its block.
+
+### Independent checks
+
+The script
+[`derivations/three_point_initial_condition.py`](derivations/three_point_initial_condition.py)
+performs the in-in integral symbolically and verifies three statements:
+
+1. the closed forms above reproduce the in-in result for every block and
+   every contribution;
+2. after converting their momenta, which are e-fold derivatives $\Pi/H$,
+   the results agree with the four $B_{\Re}^{abc}(t_{\mathrm{init}})$
+   results in Sec. 6 of Dias, Frazer, Mulryne, and Seery for all blocks and
+   contributions, except the $B$ part of their two-momentum result. Its second prefactor $k_1^2k_3^2$ breaks the exchange of the two
+   momentum legs that `PPQ` must obey; the result above obeys that symmetry;
+3. with the operator-ordered source, the initial condition solves the
+   canonical transport equation on massless de Sitter space. The residual,
+   relative to the magnitudes of the terms in each block equation, is about
+   $3\times10^{-6}$ at $x\sim10^3$ and falls as $x^{-2}$.
+
+The Rust test
+`subhorizon_initial_condition_solves_de_sitter_transport_to_retained_order`
+repeats the third check with the library's own kernel map, source
+contraction, and finite differences in $N$. It exposed two defects in the
+already accepted source layer: the covariance ordering described above, and
+input exchanges in the cubic kernel map that moved field indices without their
+momenta. Both are fixed; the second is described in
+[`cubic-kernel-conventions.md`](cubic-kernel-conventions.md).
 
 ## Verification already present
 
@@ -316,7 +511,19 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
 - the two-point linear basis conversion round-trips all four blocks, and a
   non-equilateral model verifies that output-leg vertices are distinct;
 - compile-fail tests reject both a mismatched $\alpha$ block and an incorrectly
-  dimensioned $u^P{}_{QQ}$ block.
+  dimensioned $u^P{}_{QQ}$ block;
+- the subhorizon initial condition reproduces exact rational in-in values for
+  all eight blocks, is real, is covariant under both leg transpositions for
+  arbitrary tensors, is invariant under leg exchange for an equilateral
+  curved-space model, and solves the de Sitter transport equation to the
+  retained order;
+- the leg-resolved $B$ and $C$ tensors agree with direct evaluations in each
+  Fourier-leg order on a curved two-field geometry, and doubling all
+  wavenumbers at fixed shape leaves slow-$A$ unchanged while multiplying
+  fast-$A$ by four;
+- the kernel map reads separately evaluated input-exchanged $B$ and $C$
+  tensors, and a source regression distinguishes $\Sigma^{ad}$ from
+  $\Sigma^{da}$ on a left leg.
 
 ## Remaining P3d acceptance work
 
@@ -329,13 +536,16 @@ horizon-crossing interactions and distort nonlocal triangle shapes.
 4. **Completed:** evaluate the three output-leg orderings and implement the
    typed linear/two-point and nonlinear/tree-level $V\leftrightarrow\Pi$
    conversion boundary;
-5. implement the quantum initial condition for all eight blocks;
+5. **Completed:** implement the quantum initial condition for all eight
+   blocks;
 6. combine homogeneous and sourced terms into one adaptive transport system;
 7. test the remaining general field-coordinate covariance limit; flat-space
    and single-field limits are covered for all coefficients, and the $A/B$
    Riemann plus $A$ rank-five $\nabla R$ terms already have independent
    componentwise checks;
-8. verify general-triangle permutation and reality identities;
+8. **Completed for the initial condition:** verify general-triangle
+   permutation and reality identities; they must be rechecked on evolved
+   sourced states;
 9. demonstrate convergence in integration tolerance and start depth.
 
 Only after these items pass does P3e project $\alpha^{abc}$ to the observable
@@ -343,19 +553,21 @@ curvature bispectrum $B_\zeta$.
 
 ## Exact restart point
 
-The next implementation session begins at item 5. It should not modify the
-now-established cubic coefficients or the $V\leftrightarrow\Pi$ boundary
-unless an independent derivation exposes a discrepancy.
+The next implementation session begins at item 6. The initial condition,
+cubic coefficients, operator-ordered source, and $V\leftrightarrow\Pi$
+boundary should not be modified unless an independent derivation exposes a
+discrepancy.
 
-The quantum initial-condition slice must first state its Fourier normalization
-and initial-time prescription. All three legs start on one common slice deep
-inside the horizon, so the shortest leg controls whether the whole triangle is
-eligible to initialize. The result must populate the complete canonical
-`QQQ`--`PPP` state; initializing only `QQQ`, or imposing $\alpha=0$ at horizon
-exit, is outside the accepted transport prescription.
+The next slice should combine the homogeneous flow and the three ordered
+$u\Sigma\Sigma$ terms into one adaptive canonical-basis system. The linear
+covariances in the source must be evolved alongside $\alpha$ on the same
+background, starting from the Bunch--Davies mode state on the common slice
+used by `canonical_three_point_initial_condition`. The homogeneous system is
+currently specialized to the velocity marker and $N=2$; the sourced system
+must use `CanonicalMomentumPerturbation` throughout and convert to velocity
+correlations only at output.
 
-The first tests should be algebraic rather than end-to-end: compile-time block
-dimensions, leg-permutation and reality identities, and one independently
-derived scalar or equilateral value. Once these pass, the initial condition can
-be joined to the existing homogeneous flow and ordered $u\Sigma\Sigma$ source
-inside an adaptive system.
+The first acceptance tests should be: agreement with the de Sitter consistency
+of the initial condition over the first e-folds of evolution, stability of the
+final state when the start depth increases, and convergence under tighter
+tolerances. Only then should a physical benchmark be attempted.

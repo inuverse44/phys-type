@@ -214,10 +214,12 @@ field-index/Fourier-leg symmetrization, field-space curvature regressions, and
 rank-five $\nabla R$ index checks. The cubic builder produces the three ordered
 output-leg vertices required by the cyclic source. The nonlinear
 $V^I\leftrightarrow\Pi^I$ field redefinition is included at tree level through
-its local products of two-point covariances. The quantum three-point initial
-condition, sourced evolution, and observable $B_\zeta$ projection are
-unfinished; the repository therefore does not yet claim a bispectrum
-prediction.
+its local products of two-point covariances. The tree-level quantum initial
+condition fills all eight canonical three-point blocks on a common subhorizon
+slice and is checked against an independent in-in derivation and the de Sitter
+transport equation. Sourced evolution and the observable $B_\zeta$
+projection are unfinished; the repository therefore does not yet claim a
+bispectrum prediction.
 
 `CovariantMultifieldSystem<P, G, N>` accepts a `FieldSpaceGeometry<N>` that
 supplies $G_{IJ}$, $G^{IJ}$, and $\Gamma^I{}_{JK}$. `FlatFieldSpace` exactly reproduces

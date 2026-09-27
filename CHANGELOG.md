@@ -8,6 +8,11 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The P3d tree-level quantum initial condition for all eight canonical
+  `QQQ`--`PPP` blocks on one common subhorizon slice, with separate fast-`A`,
+  slow-`A`, leg-resolved `B`, and leg-resolved `C` contributions, a
+  shortest-leg depth check, and a reproducible SymPy derivation in
+  `docs/derivations/`.
 - The first P3d three-point transport slice: a complete dimensioned
   `QQQ`--`PPP` phase-space correlation state, permutation-safe leg exchanges,
   complex conjugation, integration arithmetic, and compile-time rejection of
@@ -47,6 +52,17 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Dimensioned adaptive tolerances for each two-point phase-space block, with
   tighter-tolerance and deeper-vacuum-start convergence tests completing the
   P3c two-point transport milestone.
+
+### Fixed
+
+- The three-point `u Sigma Sigma` source now keeps the operator order of
+  `<X^a X^b X^c>`: covariances on legs to the left of the quadratic insertion
+  contract as `Sigma^{ad}` rather than `Sigma^{da}`. The same correction
+  applies to the tree-level canonical-to-velocity conversion.
+- The canonical kernel map now exchanges momenta together with field indices
+  in the `q_qp`, `p_pq`, and `p_pp` blocks and in the velocity redefinition.
+  `CanonicalCubicHamiltonianCoefficients` and the `B`/`C` coefficient types
+  gained separately evaluated input-exchanged tensors.
 
 ### Changed
 

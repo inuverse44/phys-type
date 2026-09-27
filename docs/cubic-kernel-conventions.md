@@ -251,22 +251,43 @@ D_tX^a=u^a{}_bX^b+\frac12u^a{}_{bc}X^bX^c
 $$
 
 gives the following ordered cosmic-time blocks. The field indices $I,J,K$
-belong to the output, first input, and second input respectively.
+belong to the output, first input, and second input respectively, whose
+momenta are $\mathbf{k}$, $\mathbf{q}_1$, and $\mathbf{q}_2$. Every
+coefficient argument lists the momenta of its three covariant slots in order.
 
 | Rust-style block | Canonical coefficient in cosmic time |
 | --- | --- |
-| `q_qq` | $u^{Q^I}{}_{Q^JQ^K}=-B_{JK}{}^I$ |
-| `q_qp` | $u^{Q^I}{}_{Q^J\Pi^K}=-C^I{}_{KJ}$ |
-| `q_pq` | $u^{Q^I}{}_{\Pi^JQ^K}=-C^I{}_{JK}$ |
+| `q_qq` | $u^{Q^I}{}_{Q^JQ^K}=-B_{JK}{}^I(\mathbf{q}_1,\mathbf{q}_2,\mathbf{k})$ |
+| `q_qp` | $u^{Q^I}{}_{Q^J\Pi^K}=-C^I{}_{KJ}(\mathbf{k},\mathbf{q}_2,\mathbf{q}_1)$ |
+| `q_pq` | $u^{Q^I}{}_{\Pi^JQ^K}=-C^I{}_{JK}(\mathbf{k},\mathbf{q}_1,\mathbf{q}_2)$ |
 | `q_pp` | $u^{Q^I}{}_{\Pi^J\Pi^K}=0$ |
-| `p_qq` | $u^{\Pi^I}{}_{Q^JQ^K}=3A^I{}_{JK}$ |
-| `p_qp` | $u^{\Pi^I}{}_{Q^J\Pi^K}=B^I{}_{JK}$ |
-| `p_pq` | $u^{\Pi^I}{}_{\Pi^JQ^K}=B^I{}_{KJ}$ |
-| `p_pp` | $u^{\Pi^I}{}_{\Pi^J\Pi^K}=C_{KJ}{}^I$ |
+| `p_qq` | $u^{\Pi^I}{}_{Q^JQ^K}=3A^I{}_{JK}(\mathbf{k},\mathbf{q}_1,\mathbf{q}_2)$ |
+| `p_qp` | $u^{\Pi^I}{}_{Q^J\Pi^K}=B^I{}_{JK}(\mathbf{k},\mathbf{q}_1,\mathbf{q}_2)$ |
+| `p_pq` | $u^{\Pi^I}{}_{\Pi^JQ^K}=B^I{}_{KJ}(\mathbf{k},\mathbf{q}_2,\mathbf{q}_1)$ |
+| `p_pp` | $u^{\Pi^I}{}_{\Pi^J\Pi^K}=C_{JK}{}^I(\mathbf{q}_1,\mathbf{q}_2,\mathbf{k})$ |
 
 This table is the unambiguous reading of the two matrix slices printed in the
 reference. The slices are selected by the third phase-space index; reading
-them as two output-index slices exchanges several blocks.
+them as two output-index slices exchanges several blocks. The momentum
+arguments follow from symmetry of $u^a{}_{bc}$ under simultaneous exchange of
+its input slots and input momenta. For example,
+$-C^I{}_{JK}\Pi^J(\mathbf{q}_\Pi)Q^K(\mathbf{q}_Q)$ contributes
+$u^{Q^I}{}_{\Pi^JQ^K}(\mathbf{k};\mathbf{q}_1,\mathbf{q}_2)
+=-C^I{}_{JK}(\mathbf{k},\mathbf{q}_1,\mathbf{q}_2)$, and its partner block is
+$u^{Q^I}{}_{Q^J\Pi^K}(\mathbf{k};\mathbf{q}_1,\mathbf{q}_2)
+=u^{Q^I}{}_{\Pi^KQ^J}(\mathbf{k};\mathbf{q}_2,\mathbf{q}_1)$. The reference
+writes $C_{KJ}{}^I$ for `p_pp`; with momenta attached,
+$C_{KJ}{}^I(\mathbf{q}_2,\mathbf{q}_1,\mathbf{k})=
+C_{JK}{}^I(\mathbf{q}_1,\mathbf{q}_2,\mathbf{k})$ because $C$ is symmetrized
+in its first two slots together with their momenta.
+
+An earlier revision exchanged only the array indices of the `q_qp`, `p_pq`,
+and `p_pp` blocks and left the momenta in $(\mathbf{q}_1,\mathbf{q}_2)$
+order. This agrees with the table only when $q_1=q_2$, so equilateral tests
+could not detect it. The de Sitter consistency test of the three-point
+initial condition, described in
+[`three-point-transport.md`](three-point-transport.md), failed with an
+order-one residual until the momenta were exchanged as well.
 
 For the crate's e-fold equation, every entry in the right column becomes
 $H^{-1}$ times the displayed coefficient.
@@ -319,19 +340,22 @@ by the eight-block table as five distinct fields:
 
 | Field | Components | Dimension |
 | --- | --- | --- |
-| `a_first_raised` | $A^I{}_{JK}$ | $M^1$ |
-| `b_first_raised` | $B^I{}_{JK}$ | $M^0$ |
-| `b_third_raised` | $B_{JK}{}^I$ | $M^0$ |
-| `c_first_raised` | $C^I{}_{JK}$ | $M^{-1}$ |
-| `c_third_raised` | $C_{JK}{}^I$ | $M^{-1}$ |
+| `a_first_raised` | $A^I{}_{JK}(\mathbf{k},\mathbf{q}_1,\mathbf{q}_2)$ | $M^1$ |
+| `b_first_raised` | $B^I{}_{JK}(\mathbf{k},\mathbf{q}_1,\mathbf{q}_2)$ | $M^0$ |
+| `b_first_raised_input_exchanged` | $B^I{}_{KJ}(\mathbf{k},\mathbf{q}_2,\mathbf{q}_1)$ | $M^0$ |
+| `b_third_raised` | $B_{JK}{}^I(\mathbf{q}_1,\mathbf{q}_2,\mathbf{k})$ | $M^0$ |
+| `c_first_raised` | $C^I{}_{JK}(\mathbf{k},\mathbf{q}_1,\mathbf{q}_2)$ | $M^{-1}$ |
+| `c_first_raised_input_exchanged` | $C^I{}_{KJ}(\mathbf{k},\mathbf{q}_2,\mathbf{q}_1)$ | $M^{-1}$ |
+| `c_third_raised` | $C_{JK}{}^I(\mathbf{q}_1,\mathbf{q}_2,\mathbf{k})$ | $M^{-1}$ |
 
 Every array is stored in output/first-input/second-input order $[I][J][K]$.
-`CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian` applies the
-required $J\leftrightarrow K$ exchanges and divides every cosmic-time
-coefficient by a positive finite $H$ exactly once. Tests use deliberately
-asymmetric component values so that either an index exchange or a first/third
-raising mistake changes the result. A compile-fail test fixes all five mass
-dimensions.
+The two input-exchanged tensors are separate evaluations with the input legs
+exchanged, not transposes of the corresponding unexchanged arrays.
+`CanonicalQuadraticPhaseSpaceKernel::from_cubic_hamiltonian` reads each block
+from the matching field and divides every cosmic-time coefficient by a
+positive finite $H$ exactly once. Tests use deliberately asymmetric component
+values so that a wrong field, an index exchange, or a first/third raising
+mistake changes the result. A compile-fail test fixes the mass dimensions.
 
 These integer dimensions are also obtained term by term from the displayed
 cubic action. The earlier half-integer assignment incorrectly cubed the
@@ -425,9 +449,9 @@ At tree level, `velocity_three_point_from_canonical_tree` applies
 
 $$
 \begin{aligned}
-N^{V^I}{}_{Q^JQ^K}&=-B_{JK}{}^I,\\
-N^{V^I}{}_{Q^J\Pi^K}&=-C^I{}_{KJ},\\
-N^{V^I}{}_{\Pi^JQ^K}&=-C^I{}_{JK},\\
+N^{V^I}{}_{Q^JQ^K}&=-B_{JK}{}^I(\mathbf{q}_1,\mathbf{q}_2,\mathbf{k}),\\
+N^{V^I}{}_{Q^J\Pi^K}&=-C^I{}_{KJ}(\mathbf{k},\mathbf{q}_2,\mathbf{q}_1),\\
+N^{V^I}{}_{\Pi^JQ^K}&=-C^I{}_{JK}(\mathbf{k},\mathbf{q}_1,\mathbf{q}_2),\\
 N^{Q^I}{}_{bc}&=N^{V^I}{}_{\Pi^J\Pi^K}=0,
 \end{aligned}
 $$
@@ -439,9 +463,12 @@ correlator is therefore
 $$
 \alpha_V^{abc}=\alpha_\Pi^{abc}
 +N^a{}_{de}\Sigma_\Pi^{db}\Sigma_\Pi^{ec}
-+N^b{}_{de}\Sigma_\Pi^{da}\Sigma_\Pi^{ec}
-+N^c{}_{de}\Sigma_\Pi^{da}\Sigma_\Pi^{eb}.
++N^b{}_{de}\Sigma_\Pi^{ad}\Sigma_\Pi^{ec}
++N^c{}_{de}\Sigma_\Pi^{ad}\Sigma_\Pi^{be},
 $$
+
+where, as in the transport source, a covariance on a leg to the left of the
+quadratic insertion keeps the external operator on the left.
 
 The conversion accepts only canonical correlations and covariances and returns
 the velocity-marked correlation. Tests check the exact scalar $B$ and $C$
@@ -471,7 +498,9 @@ in code and tests:
 8. **Implemented:** the nonlinear $V\leftrightarrow\Pi$ correlator conversion
    is tested for the selected canonical route;
 9. dimensions, permutation identities, and an independent numerical
-   benchmark all pass.
+   benchmark all pass. The de Sitter consistency of the initial condition
+   now checks the kernel map and source contraction together for a
+   non-equilateral triangle; the sourced numerical benchmark remains.
 
 The model-derived physical kernel and its variable boundary are now present.
 The remaining acceptance gap is item 9's independent numerical benchmark,
