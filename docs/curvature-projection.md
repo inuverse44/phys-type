@@ -102,12 +102,14 @@ $M^{-3}$ in the stripped Fourier normalization of the transport.
 The cross coefficients carry $1/6$, not $1/3$. The symmetric form
 $\tfrac12N_{ab}X^aX^b$ counts the $Q\Pi$ and $\Pi Q$ orderings separately, so
 each must be half of the real-space coefficient of $Q\Pi$. The matrix printed
-in Sec. 7 of Dias, Frazer, Mulryne, and Seery,
+in Eq. (7.4b) of Dias, Frazer, Mulryne, and Seery,
 [arXiv:1609.00379](https://arxiv.org/abs/1609.00379), carries the prefactor
 $1/(3H^2M_{\mathrm{Pl}}^2\epsilon)$ on these entries as well. With that choice,
 the straight-trajectory benchmark below gives $f_{\mathrm{NL}}\approx0.73$
 against Maldacena's $0.19$, and $\zeta$ is not conserved. With $1/6$, both
-checks pass. The quadratic $QQ$ coefficient agrees with that reference.
+checks pass. The quadratic $QQ$ coefficient agrees with that reference. The
+discrepancy, its evidence, and the exact references are recorded in
+[`literature-discrepancies.md`](literature-discrepancies.md), entry 1.
 
 ### Correlators
 

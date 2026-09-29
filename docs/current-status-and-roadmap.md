@@ -96,7 +96,9 @@ convergence.
 4. [`field-space-curvature-design.md`](field-space-curvature-design.md) fixes
    the Riemann convention and the higher-rank geometry consumed by that
    kernel.
-5. [`cubic-kernel-conventions.md`](cubic-kernel-conventions.md) writes the
+5. [`literature-discrepancies.md`](literature-discrepancies.md) records
+   every difference from a published formula, with references and evidence.
+6. [`cubic-kernel-conventions.md`](cubic-kernel-conventions.md) writes the
    curved-space cubic kernels explicitly and fixes the nonlinear distinction
    between velocity and rescaled canonical momentum.
 

@@ -10,9 +10,9 @@ SymPy). The script performs four independent checks that are summarized in
    contribution (fast A, slow A, three leg-resolved B, three leg-resolved C);
 2. compares those results with the closed-form weights implemented in
    ``canonical_three_point_from_subhorizon_vertices``;
-3. compares them with the four B_Re^{abc}(t_init) results in Sec. 6 of
-   Dias, Frazer, Mulryne & Seery, arXiv:1609.00379, whose momenta are e-fold
-   derivatives (our P / H);
+3. compares them with Eqs. (6.7a)-(6.7d) of Dias, Frazer, Mulryne & Seery,
+   arXiv:1609.00379v2, whose momenta must be read as e-fold derivatives
+   (our P / H); see docs/literature-discrepancies.md, entries 2 and 3;
 4. checks numerically that the initial condition solves the canonical
    transport equation on massless de Sitter with the operator-ordered source,
    with a relative residual that decreases as (k/aH)^-2, also when a
@@ -282,7 +282,7 @@ def implemented_rate(block, c, k, H, a):
 
 
 # ---------------------------------------------------------------------------
-# 3. Dias, Frazer, Mulryne & Seery (2016), Sec. 6 initial conditions.
+# 3. Dias, Frazer, Mulryne & Seery (2016), Eqs. (6.7a)-(6.7d).
 # ---------------------------------------------------------------------------
 def dfms(symbols):
     k1, k2, k3, H, a = symbols

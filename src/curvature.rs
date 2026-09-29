@@ -122,9 +122,10 @@ impl std::error::Error for CurvatureProjectionError {}
 /// N_{Pi Q,IJ}(k; k_a, k_b) = the same with k_a^2 replaced by k_b^2
 /// ```
 ///
-/// The cross terms carry `1/6` rather than `1/3` because the symmetric
+/// The cross terms carry `1/6` rather than the `1/3` printed in Eq. (7.4b) of
+/// Dias, Frazer, Mulryne, and Seery (arXiv:1609.00379), because the symmetric
 /// quadratic form `N_ab X^a X^b / 2` counts the `Q Pi` and `Pi Q` orderings
-/// separately. Every leg must satisfy `k_r/(aH) <= maximum_k_over_ah`.
+/// separately; see `docs/literature-discrepancies.md`, entry 1. Every leg must satisfy `k_r/(aH) <= maximum_k_over_ah`.
 pub fn curvature_gauge_coefficients<P, G, const N: usize>(
     system: &CovariantMultifieldSystem<P, G, N>,
     state: &MultifieldState<N>,

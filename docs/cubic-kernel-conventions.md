@@ -281,6 +281,9 @@ $C_{KJ}{}^I(\mathbf{q}_2,\mathbf{q}_1,\mathbf{k})=
 C_{JK}{}^I(\mathbf{q}_1,\mathbf{q}_2,\mathbf{k})$ because $C$ is symmetrized
 in its first two slots together with their momenta.
 
+The momentum attachment is stated after Eq. (5.17) of Dias, Frazer,
+Mulryne, and Seery ([arXiv:1609.00379](https://arxiv.org/abs/1609.00379)); see
+[`literature-discrepancies.md`](literature-discrepancies.md), entry 4.
 An earlier revision exchanged only the array indices of the `q_qp`, `p_pq`,
 and `p_pp` blocks and left the momenta in $(\mathbf{q}_1,\mathbf{q}_2)$
 order. This agrees with the table only when $q_1=q_2$, so equilateral tests
