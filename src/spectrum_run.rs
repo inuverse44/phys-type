@@ -3318,7 +3318,7 @@ mod tests {
     fn sourced_benchmark(shape: [f64; 3]) -> SourcedBenchmark {
         let system = system([1.0e-6, 1.5e-6]);
         let initial = slow_roll_start(&system, [12.0, 8.0]);
-        sourced_benchmark_with(system, initial, shape, None)
+        sourced_benchmark_with(system, initial, shape, None, &quick_settings())
     }
 
     /// Surveys `system` from `initial`. The triangle is `shape` times the
@@ -3328,13 +3328,13 @@ mod tests {
         initial: MultifieldState<2>,
         shape: [f64; 3],
         pivot: Option<f64>,
+        settings: &SpectrumRunSettings,
     ) -> SourcedBenchmark<P, G>
     where
         P: crate::ThriceDifferentiableMultifieldPotential<2> + Copy,
         G: crate::ThirdOrderFieldSpaceGeometry<2> + crate::CurvatureDerivativeGeometry<2> + Copy,
     {
-        let settings = quick_settings();
-        let (_, trajectory, e_folds_at_end) = system.survey_background(initial, &settings).unwrap();
+        let (_, trajectory, e_folds_at_end) = system.survey_background(initial, settings).unwrap();
         let pivot_state = trajectory.state_at(e_folds_at_end - settings.pivot_e_folds_before_end);
         let k = pivot.unwrap_or((pivot_state.a * system.hubble(&pivot_state)).into_value());
         let triangle =
@@ -3584,8 +3584,13 @@ mod tests {
             start.a,
         );
         let pivot = cartesian.triangle.canonical_wavenumbers()[0];
-        let sheared =
-            sourced_benchmark_with(sheared_system, sheared_start, [1.0, 0.9, 0.7], Some(pivot));
+        let sheared = sourced_benchmark_with(
+            sheared_system,
+            sheared_start,
+            [1.0, 0.9, 0.7],
+            Some(pivot),
+            &quick_settings(),
+        );
         (cartesian, sheared)
     }
 
@@ -3700,6 +3705,49 @@ mod tests {
             &transform_three_point(&evolved_cartesian.alpha, &jacobian),
         );
         assert!(errors.iter().all(|error| *error < 1.0e-8), "{errors:?}");
+
+        // zeta is a scalar: its correlators must not depend on the coordinates.
+        let project = |system_state: &crate::CanonicalThreePointTransportState,
+                       background: MultifieldState<2>,
+                       sheared_coordinates: bool| {
+            if sheared_coordinates {
+                crate::curvature::curvature_correlators(
+                    &sheared.system,
+                    &background,
+                    sheared.triangle,
+                    system_state,
+                    0.1,
+                )
+            } else {
+                crate::curvature::curvature_correlators(
+                    &cartesian.system,
+                    &background,
+                    cartesian.triangle,
+                    system_state,
+                    0.1,
+                )
+            }
+            .unwrap()
+        };
+        let zeta_cartesian = project(
+            &evolved_cartesian,
+            cartesian.trajectory.state_at(output),
+            false,
+        );
+        let zeta_sheared = project(&evolved_sheared, sheared.trajectory.state_at(output), true);
+        let relative = |a: f64, b: f64| (a - b).abs() / b.abs();
+        assert!(
+            relative(
+                zeta_sheared.power[0].into_value(),
+                zeta_cartesian.power[0].into_value()
+            ) < 1.0e-8
+        );
+        assert!(
+            relative(
+                zeta_sheared.bispectrum.into_value(),
+                zeta_cartesian.bispectrum.into_value()
+            ) < 1.0e-7
+        );
     }
 
     #[test]
@@ -3759,5 +3807,164 @@ mod tests {
             .fold(0.0, f64::max);
 
         assert!(error < 1.0e-5, "tolerance change {error:e}");
+    }
+
+    /// Maldacena's single-field bispectrum as a reduced `f_NL`, with
+    /// `epsilon` and `eta = d ln epsilon / dN` at horizon crossing.
+    fn maldacena_f_nl(k: [f64; 3], epsilon: f64, eta: f64) -> f64 {
+        let [k1, k2, k3] = k;
+        let kt = k1 + k2 + k3;
+        let cubes = k1.powi(3) + k2.powi(3) + k3.powi(3);
+        let mixed =
+            k1 * k2 * k2 + k1 * k3 * k3 + k2 * k1 * k1 + k2 * k3 * k3 + k3 * k1 * k1 + k3 * k2 * k2;
+        let squares = k1 * k1 * k2 * k2 + k1 * k1 * k3 * k3 + k2 * k2 * k3 * k3;
+        let shape = eta / 8.0 * cubes + epsilon / 8.0 * (-cubes + mixed + 8.0 * squares / kt);
+        // B = (2 pi)^4 Pcal^2 shape / prod k^3 and P = 2 pi^2 Pcal / k^3.
+        let pairs =
+            (k1 * k2).powi(3).recip() + (k1 * k3).powi(3).recip() + (k2 * k3).powi(3).recip();
+        5.0 / 6.0 * 4.0 * shape / (k1 * k2 * k3).powi(3) / pairs
+    }
+
+    /// Settings with the pivot well inside slow roll and a superhorizon output.
+    fn slow_roll_settings() -> SpectrumRunSettings {
+        SpectrumRunSettings {
+            e_folds_before_exit: 5.0,
+            pivot_e_folds_before_end: 40.0,
+            output_e_folds_before_end: 34.0,
+            ..quick_settings()
+        }
+    }
+
+    /// `epsilon` and `eta = d ln epsilon / dN` when `k_t / 3` crosses the
+    /// horizon on the straight equal-mass trajectory.
+    fn slow_roll_parameters_at_crossing<P, G>(bench: &SourcedBenchmark<P, G>) -> (f64, f64)
+    where
+        P: crate::ThriceDifferentiableMultifieldPotential<2> + Copy,
+        G: crate::ThirdOrderFieldSpaceGeometry<2> + crate::CurvatureDerivativeGeometry<2> + Copy,
+    {
+        let average = Mass::new(bench.triangle.canonical_wavenumbers().iter().sum::<f64>() / 3.0);
+        let crossing = bench
+            .trajectory
+            .crossing(|s| (average / (s.a * bench.system.hubble(s))).into_value() - 1.0)
+            .unwrap();
+        let epsilon = |n: f64| {
+            let s = bench.trajectory.state_at(n);
+            let h = bench.system.hubble(&s).into_value();
+            (s.pi[0].into_value().powi(2) + s.pi[1].into_value().powi(2)) / (2.0 * h * h)
+        };
+        let step = 1.0e-3;
+        let eta = (epsilon(crossing + step).ln() - epsilon(crossing - step).ln()) / (2.0 * step);
+        (epsilon(crossing), eta)
+    }
+
+    fn project_benchmark<P, G>(
+        bench: &SourcedBenchmark<P, G>,
+        depth: f64,
+        slice: f64,
+    ) -> crate::curvature::CurvatureCorrelators
+    where
+        P: crate::ThriceDifferentiableMultifieldPotential<2> + Copy,
+        G: crate::ThirdOrderFieldSpaceGeometry<2> + crate::CurvatureDerivativeGeometry<2> + Copy,
+    {
+        let state = bench.evolve(depth, slice, 1.0e-9);
+        crate::curvature::curvature_correlators(
+            &bench.system,
+            &bench.trajectory.state_at(slice),
+            bench.triangle,
+            &state,
+            0.1,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn curvature_power_from_transport_matches_the_mode_solver() {
+        // The turning benchmark, with both solvers started at the same depth.
+        let settings = SpectrumRunSettings {
+            e_folds_before_exit: 3.0,
+            ..quick_settings()
+        };
+        let turning = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&turning, [12.0, 8.0]);
+        let bench = sourced_benchmark_with(turning, initial, [1.0, 1.0, 1.0], None, &settings);
+        let projected = project_benchmark(&bench, 3.0, bench.output);
+        let k = Mass::new(bench.triangle.canonical_wavenumbers()[0]);
+        let (row, _, _) = bench
+            .system
+            .evolve_one_mode(initial, &settings, &bench.trajectory, k, 1.0, bench.output)
+            .unwrap();
+        let transported = projected.dimensionless_power()[0];
+
+        // zeta = -R, so the spectra agree without a sign.
+        assert!(
+            (transported - row.p_r).abs() <= 1.0e-5 * row.p_r,
+            "{transported:e} != {:e}",
+            row.p_r
+        );
+        assert!(projected.bispectrum_imaginary_ratio < 1.0e-6);
+    }
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn single_field_f_nl_is_conserved_and_matches_maldacena() {
+        let settings = slow_roll_settings();
+        let straight = system([1.0e-6, 1.0e-6]);
+        let start = slow_roll_start(&straight, [12.0, 8.0]);
+        for shape in [[1.0, 1.0, 1.0], [1.0, 1.0, 0.5], [1.0, 1.0, 0.2]] {
+            let bench = sourced_benchmark_with(straight, start, shape, None, &settings);
+            let late = project_benchmark(&bench, 5.0, bench.output).reduced_f_nl();
+            let early = project_benchmark(&bench, 5.0, bench.output - 1.0).reduced_f_nl();
+            let (epsilon, eta) = slow_roll_parameters_at_crossing(&bench);
+            let leading = maldacena_f_nl(bench.triangle.canonical_wavenumbers(), epsilon, eta);
+
+            assert!(
+                (late - early).abs() < 1.0e-2 * late,
+                "{shape:?}: {early} then {late}"
+            );
+            // Maldacena's result is leading order in slow roll; epsilon ~ 0.0125.
+            assert!(
+                (late - leading).abs() < 5.0e-2 * leading,
+                "{shape:?}: {late} vs {leading}"
+            );
+        }
+    }
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn squeezed_single_field_bispectrum_satisfies_the_consistency_relation() {
+        let settings = slow_roll_settings();
+        let straight = system([1.0e-6, 1.0e-6]);
+        let start = slow_roll_start(&straight, [12.0, 8.0]);
+        let deviation = |ratio: f64| {
+            let bench = sourced_benchmark_with(straight, start, [1.0, 1.0, ratio], None, &settings);
+            let f_nl = project_benchmark(&bench, 5.0, bench.output).reduced_f_nl();
+            let short = bench.triangle.canonical_wavenumbers()[0];
+            let spectrum = |k: f64| {
+                bench
+                    .system
+                    .evolve_one_mode(
+                        start,
+                        &settings,
+                        &bench.trajectory,
+                        Mass::new(k),
+                        1.0,
+                        bench.output,
+                    )
+                    .unwrap()
+                    .0
+                    .p_r
+            };
+            let step = 0.01_f64;
+            let tilt = (spectrum(short * step.exp()).ln() - spectrum(short * (-step).exp()).ln())
+                / (2.0 * step);
+            let consistency = -5.0 / 12.0 * tilt;
+            (f_nl - consistency) / consistency
+        };
+        let coarse = deviation(0.1);
+        let fine = deviation(0.05);
+
+        // Corrections to the consistency relation scale as (k_long / k_short)^2.
+        assert!(fine.abs() < 1.0e-2, "relative deviation {fine:e}");
+        assert!(fine.abs() < 0.5 * coarse.abs(), "{coarse:e} then {fine:e}");
     }
 }

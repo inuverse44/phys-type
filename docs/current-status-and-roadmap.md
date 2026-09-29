@@ -5,7 +5,7 @@ detailed mathematical contracts remain in the design documents linked below;
 this page records what is implemented, what is only designed, and the order in
 which unfinished work should proceed.
 
-## Status on 2026-09-27
+## Status on 2026-09-30
 
 The first scientific milestone is complete: `phys-type` can evolve a
 covariant two-field inflationary background and its linear quantum
@@ -46,7 +46,8 @@ The repository currently has two distinct scientific boundaries:
 | Two-field background and linear perturbations | complete | produces validated adiabatic, entropy, cross, and curvature power spectra |
 | Direct two-point phase-space transport | complete | reproduces the independent mode solver for all complex covariance blocks |
 | Three-point transport (P3d) | complete | sourced canonical evolution converges on the reference benchmark and transforms as a tensor under field redefinitions |
-| Primordial bispectrum prediction | not yet available | curvature projection (P3e) remains |
+| Curvature projection (P3e) | in progress | $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ are projected and validated in single-field limits; metadata-labeled output and a published two-field comparison remain |
+| Primordial bispectrum prediction | not yet available | the remaining P3e acceptance items must pass first |
 
 Consequently, the crate can presently make power-spectrum predictions within
 its documented inflation/no-reheating scope. It must not yet describe its
@@ -54,29 +55,32 @@ three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
 
 ### Next-session handoff
 
-The implementation boundary is the branch `feat/three-point-coordinate-covariance`,
-based on merge commit `019ad42` (PR #22). The validated state is 199 unit
-tests plus 24 compile-fail cases, with three expensive ignored tests that pass
-in release mode (`cargo test --release -- --ignored`, about 95 seconds).
-Clippy with warnings denied, rustfmt, and rustdoc pass locally.
+The implementation boundary is the branch `feat/curvature-projection`, based on
+merge commit `6f7201b` (PR #23). The validated state is 203 unit tests plus 24
+compile-fail cases, with five expensive ignored tests that pass in release mode
+(`cargo test --release -- --ignored`, about two minutes). Clippy with warnings
+denied, rustfmt, and rustdoc pass locally.
 
-P3d is complete:
+The first P3e slice projects the transported canonical correlations to
+$\zeta$; see [`curvature-projection.md`](curvature-projection.md):
 
-1. `CanonicalThreePointTransportSystem` evolves $\alpha_\Pi$ and the three
-   canonical leg covariances together, from the subhorizon initial condition
-   with first-order vertex rates;
-2. on the double-quadratic benchmark it converges in start depth as
-   $x_{\mathrm{init}}^{-1}$ (0.23% from 7 e-folds before exit) and in tolerance;
-3. repeating the benchmark in sheared coordinates of the same flat field
-   space, with a position-dependent metric and nonzero connection, reproduces
-   the tensor-transformed initial condition and evolved state to
-   $\lesssim7\times10^{-10}$, while the untransformed comparison differs by 62%.
+1. `curvature_gauge_coefficients` evaluates the covariant "simple"
+   second-order gauge transformation of Dias et al. on a superhorizon slice.
+   Its cross coefficients carry $1/6$; the matrix printed in DFMS Sec. 7 has
+   $1/3$, which fails both conservation and Maldacena's limit;
+2. `curvature_correlators` returns $P_\zeta$, $B_\zeta$ with the
+   operator-ordered gauge term, $\mathcal P_\zeta$, and $f_{\mathrm{NL}}$ in the
+   Maldacena/Planck convention with $\zeta=-\mathcal R$;
+3. $\mathcal P_\zeta$ matches the mode solver to $6\times10^{-9}$; on a straight
+   trajectory $f_{\mathrm{NL}}$ is conserved to the start-depth error, matches
+   Maldacena to next order in $\epsilon$, and satisfies the squeezed
+   consistency relation to 0.33% at $k_3/k_1=0.05$, with the expected
+   $(k_3/k_1)^2$ approach; $\zeta$ correlators are unchanged by a field
+   redefinition.
 
-Resume with P3e, the nonlinear projection to $B_\zeta$ in
-[`non-gaussianity-architecture.md`](non-gaussianity-architecture.md). The
-limitations recorded in [`three-point-transport.md`](three-point-transport.md)
-are the slow $x_{\mathrm{init}}^{-1}$ start-depth convergence and the cost of
-re-evaluating the vertices at every stage.
+Resume with the remaining P3e items: metadata-labeled CSV output, a turning
+two-field comparison with a published transport result, and triangle-grid
+convergence.
 
 ### Reading order for the active P3 work
 
@@ -223,8 +227,11 @@ turn and the complete 41-point benchmark.
   depth and tolerance on the reference benchmark, after adding the e-fold
   rates of the cubic tensors to the initial condition. A field-redefinition test
   in sheared flat coordinates confirms that the initial condition and the
-  evolved state transform as tensors. The next code change is the P3e
-  curvature projection. See
+  evolved state transform as tensors. The first P3e slice projects the
+  result to $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ and validates it
+  against the mode solver, Maldacena's single-field result, and the squeezed
+  consistency relation; see
+  [`curvature-projection.md`](curvature-projection.md). See
   [`two-point-transport-oracle.md`](two-point-transport-oracle.md) and
   [`three-point-transport.md`](three-point-transport.md), with the detailed
   derivation in

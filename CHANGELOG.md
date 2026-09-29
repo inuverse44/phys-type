@@ -8,6 +8,12 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The P3e curvature projection: covariant second-order gauge coefficients on
+  a superhorizon slice, `P_zeta`, `B_zeta` with the operator-ordered gauge
+  term, `k^3 P / (2 pi^2)`, and `f_NL` in the Maldacena/Planck convention.
+  It is validated against the mode solver, superhorizon conservation,
+  Maldacena's single-field result, the squeezed consistency relation, and a
+  field redefinition. A `MMinus6` dimension alias supports `B_zeta`.
 - A field-redefinition covariance test of the three-point initial condition
   and sourced evolution, repeating the benchmark in sheared flat coordinates
   with a position-dependent metric and constant connection.
