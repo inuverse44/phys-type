@@ -220,8 +220,9 @@ $\langle X^aX^d\rangle=\Sigma^{ad}$; an external operator to the right
 contracts as $\Sigma^{db}$. Because
 $\Sigma^{ad}=(\Sigma^{da})^*$ and the imaginary part is the equal-time
 commutator, transposing a covariance on a left leg changes the source. This
-matches the three-point transport equation in Sec. 5 of Dias, Frazer,
-Mulryne, and Seery, [arXiv:1609.00379](https://arxiv.org/abs/1609.00379). An earlier revision of
+matches Eq. (5.14) of Dias, Frazer, Mulryne, and Seery,
+[arXiv:1609.00379](https://arxiv.org/abs/1609.00379); see
+[`literature-discrepancies.md`](literature-discrepancies.md), entry 5. An earlier revision of
 this repository used $\Sigma^{da}$ on left legs; the de Sitter consistency
 test below failed with an order-one residual until the ordering was corrected.
 
@@ -505,13 +506,15 @@ performs the in-in integral symbolically and verifies four statements:
 1. the closed forms above, including the rate terms, reproduce the in-in
    result for every block and every contribution;
 2. after converting their momenta, which are e-fold derivatives $\Pi/H$,
-   the static results agree with the four
-   $B_{\Re}^{abc}(t_{\mathrm{init}})$ results in Sec. 6 of Dias, Frazer,
-   Mulryne, and Seery for all blocks and contributions, except the $B$ part of
-   their two-momentum result. Its second prefactor $k_1^2k_3^2$ breaks the
-   exchange of the two momentum legs that `PPQ` must obey; the result above
-   obeys that symmetry. DFMS freeze the background coefficients and have no
-   rate terms;
+   the static results agree with Eqs. (6.7a)--(6.7d) of Dias, Frazer,
+   Mulryne, and Seery (arXiv:1609.00379v2) for all blocks and contributions,
+   except the $B$ part of their two-momentum result, Eq. (6.7c). Its second
+   prefactor $k_1^2k_3^2$ breaks the exchange of the two momentum legs that
+   `PPQ` must obey; the result above obeys that symmetry. DFMS freeze the
+   background coefficients and have no rate terms. This and the momentum
+   normalization of those equations are recorded in
+   [`literature-discrepancies.md`](literature-discrepancies.md), entries 2
+   and 3;
 3. with the operator-ordered source, the initial condition solves the
    canonical transport equation on massless de Sitter space. The residual,
    relative to the magnitudes of the terms in each block equation, is about
