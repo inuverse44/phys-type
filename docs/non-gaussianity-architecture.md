@@ -362,8 +362,18 @@ three-point function together with the three leg covariances. On the
 reference benchmark it converges in start depth as $x_{\mathrm{init}}^{-1}$ and
 in tolerance, and it transforms as a tensor under a nonlinear field
 redefinition to $4\times10^{-10}$. The details and remaining limitations are
-recorded in [`three-point-transport.md`](three-point-transport.md). P3e is the
-next milestone.
+recorded in [`three-point-transport.md`](three-point-transport.md).
+
+### P3e implementation status
+
+P3e is in progress. The projection to $\zeta$ uses the covariant "simple"
+second-order gauge transformation on a superhorizon slice, and reports
+$P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ with an explicit sign and
+normalization convention. The momentum arguments left open above are fixed
+in [`curvature-projection.md`](curvature-projection.md), which also records
+the validation against the mode solver, Maldacena's single-field result, and
+the squeezed consistency relation. Metadata-labeled output, a published
+two-field comparison, and triangle-grid convergence remain.
 
 ## Acceptance boundary
 

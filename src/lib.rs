@@ -6,6 +6,7 @@
 
 pub mod autodiff;
 pub mod background;
+pub mod curvature;
 pub mod dimension;
 pub mod field_space;
 pub mod integrate;
@@ -25,9 +26,13 @@ pub use autodiff::{Dual, Jet, ThirdOrderJet, Transcendental};
 pub use background::{
     AdaptiveRunSettings, AdaptiveStep, BackgroundRun, Record, RunSettings, Termination,
 };
+pub use curvature::{
+    CurvatureCorrelators, CurvatureGaugeCoefficients, CurvatureGaugeQuadratic,
+    CurvatureProjectionError, curvature_correlators, curvature_gauge_coefficients,
+};
 pub use dimension::{
     DimDiv, DimMul, DimSqrt, M0, M1, M2, M3, M3Over2, M4, M5Over2, MHalf, MMinus1, MMinus2,
-    MMinus3, MMinus3Over2, MMinusHalf, MassPower,
+    MMinus3, MMinus3Over2, MMinus6, MMinusHalf, MassPower,
 };
 pub use field_space::{
     ChristoffelDerivativeComponents, ChristoffelDerivatives, ChristoffelSymbols,
