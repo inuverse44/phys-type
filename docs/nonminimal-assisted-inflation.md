@@ -169,6 +169,48 @@ relative to that estimate. The approximation therefore underestimates
 $|f_{\mathrm{NL}}|$ by about 20%. The reference's conclusion that
 $|f_{\mathrm{NL}}|$ is small is unaffected.
 
+## All branches of Sec. 4.1
+
+The same pipeline covers the four $(\alpha,s_*)$ branches of the reference.
+For each branch the initial $\phi$ lies about 72 e-folds before the end of
+$\phi$ slow roll, and the initial $s$ is tuned so that $s=s_*$ at the pivot.
+The coupling that gives $n_s=0.965$ at the end of inflation is found by linear
+interpolation on a coupling grid:
+
+| $(\alpha,s_*)$ | numerical | prescription of the reference | shift | range quoted in Sec. 4.1 |
+| --- | --- | --- | --- | --- |
+| $(0.1,10^{-3})$ | 0.02282 | 0.02212 | $+3.2\%$ | $(2.1$--$2.3)\times10^{-2}$ |
+| $(0.1,0.1)$ | 0.01367 | 0.01342 | $+1.9\%$ | $(1.2$--$1.4)\times10^{-2}$ |
+| $(1,10^{-3})$ | 0.02138 | 0.02088 | $+2.4\%$ | $(1.9$--$2.1)\times10^{-2}$ |
+| $(1,0.1)$ | 0.01235 | 0.01216 | $+1.6\%$ | $(1.1$--$1.3)\times10^{-2}$ |
+
+The quoted ranges are Planck--BK 2$\sigma$ intervals in $(n_s,r)$ rather than the
+single point $n_s=0.965$. The numerical couplings lie inside them, except that
+$(1,10^{-3})$ sits at the upper edge. In every branch, Eq. (3.1) with the
+numerical $s_e$ reproduces the exact tilt to $1.5\times10^{-3}$. The shift again
+comes only from the slow-roll relation (3.9), which overestimates $s_e$ by
+4--17%.
+
+At these couplings, the end-of-inflation $f_{\mathrm{NL}}$ in the Planck sign is
+
+| $(\alpha,s_*,\xi_2)$ | transport | Eq. (3.5), numerical inputs | Eq. (3.5), prescription of the reference |
+| --- | --- | --- | --- |
+| $(0.1,10^{-3},0.0228)$ | $-0.713$ | $-0.612$ | $-1.333$ |
+| $(0.1,0.1,0.0137)$ | $0.0077$ | $0.0109$ | $0.0095$ |
+| $(1,10^{-3},0.0214)$ | $-1.060$ | $-0.970$ | $-1.991$ |
+| $(1,0.1,0.0124)$ | $0.0027$ | $0.0019$ | $-0.0011$ |
+
+The last column is larger in magnitude because at the same coupling the
+reference's $s_e$ is larger. The $s_*=0.1$ branches give
+$|f_{\mathrm{NL}}|\lesssim10^{-2}$, as the reference states.
+
+On a slice $10^{-2}$ e-folds before the end, the phase-space $\delta N$
+reproduces the transport in every branch. The differences are 0.05%, 0.4%,
+0.16%, and $4\times10^{-5}$ in absolute terms for the $f_{\mathrm{NL}}\approx0.0025$
+case. That slice is used because a perturbed trajectory may end inflation
+before the target surface of $10^{-3}$ e-folds. $f_{\mathrm{NL}}$ still evolves in
+the last e-folds, for example from $-0.861$ to $-0.713$ in the first branch.
+
 ## Tests
 
 The regular suite runs the geometry and potential tests in `src/nonminimal.rs`.
@@ -180,7 +222,10 @@ The ignored release-mode tests are:
   fixes the transport start-depth convergence, the agreement of the
   crossing-time $\delta N$ with Eq. (3.5), and their 20% deficit;
 - `assisted_loop_transport_matches_phase_space_delta_n`, the phase-space
-  $\delta N$ check above for both shapes and two slices.
+  $\delta N$ check above for both shapes and two slices;
+- `assisted_loop_branches_follow_eq_3_1_with_the_exact_s_e` and
+  `assisted_loop_branches_transport_matches_phase_space_delta_n`, the same
+  checks for all four branches.
 
 ## Plan
 
@@ -197,7 +242,7 @@ next begins.
    is independent of $N_c$ and equal to the transport result. That is a
    separate-universe consistency test of the transport. The Gaussian term
    alone then shows how much the crossing-time approximation misses.
-2. **Other branches of the reference.** Repeat the $n_s$ and $f_{\mathrm{NL}}$
+2. **Other branches of the reference. (Completed.)** Repeat the $n_s$ and $f_{\mathrm{NL}}$
    comparison for $(\alpha,s_*)=(0.1,0.1)$, $(1,0.001)$, and $(1,0.1)$. Compare
    the numerical couplings for $n_s=0.965$ with the ranges quoted in Sec. 4.1:
    $(1.2$--$1.4)\times10^{-2}$, $(1.9$--$2.1)\times10^{-2}$, and

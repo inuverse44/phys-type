@@ -203,7 +203,10 @@ $s_*$ and $s_e$ satisfy Eq. (3.9) with 58.3 rather than 60 e-folds. Because
 $s_e\propto e^{4\xi_2N}$, this 3% difference changes $s_e$ by 16%. It moves the
 coupling that gives $n_s=0.965$ from $\xi_2\approx0.0222$ to $0.0228$. Given the
 numerical $s_e$, Eq. (3.1) itself agrees with the exact tilt to
-$5\times10^{-4}$ for $0.021\le\xi_2\le0.025$.
+$5\times10^{-4}$ for $0.021\le\xi_2\le0.025$. The other three branches of
+Sec. 4.1 behave the same way: the $n_s=0.965$ coupling moves up by
+1.6--3.2%, and it stays inside the quoted ranges except at the upper edge
+for $(\alpha,s_*)=(1,10^{-3})$.
 
 ### 9. Crossing-time statistics in [HKKPT] Eq. (3.5) — approximation note
 

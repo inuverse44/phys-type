@@ -8,6 +8,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- All four loop-inflation branches of arXiv:2302.05866 Sec. 4.1: given the
+  exact end-of-inflation value of `s`, Eq. (3.1) matches the numerical tilt,
+  and the transport `f_NL` matches a phase-space delta N.
 - A phase-space delta N consistency test: on superhorizon slices, delta N
   with the evolved covariance and field three-point function reproduces the
   transport `f_NL` of assisted loop inflation to 0.05% for equilateral and
