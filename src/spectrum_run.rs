@@ -790,13 +790,13 @@ struct BackgroundCheckpoint {
 }
 
 #[derive(Clone, Debug)]
-struct BackgroundTrajectory {
+pub(crate) struct BackgroundTrajectory {
     initial: MultifieldState<2>,
     checkpoints: Vec<BackgroundCheckpoint>,
 }
 
 impl BackgroundTrajectory {
-    fn state_at(&self, e_folds: f64) -> MultifieldState<2> {
+    pub(crate) fn state_at(&self, e_folds: f64) -> MultifieldState<2> {
         let last = self.checkpoints.len() - 1;
         let upper = self
             .checkpoints
@@ -830,7 +830,10 @@ impl BackgroundTrajectory {
         )
     }
 
-    fn crossing(&self, mut event: impl FnMut(&MultifieldState<2>) -> f64) -> Option<f64> {
+    pub(crate) fn crossing(
+        &self,
+        mut event: impl FnMut(&MultifieldState<2>) -> f64,
+    ) -> Option<f64> {
         let mut left = self.checkpoints[0].e_folds;
         let left_value = event(&self.checkpoints[0].state);
         if left_value <= 0.0 {
@@ -1209,7 +1212,7 @@ where
     }
 
     /// Integrates the background to the end of inflation, recording rows.
-    fn survey_background(
+    pub(crate) fn survey_background(
         &self,
         initial: MultifieldState<2>,
         settings: &SpectrumRunSettings,
@@ -1851,7 +1854,7 @@ fn grid_point(settings: &SpectrumRunSettings, index: usize) -> f64 {
     (low + (high - low) * fraction).exp()
 }
 
-fn validate(settings: &SpectrumRunSettings) -> Result<(), SpectrumRunError> {
+pub(crate) fn validate(settings: &SpectrumRunSettings) -> Result<(), SpectrumRunError> {
     if settings.k_count == 0 {
         return Err(SpectrumRunError::InvalidSettings(
             "k_count must be positive",
@@ -3369,52 +3372,17 @@ mod tests {
             target: f64,
             relative_tolerance: f64,
         ) -> crate::CanonicalThreePointTransportState {
-            let depth = e_folds_before_exit.exp();
-            let start = self.slice(depth);
-            let mut state = crate::canonical_three_point_transport_initial_state(
-                &self.system,
-                &crate::BackgroundNeighborhood::from_trajectory(&self.trajectory, start, 1.0e-3),
-                self.triangle,
-                depth * (1.0 - 1.0e-6),
-            )
-            .unwrap();
-            let transport = crate::CanonicalThreePointTransportSystem::new(
+            crate::bispectrum_run::evolve_three_point(
                 &self.system,
                 &self.trajectory,
                 self.triangle,
-            );
-            let tolerances = ErrorTolerances::new(
-                crate::CanonicalThreePointTransportTolerance::pure_relative(),
+                e_folds_before_exit,
+                target,
                 relative_tolerance,
-            );
-            let limits = StepSizeLimits {
-                min: crate::Dimensionless::new(1.0e-9),
-                max: crate::Dimensionless::new(5.0e-2),
-            };
-            let mut e_folds = start;
-            let mut step: crate::Dimensionless = crate::Dimensionless::new(1.0e-3);
-
-            for _ in 0..2_000_000 {
-                let remaining = target - e_folds;
-                if remaining <= 1.0e-13 {
-                    return state;
-                }
-                let attempted = crate::Dimensionless::new(step.into_value().min(remaining));
-                let outcome = adaptive_step(
-                    &transport,
-                    crate::Dimensionless::new(e_folds),
-                    &state,
-                    attempted,
-                    &tolerances,
-                );
-                if outcome.accepted {
-                    state = outcome.state;
-                    e_folds += attempted.into_value();
-                }
-                step = next_step_size(attempted, outcome.error_ratio, &limits);
-            }
-
-            panic!("sourced three-point transport exceeded its adaptive step limit")
+                2_000_000,
+            )
+            .unwrap()
+            .1
         }
     }
 

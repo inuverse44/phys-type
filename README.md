@@ -220,11 +220,13 @@ slice and is checked against an independent in-in derivation and the de Sitter
 transport equation. `CanonicalThreePointTransportSystem` evolves the sourced
 three-point function with the three leg covariances, converges in start
 depth and tolerance on the reference benchmark, and transforms as a tensor
-under a nonlinear field redefinition. This completes P3d. The first P3e
-slice projects the result to $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ and
-reproduces the single-field consistency relation; metadata-labeled output and
-a published two-field comparison remain, so the repository does not yet claim
-a bispectrum prediction.
+under a nonlinear field redefinition. This completes P3d. P3e projects the
+result to $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$, reproduces the single-field
+consistency relation and the published axion-quartic bispectrum, and
+`run_bispectrum` writes convention-labeled CSV output. Within the documented
+scope (tree level, during inflation, no reheating) the repository therefore
+provides a primordial bispectrum prediction; see
+[`docs/curvature-projection.md`](docs/curvature-projection.md).
 
 `CovariantMultifieldSystem<P, G, N>` accepts a `FieldSpaceGeometry<N>` that
 supplies $G_{IJ}$, $G^{IJ}$, and $\Gamma^I{}_{JK}$. `FlatFieldSpace` exactly reproduces
