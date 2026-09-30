@@ -20,16 +20,13 @@ Implemented:
   redefinition, the published axion-quartic result of Dias, Frazer, Mulryne,
   and Seery, and a numerical $\delta N$ calculation.
 
-Not implemented yet:
-
-- CSV output of $\alpha^{abc}$, $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ with
-  gauge, slice, shape, normalization, and no-reheating metadata;
-- triangle-grid convergence.
-
-The repository still does not describe its output as a prediction of
-primordial non-Gaussianity; the remaining items above are the P3e acceptance
-conditions in
-[`non-gaussianity-architecture.md`](non-gaussianity-architecture.md).
+With `run_bispectrum` and its CSV writers (below), every P3e acceptance
+condition of [`non-gaussianity-architecture.md`](non-gaussianity-architecture.md)
+is met. Within the documented scope (tree level, the canonical transport of
+[`three-point-transport.md`](three-point-transport.md), evaluation during
+inflation, no reheating), the output is therefore a prediction of the
+primordial bispectrum of $\zeta$ for the supplied model. Its limitations are
+listed at the end of this document.
 
 ## Gauge transformation
 
@@ -226,17 +223,78 @@ the 0.1% difference is of the size of the intrinsic and slow-roll-velocity
 corrections that $\delta N$ omits. Both comparisons are in the ignored test
 `axion_quartic_bispectrum_matches_dfms_and_numerical_delta_n`.
 
-## Remaining P3e work
+## Bispectrum runs and CSV output
 
-1. Emit CSV rows for $\alpha^{abc}$, $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$
-   whose metadata names the gauge representation, output slice, triangle
-   convention, normalization, $f_{\mathrm{NL}}$ convention, model provenance,
-   and the absence of reheating.
-2. Demonstrate triangle-grid convergence of any reported shape.
+`CovariantMultifieldSystem::run_bispectrum` (in `src/bispectrum_run.rs`)
+surveys the background once and fixes $k_{\mathrm{pivot}}=aH$ with the
+convention of the spectrum run. Each `TriangleShape` gives $k_t/k_{\mathrm{pivot}}$
+and the Fergusson--Shellard coordinates used in Eq. (9.4) of DFMS,
 
-The published-result comparison is complete; see the axion-quartic benchmark
-above.
+$$
+k_1=\frac{k_t}{4}(1+\alpha+\beta),\qquad
+k_2=\frac{k_t}{4}(1-\alpha+\beta),\qquad
+k_3=\frac{k_t}{2}(1-\beta).
+$$
 
-The limitations recorded in
-[`three-point-transport.md`](three-point-transport.md) carry over: the start
-depth error falls as $x_{\mathrm{init}}^{-1}$, and each triangle is expensive.
+For each shape the run starts the canonical transport when the shortest leg
+has $k/(aH)=e^{\Delta N}$, evolves it to the output slice, and projects it.
+It rejects an output slice on which any leg is not outside the horizon.
+
+`BispectrumRun::write_csv` writes one row per shape with the canonically
+ordered $k_i/k_{\mathrm{pivot}}$, the start and output e-folds, the largest
+$k/(aH)$ on the output slice, $\mathcal P_\zeta(k_i)$,
+$\mathcal B_\zeta=(k_1k_2k_3)^2B_\zeta$, $f_{\mathrm{NL}}$, the intrinsic fraction
+$N_aN_bN_c\alpha^{abc}/B_\zeta$, and the imaginary residual of the ordered
+contraction. `write_phase_space_csv` writes all 64 components of the canonical
+$(k_1k_2k_3)^2\alpha^{abc}$ before projection. `write_bispectrum_metadata`
+writes `#` lines naming:
+
+- the model, supplied by the caller;
+- the method and initial-condition prescription;
+- the gauge representation, with a reference to the corrected cross
+  coefficient;
+- the sign of $\zeta$;
+- the normalization of $P$, $B$, $\mathcal P$, and $\mathcal B$;
+- the $f_{\mathrm{NL}}$ convention;
+- the shape coordinates and leg ordering;
+- the pivot and output slices;
+- the absence of reheating;
+- the units of the phase-space columns.
+
+A regular test recomputes $f_{\mathrm{NL}}$ from the dimensionless columns alone
+and checks that every one of these keys is present.
+
+## Triangle-grid convergence
+
+A reported shape is only meaningful if the grid resolves it. On the straight
+single-field benchmark at $k_t=3k_{\mathrm{pivot}}$, the isosceles line $\alpha=0$
+was sampled from $\beta=0.1$ to $0.7$ at spacing $0.05$. Along it,
+$f_{\mathrm{NL}}$ rises from $0.0259$ to $0.0305$ near equilateral and falls to
+$0.0240$. Linear interpolation from a grid of spacing $h$, tested at the
+shapes that grid omits, misses by at most
+
+| Spacing $h$ | Largest relative interpolation error |
+| --- | --- |
+| 0.2 | $2.8\times10^{-2}$ |
+| 0.1 | $5.8\times10^{-3}$ |
+
+The error falls by 4.9 as $h$ halves, as expected for a smooth shape, and at
+$h=0.1$ it is comparable to the start-depth error of each point. A shape
+reported on a grid of spacing 0.1 or finer is therefore resolved at the
+percent level. The check is the ignored test
+`isosceles_shape_is_resolved_by_the_reported_grid`.
+
+## Scope and limitations
+
+- Tree level only; loop corrections are not included.
+- The projection uses a superhorizon slice during inflation. There is no
+  reheating or post-inflationary transfer, which matters whenever $\zeta$ is
+  not conserved at the end of inflation.
+- The start-depth error falls only as $x_{\mathrm{init}}^{-1}$ (0.23% from 7
+  e-folds before exit on the double-quadratic benchmark), because the
+  odd-momentum blocks of the initial condition keep only their first
+  surviving order.
+- Each triangle re-evaluates the cubic vertices at every stage and costs
+  seconds to a minute in release mode; squeezed triangles, whose long legs
+  start much deeper, are the most expensive.
+- Two fields only, through the `TwoFieldBackgroundProvider` boundary.

@@ -46,8 +46,8 @@ The repository currently has two distinct scientific boundaries:
 | Two-field background and linear perturbations | complete | produces validated adiabatic, entropy, cross, and curvature power spectra |
 | Direct two-point phase-space transport | complete | reproduces the independent mode solver for all complex covariance blocks |
 | Three-point transport (P3d) | complete | sourced canonical evolution converges on the reference benchmark and transforms as a tensor under field redefinitions |
-| Curvature projection (P3e) | in progress | $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ are projected and validated in single-field limits and against the published axion-quartic result; metadata-labeled output and triangle-grid convergence remain |
-| Primordial bispectrum prediction | not yet available | the remaining P3e acceptance items must pass first |
+| Curvature projection (P3e) | complete | $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ are validated in single-field limits and against the published axion-quartic result, with labeled CSV output and grid convergence |
+| Primordial bispectrum prediction | available within scope | tree level, during inflation, no reheating; see `curvature-projection.md` |
 
 Consequently, the crate can presently make power-spectrum predictions within
 its documented inflation/no-reheating scope. It must not yet describe its
@@ -55,36 +55,31 @@ three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
 
 ### Next-session handoff
 
-The implementation boundary is the branch `feat/curvature-projection`, based on
-merge commit `6f7201b` (PR #23). The validated state is 203 unit tests plus 24
-compile-fail cases, with five expensive ignored tests that pass in release mode
-(`cargo test --release -- --ignored`, about two minutes). Clippy with warnings
-denied, rustfmt, and rustdoc pass locally.
+The implementation boundary is the branch `feat/bispectrum-run`, based on
+merge commit `50724df` (PR #26). The validated state is 206 unit tests plus 24
+compile-fail cases, with seven expensive ignored tests that pass in release
+mode (`cargo test --release -- --ignored`, about four minutes). Clippy with
+warnings denied, rustfmt, and rustdoc pass locally.
 
-The first P3e slice projects the transported canonical correlations to
-$\zeta$; see [`curvature-projection.md`](curvature-projection.md):
+P3e, and with it the non-Gaussianity milestone, is complete within its
+documented scope; see [`curvature-projection.md`](curvature-projection.md):
 
-1. `curvature_gauge_coefficients` evaluates the covariant "simple"
-   second-order gauge transformation of Dias et al. on a superhorizon slice.
-   Its cross coefficients carry $1/6$; the matrix printed in DFMS Sec. 7 has
-   $1/3$, which fails both conservation and Maldacena's limit;
-2. `curvature_correlators` returns $P_\zeta$, $B_\zeta$ with the
-   operator-ordered gauge term, $\mathcal P_\zeta$, and $f_{\mathrm{NL}}$ in the
-   Maldacena/Planck convention with $\zeta=-\mathcal R$;
-3. $\mathcal P_\zeta$ matches the mode solver to $6\times10^{-9}$; on a straight
-   trajectory $f_{\mathrm{NL}}$ is conserved to the start-depth error, matches
-   Maldacena to next order in $\epsilon$, and satisfies the squeezed
-   consistency relation to 0.33% at $k_3/k_1=0.05$, with the expected
-   $(k_3/k_1)^2$ approach; $\zeta$ correlators are unchanged by a field
-   redefinition.
+1. `curvature_gauge_coefficients` and `curvature_correlators` project the
+   canonical transport to $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$;
+2. the projection matches the mode solver, Maldacena's single-field result,
+   and the squeezed consistency relation, and it is invariant under a field
+   redefinition;
+3. the axion-quartic model reproduces the equilateral $f_{\mathrm{NL}}$ of DFMS
+   Fig. 7 at nine plotted samples and a numerical $\delta N$ result to 0.1%;
+4. `run_bispectrum` writes convention-labeled CSV output, and an isosceles grid
+   of spacing 0.1 resolves the shape to 0.6%;
+5. every departure from a published formula is recorded with references in
+   [`literature-discrepancies.md`](literature-discrepancies.md).
 
-4. the axion-quartic model of DFMS Sec. 9.1 reproduces the equilateral
-   $f_{\mathrm{NL}}$ of their Fig. 7 at nine plotted samples, through a minimum
-   of $-39$ and a maximum of $+17$, and a numerical $\delta N$ calculation
-   agrees with the final value $13.12$ to 0.1%.
-
-Resume with the remaining P3e items: metadata-labeled CSV output and
-triangle-grid convergence.
+Candidate next milestones: reducing the start-depth error of the odd-momentum
+initial blocks, caching or reducing the per-stage vertex cost, reheating and
+post-inflationary transfer, and the nonminimal assisted inflation
+reproduction target listed under P3.
 
 ### Reading order for the active P3 work
 

@@ -8,6 +8,12 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `CovariantMultifieldSystem::run_bispectrum`, which projects the tree-level
+  bispectrum of Fergusson--Shellard `TriangleShape`s on a superhorizon output
+  slice, with CSV writers for the projected rows and the canonical
+  phase-space components and `#` metadata naming the model, gauge, sign,
+  normalization, `f_NL` convention, shape, slices, and the absence of
+  reheating. An isosceles grid test demonstrates shape resolution.
 - A turning two-field benchmark: the axion-quartic model reproduces the
   equilateral `f_NL` of Fig. 7 of Dias, Frazer, Mulryne, and Seery at nine
   samples digitized from the figure's vector path, and a numerical delta N

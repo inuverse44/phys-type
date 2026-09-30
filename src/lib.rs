@@ -6,6 +6,7 @@
 
 pub mod autodiff;
 pub mod background;
+pub mod bispectrum_run;
 pub mod curvature;
 pub mod dimension;
 pub mod field_space;
@@ -25,6 +26,10 @@ pub mod transport;
 pub use autodiff::{Dual, Jet, ThirdOrderJet, Transcendental};
 pub use background::{
     AdaptiveRunSettings, AdaptiveStep, BackgroundRun, Record, RunSettings, Termination,
+};
+pub use bispectrum_run::{
+    BispectrumRecord, BispectrumRun, BispectrumRunError, BispectrumRunSettings,
+    PhaseSpaceBispectrumRecord, TriangleShape, write_bispectrum_metadata,
 };
 pub use curvature::{
     CurvatureCorrelators, CurvatureGaugeCoefficients, CurvatureGaugeQuadratic,

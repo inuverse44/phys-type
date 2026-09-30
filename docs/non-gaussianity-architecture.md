@@ -366,14 +366,16 @@ recorded in [`three-point-transport.md`](three-point-transport.md).
 
 ### P3e implementation status
 
-P3e is in progress. The projection to $\zeta$ uses the covariant "simple"
+P3e is complete. The projection to $\zeta$ uses the covariant "simple"
 second-order gauge transformation on a superhorizon slice, and reports
 $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ with an explicit sign and
 normalization convention. The momentum arguments left open above are fixed
 in [`curvature-projection.md`](curvature-projection.md), which also records
 the validation against the mode solver, Maldacena's single-field result, and
-the squeezed consistency relation. Metadata-labeled output, a published
-two-field comparison, and triangle-grid convergence remain.
+the squeezed consistency relation. The axion-quartic model reproduces the
+published result of Dias, Frazer, Mulryne, and Seery, `run_bispectrum` writes
+convention-labeled CSV output, and an isosceles grid demonstrates shape
+resolution.
 
 ## Acceptance boundary
 
@@ -390,6 +392,11 @@ The non-Gaussianity milestone is complete only when:
 
 Until then, the repository must describe the feature as transport
 infrastructure, not as a prediction of primordial non-Gaussianity.
+
+**Status (2026-09-30):** every condition above is met; see
+[`curvature-projection.md`](curvature-projection.md) for the single-field,
+axion-quartic, grid-convergence, and CSV-metadata evidence and for the scope
+and limitations of the prediction.
 
 ## Primary references
 
