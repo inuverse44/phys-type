@@ -205,6 +205,18 @@ coupling that gives $n_s=0.965$ from $\xi_2\approx0.0222$ to $0.0228$. Given the
 numerical $s_e$, Eq. (3.1) itself agrees with the exact tilt to
 $5\times10^{-4}$ for $0.021\le\xi_2\le0.025$.
 
+### 9. Crossing-time statistics in [HKKPT] Eq. (3.5) — approximation note
+
+This is not an error. The slow-roll $\delta N$ expression (3.5) assumes massless,
+uncorrelated field perturbations at horizon crossing. For loop inflation with
+$\xi_2=0.022$ and $s_*=10^{-3}$, the assistant direction is tachyonic
+($\eta^{\sigma\sigma}\approx-4\xi_2$). Eq. (3.5) and a numerical crossing-time
+$\delta N$ then agree with each other ($-0.216$ and $-0.199$ in the Planck sign)
+but underestimate $|f_{\mathrm{NL}}|$ by about 20%. A phase-space $\delta N$ from a
+later slice, which uses the evolved covariance, reproduces the tree-level
+transport value $-0.2514$ to 0.05%. The conclusion of the reference that
+$|f_{\mathrm{NL}}|\ll1$ is unaffected.
+
 ## Agreements checked
 
 Recording these makes clear which published results have been independently

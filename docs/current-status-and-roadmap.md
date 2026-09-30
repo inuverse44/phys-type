@@ -48,7 +48,7 @@ The repository currently has two distinct scientific boundaries:
 | Three-point transport (P3d) | complete | sourced canonical evolution converges on the reference benchmark and transforms as a tensor under field redefinitions |
 | Curvature projection (P3e) | complete | $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ are validated in single-field limits and against the published axion-quartic result, with labeled CSV output and grid convergence |
 | Primordial bispectrum prediction | available within scope | tree level, during inflation, no reheating; see `curvature-projection.md` |
-| Nonminimally assisted inflation | in progress | Einstein-frame geometry and loop potential implemented; $n_s$ agrees with the reference given the exact $s_e$; an $f_{\mathrm{NL}}$ difference between transport and $\delta N$ is open |
+| Nonminimally assisted inflation | in progress | loop inflation: $n_s$ agrees with the reference given the exact $s_e$, and $f_{\mathrm{NL}}$ is confirmed by phase-space $\delta N$; other branches and Class II remain |
 
 Consequently, the crate can presently make power-spectrum predictions within
 its documented inflation/no-reheating scope. It must not yet describe its
@@ -75,11 +75,15 @@ The first external model validation after P3 is under way; see
    $n_s=0.965$ coupling from 0.0228 to 0.0222.
 3. The reference's Eq. (4.2) typo and its Lyth--Rodriguez $f_{\mathrm{NL}}$ sign
    are recorded in [`literature-discrepancies.md`](literature-discrepancies.md),
-   entries 6--8.
+   entries 6--9.
 
-Resume with the open $f_{\mathrm{NL}}$ item: the converged transport value
-(equilateral $-0.251$) differs from $\delta N$ ($-0.199$) and the reference's
-Eq. (3.5) ($-0.216$).
+4. The $f_{\mathrm{NL}}$ difference is resolved: a phase-space $\delta N$ with the
+   evolved covariance reproduces the transport to 0.05% for equilateral and
+   squeezed shapes. The crossing-time $\delta N$ and Eq. (3.5) underestimate
+   $|f_{\mathrm{NL}}|$ by about 20% because the assistant direction is tachyonic.
+
+Resume with step 2 of the plan in that document: the $s_*=0.1$ and $\alpha=1$
+branches of the reference.
 
 ### Reading order for the active P3 work
 

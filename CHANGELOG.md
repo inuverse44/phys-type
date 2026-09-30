@@ -8,6 +8,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A phase-space delta N consistency test: on superhorizon slices, delta N
+  with the evolved covariance and field three-point function reproduces the
+  transport `f_NL` of assisted loop inflation to 0.05% for equilateral and
+  squeezed shapes. The crossing-time delta N falls 20% short of that value.
 - `NonminimalAssistedFieldSpace` and `NonminimalLoopInflationPotential`, the
   Einstein-frame model of nonminimally assisted inflation (arXiv:2302.05866)
   in `(phi, s)` coordinates. Their geometry is checked against
