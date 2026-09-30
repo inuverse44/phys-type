@@ -4087,11 +4087,11 @@ mod tests {
         2,
     >;
 
-    fn assisted_loop(coupling: f64) -> AssistedSystem {
+    fn assisted_loop(alpha: f64, coupling: f64) -> AssistedSystem {
         CovariantMultifieldSystem::in_planck_units(
             crate::NonminimalLoopInflationPotential {
                 scale: crate::EnergyDensity::new(1.0e-10),
-                alpha: 0.1,
+                alpha,
                 coupling,
                 planck_mass: Mass::new(1.0),
             },
@@ -4122,7 +4122,7 @@ mod tests {
         two_b: f64,
     }
 
-    fn assisted_slow_roll(xi: f64, phi: f64, s: f64) -> AssistedSlowRoll {
+    fn assisted_slow_roll(alpha: f64, xi: f64, phi: f64, s: f64) -> AssistedSlowRoll {
         let kappa = 1.0;
         let denominator = 1.0 + xi * s * s * (1.0 + 6.0 * kappa * xi);
         let epsilon_sigma = 8.0 * xi * xi * s * s / denominator;
@@ -4131,7 +4131,6 @@ mod tests {
             * (-1.0 + 3.0 * xi * s * s + 4.0 * xi * xi * s.powi(4) * (1.0 + 6.0 * kappa * xi))
             / (denominator * denominator);
         let eta_b = -16.0 * xi * (1.0 + xi * s * s) / (denominator * denominator);
-        let alpha = 0.1;
         let loop_factor = 1.0 + alpha * phi.ln();
         // Corrected Eq. (4.2): phi^2, not phi, in epsilon^(0).
         let epsilon_zero = alpha * alpha / (2.0 * phi * phi * loop_factor * loop_factor);
@@ -4191,6 +4190,8 @@ mod tests {
     }
 
     struct CalibratedAssistedLoop {
+        alpha: f64,
+        s_star: f64,
         coupling: f64,
         system: AssistedSystem,
         initial: MultifieldState<2>,
@@ -4199,32 +4200,59 @@ mod tests {
         settings: SpectrumRunSettings,
     }
 
-    /// Loop inflation with alpha = 0.1 and kappa = 1, with the initial s tuned
-    /// so that s = 1e-3 at the pivot, 60 e-folds before epsilon_H = 1.
-    fn calibrated_assisted_loop(coupling: f64) -> CalibratedAssistedLoop {
-        let system = assisted_loop(coupling);
+    /// Loop inflation with the given alpha and kappa = 1, with the initial s
+    /// tuned so that s = s_star at the pivot, 60 e-folds before epsilon_H = 1.
+    fn calibrated_assisted_loop(alpha: f64, s_star: f64, coupling: f64) -> CalibratedAssistedLoop {
+        calibrated_assisted_loop_with_output(alpha, s_star, coupling, 1.0e-3)
+    }
+
+    /// As [`calibrated_assisted_loop`], with the output slice
+    /// `output_before_end` e-folds before epsilon_H = 1.
+    fn calibrated_assisted_loop_with_output(
+        alpha: f64,
+        s_star: f64,
+        coupling: f64,
+        output_before_end: f64,
+    ) -> CalibratedAssistedLoop {
+        let system = assisted_loop(alpha, coupling);
         let settings = SpectrumRunSettings {
             pivot_e_folds_before_end: 60.0,
-            output_e_folds_before_end: 1.0e-3,
+            output_e_folds_before_end: output_before_end,
             k_min_over_pivot: 1.0,
             k_max_over_pivot: 1.0,
             k_count: 1,
             ..SpectrumRunSettings::default()
         };
-        let phi0 = 3.8;
-        let mut s0 = 3.5e-4;
+        // Start about 72 e-folds before the end of phi slow roll, using
+        // N(phi) = [phi^2/2 + alpha (phi^2 ln phi / 2 - phi^2 / 4)] / alpha.
+        let n_phi = |phi: f64| {
+            (phi * phi / 2.0 + alpha * (phi * phi * phi.ln() / 2.0 - phi * phi / 4.0)) / alpha
+        };
+        let (mut low, mut high) = (1.0_f64, 50.0_f64);
+        for _ in 0..100 {
+            let middle = 0.5 * (low + high);
+            if n_phi(middle) - n_phi(0.1) > 72.0 {
+                high = middle;
+            } else {
+                low = middle;
+            }
+        }
+        let phi0 = 0.5 * (low + high);
+        let mut s0 = 0.35 * s_star;
         let mut survey = system
             .survey_background(assisted_start(&system, phi0, s0), &settings)
             .unwrap();
         for _ in 0..6 {
             let pivot = survey.1.state_at(survey.2 - 60.0);
-            s0 *= 1.0e-3 / pivot.phi[1].into_value();
+            s0 *= s_star / pivot.phi[1].into_value();
             survey = system
                 .survey_background(assisted_start(&system, phi0, s0), &settings)
                 .unwrap();
         }
         let (_, trajectory, end) = survey;
         CalibratedAssistedLoop {
+            alpha,
+            s_star,
             coupling,
             system,
             initial: assisted_start(&system, phi0, s0),
@@ -4356,7 +4384,7 @@ mod tests {
         fn analytic_prediction(&self) -> (f64, f64) {
             let pivot = self.pivot();
             let final_state = self.trajectory.state_at(self.end);
-            let alpha: f64 = 0.1;
+            let alpha = self.alpha;
             // phi_e = [sqrt(2) W_0(e^{1/alpha} / sqrt(2))]^{-1}; W_0 by Newton.
             let argument = (1.0 / alpha).exp() / 2.0_f64.sqrt();
             let mut w = argument.ln();
@@ -4366,19 +4394,66 @@ mod tests {
             let phi_e = 1.0 / (2.0_f64.sqrt() * w);
             assisted_delta_n_prediction(
                 &assisted_slow_roll(
+                    self.alpha,
                     self.coupling,
                     pivot.phi[0].into_value(),
                     pivot.phi[1].into_value(),
                 ),
-                &assisted_slow_roll(self.coupling, phi_e, final_state.phi[1].into_value()),
+                &assisted_slow_roll(
+                    self.alpha,
+                    self.coupling,
+                    phi_e,
+                    final_state.phi[1].into_value(),
+                ),
             )
+        }
+
+        /// Eqs. (3.1) and (3.5) evaluated entirely with the prescription of
+        /// the reference: phi_* from 60 e-folds of phi slow roll from
+        /// epsilon^(0) = 1, and s_e from Eq. (3.9) with N_e = 60.
+        fn paper_prescription(&self) -> (f64, f64, f64) {
+            let (alpha, xi, s_star) = (self.alpha, self.coupling, self.s_star);
+            let bisect = |f: &dyn Fn(f64) -> f64, mut low: f64, mut high: f64| {
+                for _ in 0..200 {
+                    let middle = 0.5 * (low + high);
+                    if f(low) * f(middle) <= 0.0 {
+                        high = middle;
+                    } else {
+                        low = middle;
+                    }
+                }
+                0.5 * (low + high)
+            };
+            let argument = (1.0 / alpha).exp() / 2.0_f64.sqrt();
+            let mut w = argument.ln().max(0.5);
+            for _ in 0..50 {
+                w -= (w * w.exp() - argument) / (w.exp() * (w + 1.0));
+            }
+            let phi_e = 1.0 / (2.0_f64.sqrt() * w);
+            // N(phi) = int V_J / V_J' dphi = [phi^2/2 + alpha (phi^2 ln phi / 2 - phi^2 / 4)] / alpha.
+            let n_phi = |phi: f64| {
+                (phi * phi / 2.0 + alpha * (phi * phi * phi.ln() / 2.0 - phi * phi / 4.0)) / alpha
+            };
+            let phi_star = bisect(&|phi| n_phi(phi) - n_phi(phi_e) - 60.0, phi_e * 1.01, 50.0);
+            let e_folds = |s_e: f64| {
+                ((s_e / s_star).ln()
+                    + 3.0 * xi * ((1.0 + xi * s_e * s_e) / (1.0 + xi * s_star * s_star)).ln())
+                    / (4.0 * xi)
+                    - 60.0
+            };
+            let s_e = bisect(&e_folds, s_star, 100.0);
+            let (n_s, f_nl) = assisted_delta_n_prediction(
+                &assisted_slow_roll(alpha, xi, phi_star, s_star),
+                &assisted_slow_roll(alpha, xi, phi_e, s_e),
+            );
+            (n_s, f_nl, s_e)
         }
     }
 
     #[test]
     #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
     fn assisted_loop_spectral_index_agrees_with_delta_n_and_eq_3_1() {
-        let model = calibrated_assisted_loop(0.022);
+        let model = calibrated_assisted_loop(0.1, 1.0e-3, 0.022);
         let pivot = model.end - 60.0;
         let mode_solver = 1.0 + model.mode_solver_tilt(model.output());
         let (k_minus, p_minus, _) = model.delta_n_at_crossing(pivot - 0.5);
@@ -4406,7 +4481,7 @@ mod tests {
     #[test]
     #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
     fn assisted_loop_crossing_delta_n_underestimates_the_converged_f_nl() {
-        let model = calibrated_assisted_loop(0.022);
+        let model = calibrated_assisted_loop(0.1, 1.0e-3, 0.022);
         let k = model.k_pivot();
         let bench = sourced_benchmark_with(
             model.system,
@@ -4446,7 +4521,7 @@ mod tests {
         // Given the numerical s_e, Eq. (3.1) follows the exact tilt while n_s
         // moves by 0.04 across this range of the coupling.
         for xi in [0.021, 0.023, 0.024] {
-            let model = calibrated_assisted_loop(xi);
+            let model = calibrated_assisted_loop(0.1, 1.0e-3, xi);
             let numerical = 1.0 + model.mode_solver_tilt(model.output());
             let (analytic, _) = model.analytic_prediction();
             assert!(
@@ -4512,7 +4587,7 @@ mod tests {
             let (_, perturbed, _) = self.system.survey_background(start, &precise).unwrap();
             perturbed
                 .crossing(|st| (self.system.hubble(st) - target).into_value())
-                .unwrap()
+                .expect("a perturbed trajectory ended before the target surface; move it earlier")
         }
 
         /// Phase-space delta N from the slice `n_c` for the triangle `shape`
@@ -4649,7 +4724,7 @@ mod tests {
         // delta N on a superhorizon slice, with the evolved Gaussian covariance
         // and the transported field three-point function, must reproduce the
         // transport f_NL for any slice and shape.
-        let model = calibrated_assisted_loop(0.022);
+        let model = calibrated_assisted_loop(0.1, 1.0e-3, 0.022);
         let k = model.k_pivot();
         let pivot = model.end - 60.0;
         for shape in [[1.0, 1.0, 1.0], [1.0, 1.0, 0.1]] {
@@ -4671,6 +4746,66 @@ mod tests {
                 // The field three-point term is small on these slices.
                 assert!((total - gaussian).abs() < 1.0e-2 * transport.abs());
             }
+        }
+    }
+
+    /// The four (alpha, s_*) branches of Sec. 4.1 of arXiv:2302.05866, each
+    /// with the numerical coupling that gives n_s = 0.965 at the end of
+    /// inflation.
+    const ASSISTED_BRANCHES: [(f64, f64, f64); 4] = [
+        (0.1, 1.0e-3, 0.0228),
+        (0.1, 0.1, 0.0137),
+        (1.0, 1.0e-3, 0.0214),
+        (1.0, 0.1, 0.0124),
+    ];
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn assisted_loop_branches_follow_eq_3_1_with_the_exact_s_e() {
+        for (alpha, s_star, xi) in ASSISTED_BRANCHES {
+            let model = calibrated_assisted_loop(alpha, s_star, xi);
+            let numerical = 1.0 + model.mode_solver_tilt(model.output());
+            let (analytic, _) = model.analytic_prediction();
+            let (paper, _, paper_s_e) = model.paper_prescription();
+            let s_e = model.trajectory.state_at(model.end).phi[1].into_value();
+            assert!(
+                (numerical - 0.965).abs() < 2.0e-3,
+                "{alpha} {s_star}: n_s {numerical}"
+            );
+            assert!(
+                (numerical - analytic).abs() < 1.5e-3,
+                "{alpha} {s_star}: {numerical} vs Eq. (3.1) {analytic}"
+            );
+            // The slow-roll relation (3.9) overestimates s_e, which lowers n_s.
+            assert!(
+                paper_s_e > s_e && paper < numerical,
+                "{alpha} {s_star}: {paper} vs {numerical}"
+            );
+        }
+    }
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn assisted_loop_branches_transport_matches_phase_space_delta_n() {
+        for (alpha, s_star, xi) in ASSISTED_BRANCHES {
+            // A slightly earlier target keeps every perturbed trajectory
+            // inflating until it reaches the common surface.
+            let model = calibrated_assisted_loop_with_output(alpha, s_star, xi, 1.0e-2);
+            let k = model.k_pivot();
+            let bench = sourced_benchmark_with(
+                model.system,
+                model.initial,
+                [1.0, 1.0, 1.0],
+                Some(k),
+                &model.settings,
+            );
+            let transport = project_benchmark(&bench, 5.0, model.output()).reduced_f_nl();
+            let (delta_n, _, _) =
+                model.phase_space_delta_n(k, [1.0, 1.0, 1.0], model.end - 57.0, 1.0e-2);
+            assert!(
+                (delta_n - transport).abs() < (3.0e-3 * transport.abs()).max(1.0e-4),
+                "{alpha} {s_star}: delta N {delta_n} vs transport {transport}"
+            );
         }
     }
 }

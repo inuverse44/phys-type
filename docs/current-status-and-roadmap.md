@@ -48,7 +48,7 @@ The repository currently has two distinct scientific boundaries:
 | Three-point transport (P3d) | complete | sourced canonical evolution converges on the reference benchmark and transforms as a tensor under field redefinitions |
 | Curvature projection (P3e) | complete | $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ are validated in single-field limits and against the published axion-quartic result, with labeled CSV output and grid convergence |
 | Primordial bispectrum prediction | available within scope | tree level, during inflation, no reheating; see `curvature-projection.md` |
-| Nonminimally assisted inflation | in progress | loop inflation: $n_s$ agrees with the reference given the exact $s_e$, and $f_{\mathrm{NL}}$ is confirmed by phase-space $\delta N$; other branches and Class II remain |
+| Nonminimally assisted inflation | in progress | all four loop-inflation branches reproduced; Class II remains |
 
 Consequently, the crate can presently make power-spectrum predictions within
 its documented inflation/no-reheating scope. It must not yet describe its
@@ -82,8 +82,13 @@ The first external model validation after P3 is under way; see
    squeezed shapes. The crossing-time $\delta N$ and Eq. (3.5) underestimate
    $|f_{\mathrm{NL}}|$ by about 20% because the assistant direction is tachyonic.
 
-Resume with step 2 of the plan in that document: the $s_*=0.1$ and $\alpha=1$
-branches of the reference.
+5. All four $(\alpha,s_*)$ branches of Sec. 4.1 follow the same pattern. The
+   $n_s=0.965$ coupling moves up by 1.6--3.2% relative to the reference's
+   slow-roll prescription. The transport $f_{\mathrm{NL}}$ is confirmed by
+   phase-space $\delta N$ in every branch.
+
+Resume with step 3 of the plan in that document: a general end-of-inflation
+event and the Class II power-law and hybrid examples.
 
 ### Reading order for the active P3 work
 
