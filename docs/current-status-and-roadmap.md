@@ -50,14 +50,14 @@ The repository currently has two distinct scientific boundaries:
 | Primordial bispectrum prediction | available within scope | tree level, during inflation, no reheating; see `curvature-projection.md` |
 | Nonminimally assisted inflation | complete | the loop-inflation (Class I) and power-law and hybrid (Class II) examples of arXiv:2302.05866 reproduced; see `nonminimal-assisted-inflation.md` |
 
-Consequently, the crate can presently make power-spectrum predictions within
-its documented inflation/no-reheating scope. It must not yet describe its
-three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
+Consequently, the crate can presently make power-spectrum predictions and
+tree-level predictions of $B_\zeta$ and $f_{\mathrm{NL}}$ within its documented
+inflation/no-reheating scope. Loop corrections and post-inflationary evolution
+are outside that scope; see [`curvature-projection.md`](curvature-projection.md).
 
 ### Next-session handoff
 
-The implementation boundary is the branch `feat/end-of-inflation-events`,
-based on merge commit `7aa840f` (PR #31). The validated state is 214 unit
+The implementation boundary is `main` at merge commit `e115481` (PR #32). The validated state is 214 unit
 tests plus 24 compile-fail cases, with fifteen expensive ignored tests that
 pass in release mode (`cargo test --release -- --ignored`; they are not run by
 CI). Clippy with warnings denied, rustfmt, and rustdoc pass locally.
