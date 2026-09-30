@@ -178,7 +178,12 @@ reproduced here:
   ordering note of entry 5;
 - the squeezed-limit consistency relation of [M] and its leading-order
   bispectrum, as recorded in
-  [`curvature-projection.md`](curvature-projection.md).
+  [`curvature-projection.md`](curvature-projection.md);
+- [DFMS] Fig. 7, the equilateral $f_{\mathrm{NL}}$ of the axion-quartic model of
+  Sec. 9.1, reproduced at nine plotted samples to the precision of the figure,
+  with the samples recovered from its vector path by
+  `docs/derivations/digitize_dfms_figure7.py`. The agreement also confirms
+  that the printed $1/3$ of entry 1 is not what their code uses.
 
 ## Beyond the printed formulas
 

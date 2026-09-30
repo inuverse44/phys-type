@@ -46,7 +46,7 @@ The repository currently has two distinct scientific boundaries:
 | Two-field background and linear perturbations | complete | produces validated adiabatic, entropy, cross, and curvature power spectra |
 | Direct two-point phase-space transport | complete | reproduces the independent mode solver for all complex covariance blocks |
 | Three-point transport (P3d) | complete | sourced canonical evolution converges on the reference benchmark and transforms as a tensor under field redefinitions |
-| Curvature projection (P3e) | in progress | $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ are projected and validated in single-field limits; metadata-labeled output and a published two-field comparison remain |
+| Curvature projection (P3e) | in progress | $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ are projected and validated in single-field limits and against the published axion-quartic result; metadata-labeled output and triangle-grid convergence remain |
 | Primordial bispectrum prediction | not yet available | the remaining P3e acceptance items must pass first |
 
 Consequently, the crate can presently make power-spectrum predictions within
@@ -78,9 +78,13 @@ $\zeta$; see [`curvature-projection.md`](curvature-projection.md):
    $(k_3/k_1)^2$ approach; $\zeta$ correlators are unchanged by a field
    redefinition.
 
-Resume with the remaining P3e items: metadata-labeled CSV output, a turning
-two-field comparison with a published transport result, and triangle-grid
-convergence.
+4. the axion-quartic model of DFMS Sec. 9.1 reproduces the equilateral
+   $f_{\mathrm{NL}}$ of their Fig. 7 at nine plotted samples, through a minimum
+   of $-39$ and a maximum of $+17$, and a numerical $\delta N$ calculation
+   agrees with the final value $13.12$ to 0.1%.
+
+Resume with the remaining P3e items: metadata-labeled CSV output and
+triangle-grid convergence.
 
 ### Reading order for the active P3 work
 
