@@ -60,7 +60,8 @@ pub use multifield::{
     MultifieldSystem, TwoFieldKinematics,
 };
 pub use nonminimal::{
-    NonminimalAssistedFieldSpace, NonminimalLoopInflationPotential, NonminimalParameterError,
+    NonminimalAssistedFieldSpace, NonminimalHybridPotential, NonminimalLoopInflationPotential,
+    NonminimalParameterError, NonminimalPowerLawPotential,
 };
 pub use num_complex::Complex64;
 pub use observation::{
@@ -91,8 +92,8 @@ pub use spectra::{
     project,
 };
 pub use spectrum_run::{
-    BackgroundRecord, ModeEvolutionRecord, Pivot, SpectrumRecord, SpectrumRun, SpectrumRunError,
-    SpectrumRunSettings, SpectrumRunStage, write_metadata,
+    BackgroundRecord, EndOfInflation, ModeEvolutionRecord, Pivot, SpectrumRecord, SpectrumRun,
+    SpectrumRunError, SpectrumRunSettings, SpectrumRunStage, write_metadata,
 };
 pub use state::{State, StateDelta, StateDerivative};
 pub use time::ConformalTime;

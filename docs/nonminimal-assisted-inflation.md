@@ -6,7 +6,8 @@ This is the first external model validation after the non-Gaussianity
 milestone. The target is Hyun, Kim, Kodama, Park, and Takahashi,
 [*Nonminimally Assisted Inflation: A General Analysis*](https://arxiv.org/abs/2302.05866)
 (arXiv:2302.05866v2, hereafter [HKKPT]), and within it the loop-inflation
-example of Class I (Sec. 4.1). The contract from the roadmap is that the
+example of Class I (Sec. 4.1) and the Class II power-law and hybrid examples
+(Secs. 4.2 and 4.3). The contract from the roadmap is that the
 Einstein-frame metric and potential enter as ordinary `FieldSpaceGeometry` and
 potential providers, with no special case in the solvers. The dimension,
 index-variance, Riemann-identity, and covariance checks must all stay active.
@@ -211,6 +212,69 @@ case. That slice is used because a perturbed trajectory may end inflation
 before the target surface of $10^{-3}$ e-folds. $f_{\mathrm{NL}}$ still evolves in
 the last e-folds, for example from $-0.861$ to $-0.713$ in the first branch.
 
+## Class II: power-law and hybrid
+
+In Class II, inflation ends when $\phi$ reaches a prescribed value rather than
+by slow-roll violation. `SpectrumRunSettings::end_of_inflation` selects the
+event of the background survey. The default
+`EndOfInflation::SlowRollViolation` is the old $\epsilon_H=1$ event.
+`EndOfInflation::FieldValue { field, value }` ends the survey where the
+coordinate `field` crosses `value`, approached from its initial side. If
+$\epsilon_H=1$ comes first, the run fails with
+`SpectrumRunError::SlowRollEndedFirst`; the metadata records the chosen event.
+
+The two potentials are
+
+- `NonminimalPowerLawPotential`, $V=\Lambda^4e^{-\lambda\phi}/(1+\xi_2 s^2)^2$,
+  starting at $\phi=0$ and ending at $\phi=72\lambda$. $\epsilon^{(\phi)}=\lambda^2/2$
+  is constant, so this is 72 e-folds of $\phi$ slow roll. It stands for the
+  separate sector that ends inflation.
+- `NonminimalHybridPotential`, $V=\Lambda^4[1+(\phi/\mu)^2]/(1+\xi_2s^2)^2$,
+  ending at the waterfall $\phi=\phi_e$, with the initial $\phi$ set by bisection
+  on the slow-roll $N(\phi)=72$.
+
+The pivot again leaves 60 e-folds before the end, and observables are taken
+$10^{-3}$ e-folds before it. For Class II the $\delta N$ expressions of the
+reference use $\epsilon^{(\phi)}$ at the end surface instead of $1/2$; the
+numerical-input version of Eq. (3.1) uses the numerical final $\phi$ and $s_e$.
+The coupling that gives $n_s=0.965$ is
+
+| model | $s_*$ | numerical | prescription of the reference | range quoted in Secs. 4.2--4.3 |
+| --- | --- | --- | --- | --- |
+| power-law $\lambda=0.01$ | $10^{-3}$ | 0.01100 | 0.01090 | $(1.05$--$1.11)\times10^{-2}$ |
+| power-law $\lambda=0.01$ | $0.1$ | 0.00516 | 0.00513 | $(4.5$--$5.6)\times10^{-3}$ |
+| power-law $\lambda=0.05$ | $10^{-3}$ | 0.01353 | 0.01336 | $(1.29$--$1.36)\times10^{-2}$ |
+| power-law $\lambda=0.05$ | $0.1$ | 0.00662 | 0.00658 | $(6.0$--$6.9)\times10^{-3}$ |
+| hybrid $\mu=10$, $\phi_e=1$ | $10^{-3}$ | 0.01077 | 0.01069 | $(1.0$--$1.1)\times10^{-2}$ |
+| hybrid $\mu=10$, $\phi_e=1$ | $0.1$ | 0.00486 | 0.00485 | $(4.3$--$5.3)\times10^{-3}$ |
+| hybrid $\mu=6$, $\phi_e=0.06$ | $10^{-3}$ | 0.00558 | 0.00567 | $(5.3$--$5.9)\times10^{-3}$ |
+| hybrid $\mu=6$, $\phi_e=0.06$ | $0.1$ | 0.00340 | 0.00350 | $(2.2$--$4.3)\times10^{-3}$ |
+
+All numerical couplings lie inside the quoted ranges. The shifts are at most
+1.6%, smaller than for loop inflation, because $\epsilon^{(\phi)}$ is small and
+nearly constant, so the slow-roll relation (3.9) is more accurate. With the
+numerical $s_e$, Eq. (3.1) reproduces the exact tilt to $1.5\times10^{-3}$.
+
+The end-of-inflation $f_{\mathrm{NL}}$ (Planck sign) at four of these couplings:
+
+| model, $s_*$, $\xi_2$ | transport | crossing-time $\delta N$ | Eq. (3.5), numerical inputs | Eq. (3.5), prescription of the reference |
+| --- | --- | --- | --- | --- |
+| power-law 0.01, $10^{-3}$, 0.0110 | $-1.635$ | $-1.508$ | $-1.540$ | $-1.708$ |
+| power-law 0.05, $0.1$, 0.00662 | $-0.0834$ | $-0.0810$ | $-0.0810$ | $-0.0821$ |
+| hybrid 10, $10^{-3}$, 0.01077 | $-13.36$ | $-12.31$ | $-12.51$ | $-13.17$ |
+| hybrid 6, $0.1$, 0.0034 | $0.0620$ | $0.0620$ | $0.0603$ | $0.0602$ |
+
+For $s_*=10^{-3}$ the crossing-time $\delta N$ again falls short, by about 8%,
+for the reason of the loop case. The hybrid $\mu=10$ branch has
+$|f_{\mathrm{NL}}|\approx13$; the reference's prescription gives a similar value. On a slice $10^{-2}$ e-folds
+before the end, the phase-space $\delta N$ reproduces the transport to 0.1%
+in all four cases (for example $-1.6331$ against $-1.6332$ and $-13.334$ against
+$-13.348$).
+
+The phase-space $\delta N$ uses the step $h_s=\min(10^{-2}s,10^{-5})$ in $s$.
+A purely relative step fails for $s_*=10^{-3}$: $10^{-2}s$ is too coarse for
+$N_{ss}$, and $10^{-4}s$ loses precision to roundoff.
+
 ## Tests
 
 The regular suite runs the geometry and potential tests in `src/nonminimal.rs`.
@@ -225,7 +289,14 @@ The ignored release-mode tests are:
   $\delta N$ check above for both shapes and two slices;
 - `assisted_loop_branches_follow_eq_3_1_with_the_exact_s_e` and
   `assisted_loop_branches_transport_matches_phase_space_delta_n`, the same
-  checks for all four branches.
+  checks for all four branches;
+- `assisted_class_two_branches_follow_eq_3_1` and
+  `assisted_class_two_transport_matches_phase_space_delta_n`, the Class II
+  checks: $n_s$, Eq. (3.1), the quoted coupling ranges, the phase-space
+  $\delta N$ agreement, and the crossing-time deficit.
+
+`a_field_value_event_ends_the_survey_at_the_requested_crossing` in the regular
+suite checks the field-value event itself.
 
 ## Plan
 
@@ -247,7 +318,7 @@ next begins.
    the numerical couplings for $n_s=0.965$ with the ranges quoted in Sec. 4.1:
    $(1.2$--$1.4)\times10^{-2}$, $(1.9$--$2.1)\times10^{-2}$, and
    $(1.1$--$1.3)\times10^{-2}$, respectively.
-3. **Class II.** Replace the fixed $\epsilon_H=1$ end of the background survey
+3. **Class II. (Completed.)** Replace the fixed $\epsilon_H=1$ end of the background survey
    with a selectable end-of-inflation event, including a field-value
    crossing. Then reproduce the power-law ($V_J=\Lambda^4e^{-\lambda\phi}$, end
    by a separate sector) and hybrid ($V_J=\Lambda^4[1+(\phi/\mu)^2]$, end at the

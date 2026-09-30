@@ -35,6 +35,24 @@ use crate::{
 #[cfg(test)]
 use crate::ConformalTime;
 
+/// The event that ends inflation in the background survey.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum EndOfInflation {
+    /// Slow roll is violated: `epsilon_H = 1`.
+    SlowRollViolation,
+    /// A separate sector, such as a waterfall field, ends inflation when the
+    /// field component `field` crosses `value` from its initial side.
+    ///
+    /// The survey reports an error if `epsilon_H` reaches one first, because
+    /// inflation would then have ended by slow-roll violation instead.
+    FieldValue {
+        /// Index of the field coordinate.
+        field: usize,
+        /// The critical value.
+        value: crate::Field,
+    },
+}
+
 /// Everything the run needs beyond the physical model and its initial state.
 #[derive(Clone, Copy, Debug)]
 pub struct SpectrumRunSettings {
@@ -55,6 +73,8 @@ pub struct SpectrumRunSettings {
     pub max_steps: usize,
     /// Give up on inflation ending after this many e-folds.
     pub max_e_folds: f64,
+    /// The event that ends inflation; `epsilon_H = 1` by default.
+    pub end_of_inflation: EndOfInflation,
     /// How many e-folds before its own horizon exit each mode is initialized.
     ///
     /// This is the readable form of the depth `x_init = k/(aH)`, which is its
@@ -93,6 +113,7 @@ impl Default for SpectrumRunSettings {
             ),
             max_steps: 1_000_000,
             max_e_folds: 120.0,
+            end_of_inflation: EndOfInflation::SlowRollViolation,
             e_folds_before_exit: 5.0,
             pivot_e_folds_before_end: 55.0,
             output_e_folds_before_end: 5.0,
@@ -111,9 +132,14 @@ impl Default for SpectrumRunSettings {
 pub enum SpectrumRunError {
     /// A setting was outside its permitted range.
     InvalidSettings(&'static str),
-    /// `epsilon_H` never reached one within `max_e_folds`.
+    /// The end-of-inflation event did not occur within `max_e_folds`.
     InflationDidNotEnd {
         /// The e-folding number actually reached.
+        e_folds: f64,
+    },
+    /// `epsilon_H` reached one before the requested field-value event.
+    SlowRollEndedFirst {
+        /// The e-folding number at which `epsilon_H = 1`.
         e_folds: f64,
     },
     /// Inflation ended before the requested pivot or output time could exist.
@@ -208,6 +234,10 @@ impl fmt::Display for SpectrumRunError {
                     "inflation did not end within {e_folds:e} e-folds"
                 )
             }
+            Self::SlowRollEndedFirst { e_folds } => write!(
+                formatter,
+                "epsilon_H reached one after {e_folds:e} e-folds, before the field-value end of inflation"
+            ),
             Self::NotEnoughEFolds {
                 available,
                 required,
@@ -509,6 +539,16 @@ pub fn write_metadata<W: Write>(
         settings.e_folds_before_exit
     )?;
     writeln!(writer, "# x_init: {:e}", start_depth(settings))?;
+    match settings.end_of_inflation {
+        EndOfInflation::SlowRollViolation => {
+            writeln!(writer, "# end_of_inflation: epsilon_H = 1")?;
+        }
+        EndOfInflation::FieldValue { field, value } => writeln!(
+            writer,
+            "# end_of_inflation: field {field} crosses {:e} M_pl",
+            value.into_value()
+        )?,
+    }
     // The absolute tolerances are per component group, so the metadata
     // records each of them rather than one number.
     let absolute = &settings.tolerances.absolute;
@@ -1226,8 +1266,16 @@ where
         let mut accepted = 0_usize;
         let mut checkpoints = vec![self.background_checkpoint(&initial, &initial)];
 
-        // Inflation ends where epsilon_H reaches one. The survey also stops if
-        // the e-folding budget runs out first, which is reported separately.
+        // Inflation ends at the requested event. The survey also stops if the
+        // e-folding budget runs out, or if slow roll is violated before a
+        // field-value event; both are reported separately.
+        let field_event = match settings.end_of_inflation {
+            EndOfInflation::SlowRollViolation => None,
+            EndOfInflation::FieldValue { field, value } => {
+                let side = (initial.phi[field] - value).into_value().signum();
+                Some((field, value, side))
+            }
+        };
         let (final_state, _) = advance_until(
             self,
             initial,
@@ -1240,8 +1288,12 @@ where
             |state| {
                 let remaining = settings.max_e_folds - state.e_folds(&initial);
                 let inflating = 1.0 - self.epsilon_h(state);
+                let before_field_event = field_event
+                    .map_or(f64::INFINITY, |(field, value, side)| {
+                        side * (state.phi[field] - value).into_value()
+                    });
 
-                remaining.min(inflating)
+                remaining.min(inflating).min(before_field_event)
             },
             |state, _| {
                 accepted += 1;
@@ -1266,7 +1318,21 @@ where
         }
 
         let e_folds = final_state.e_folds(&initial);
-        if self.epsilon_h(&final_state) < 1.0 - 1.0e-9 {
+        let ended = match field_event {
+            None => self.epsilon_h(&final_state) >= 1.0 - 1.0e-9,
+            Some((field, value, side)) => {
+                let distance = side * (final_state.phi[field] - value).into_value();
+                if distance > 1.0e-9 * value.into_value().abs().max(1.0) {
+                    if self.epsilon_h(&final_state) >= 1.0 - 1.0e-9 {
+                        return Err(SpectrumRunError::SlowRollEndedFirst { e_folds });
+                    }
+                    false
+                } else {
+                    true
+                }
+            }
+        };
+        if !ended {
             return Err(SpectrumRunError::InflationDidNotEnd { e_folds });
         }
 
@@ -1886,6 +1952,13 @@ pub(crate) fn validate(settings: &SpectrumRunSettings) -> Result<(), SpectrumRun
             "pivot and output times must be finite and no later than inflation end",
         ));
     }
+    if let EndOfInflation::FieldValue { field, value } = settings.end_of_inflation
+        && (field >= 2 || !value.into_value().is_finite())
+    {
+        return Err(SpectrumRunError::InvalidSettings(
+            "a field-value end of inflation needs a field index below 2 and a finite value",
+        ));
+    }
     if !settings.max_e_folds.is_finite() || settings.max_e_folds <= 0.0 {
         return Err(SpectrumRunError::InvalidSettings(
             "max_e_folds must be positive and finite",
@@ -2029,6 +2102,51 @@ mod tests {
             mode_sample_every: 200,
             ..SpectrumRunSettings::default()
         }
+    }
+
+    #[test]
+    fn a_field_value_event_ends_the_survey_at_the_requested_crossing() {
+        let system = system([1.0e-6, 1.5e-6]);
+        let initial = slow_roll_start(&system, [12.0, 8.0]);
+        let slow_roll = quick_settings();
+        let (_, _, natural_end) = system.survey_background(initial, &slow_roll).unwrap();
+        let settings = SpectrumRunSettings {
+            end_of_inflation: EndOfInflation::FieldValue {
+                field: 0,
+                value: Field::new(6.0),
+            },
+            ..quick_settings()
+        };
+        let (_, trajectory, end) = system.survey_background(initial, &settings).unwrap();
+        let final_state = trajectory.state_at(end);
+
+        assert!(end < natural_end);
+        assert!((final_state.phi[0].into_value() - 6.0).abs() < 1.0e-8);
+        assert!(system.epsilon_h(&final_state) < 1.0);
+
+        // A value the trajectory cannot reach before slow roll ends.
+        let unreachable = SpectrumRunSettings {
+            end_of_inflation: EndOfInflation::FieldValue {
+                field: 0,
+                value: Field::new(-3.0),
+            },
+            ..quick_settings()
+        };
+        assert!(matches!(
+            system.survey_background(initial, &unreachable),
+            Err(SpectrumRunError::SlowRollEndedFirst { .. })
+        ));
+        let invalid = SpectrumRunSettings {
+            end_of_inflation: EndOfInflation::FieldValue {
+                field: 2,
+                value: Field::new(1.0),
+            },
+            ..quick_settings()
+        };
+        assert!(matches!(
+            validate(&invalid),
+            Err(SpectrumRunError::InvalidSettings(_))
+        ));
     }
 
     #[test]
@@ -4081,25 +4199,207 @@ mod tests {
         );
     }
 
-    type AssistedSystem = CovariantMultifieldSystem<
-        crate::NonminimalLoopInflationPotential,
-        crate::NonminimalAssistedFieldSpace,
-        2,
-    >;
-
-    fn assisted_loop(alpha: f64, coupling: f64) -> AssistedSystem {
-        CovariantMultifieldSystem::in_planck_units(
-            crate::NonminimalLoopInflationPotential {
-                scale: crate::EnergyDensity::new(1.0e-10),
-                alpha,
-                coupling,
-                planck_mass: Mass::new(1.0),
-            },
-            crate::NonminimalAssistedFieldSpace::new(coupling, 1.0, Mass::new(1.0)).unwrap(),
-        )
+    /// The inflaton sector `V_J(phi)` of the assisted model, together with the
+    /// prescription arXiv:2302.05866 uses for it.
+    trait AssistedInflaton: Copy + core::fmt::Debug {
+        type Potential: crate::ThriceDifferentiableMultifieldPotential<2> + Copy;
+        /// The Einstein-frame potential for the coupling `xi_2`.
+        fn potential(&self, coupling: f64) -> Self::Potential;
+        /// `epsilon^(0)` and `eta^(0)` of `V_J` at `phi`, Eq. (3.14).
+        fn slow_roll(&self, phi: f64) -> (f64, f64);
+        /// E-folds of `phi` slow roll from `phi` to the reference's end value.
+        fn slow_roll_e_folds(&self, phi: f64) -> f64;
+        /// The end-of-inflation value of `phi` in the reference's prescription.
+        fn paper_phi_e(&self) -> f64;
+        /// A bracket for `phi` in which `slow_roll_e_folds` is monotonic.
+        fn phi_bracket(&self) -> (f64, f64);
+        /// The end-of-inflation event of the numerical background.
+        fn end_of_inflation(&self) -> EndOfInflation;
+        /// Class I ends by slow-roll violation, epsilon^phi_e = 1 - epsilon^sigma_e.
+        fn class_one(&self) -> bool;
     }
 
-    fn assisted_start(system: &AssistedSystem, phi: f64, s: f64) -> MultifieldState<2> {
+    fn bisect(f: &dyn Fn(f64) -> f64, mut low: f64, mut high: f64) -> f64 {
+        for _ in 0..200 {
+            let middle = 0.5 * (low + high);
+            if f(low) * f(middle) <= 0.0 {
+                high = middle;
+            } else {
+                low = middle;
+            }
+        }
+        0.5 * (low + high)
+    }
+
+    /// Loop inflation, Sec. 4.1: Class I.
+    #[derive(Clone, Copy, Debug)]
+    struct LoopInflaton {
+        alpha: f64,
+    }
+
+    impl LoopInflaton {
+        fn e_folds_from_zero(&self, phi: f64) -> f64 {
+            let alpha = self.alpha;
+            (phi * phi / 2.0 + alpha * (phi * phi * phi.ln() / 2.0 - phi * phi / 4.0)) / alpha
+        }
+    }
+
+    impl AssistedInflaton for LoopInflaton {
+        type Potential = crate::NonminimalLoopInflationPotential;
+
+        fn potential(&self, coupling: f64) -> Self::Potential {
+            crate::NonminimalLoopInflationPotential {
+                scale: crate::EnergyDensity::new(1.0e-10),
+                alpha: self.alpha,
+                coupling,
+                planck_mass: Mass::new(1.0),
+            }
+        }
+
+        fn slow_roll(&self, phi: f64) -> (f64, f64) {
+            let factor = 1.0 + self.alpha * phi.ln();
+            // Corrected Eq. (4.2): phi^2, not phi, in epsilon^(0).
+            (
+                self.alpha * self.alpha / (2.0 * phi * phi * factor * factor),
+                -self.alpha / (phi * phi * factor),
+            )
+        }
+
+        fn slow_roll_e_folds(&self, phi: f64) -> f64 {
+            self.e_folds_from_zero(phi) - self.e_folds_from_zero(self.paper_phi_e())
+        }
+
+        fn paper_phi_e(&self) -> f64 {
+            // phi_e = [sqrt(2) W_0(e^{1/alpha} / sqrt(2))]^{-1}; W_0 by Newton.
+            let argument = (1.0 / self.alpha).exp() / 2.0_f64.sqrt();
+            let mut w = argument.ln().max(0.5);
+            for _ in 0..50 {
+                w -= (w * w.exp() - argument) / (w.exp() * (w + 1.0));
+            }
+            1.0 / (2.0_f64.sqrt() * w)
+        }
+
+        fn phi_bracket(&self) -> (f64, f64) {
+            (self.paper_phi_e() * 1.01, 50.0)
+        }
+
+        fn end_of_inflation(&self) -> EndOfInflation {
+            EndOfInflation::SlowRollViolation
+        }
+
+        fn class_one(&self) -> bool {
+            true
+        }
+    }
+
+    /// Power-law inflation, Sec. 4.2: Class II with constant slow-roll
+    /// parameters. Inflation starts at phi = 0 and a separate sector ends it
+    /// after about 72 e-folds of phi slow roll.
+    #[derive(Clone, Copy, Debug)]
+    struct PowerLawInflaton {
+        lambda: f64,
+    }
+
+    impl AssistedInflaton for PowerLawInflaton {
+        type Potential = crate::NonminimalPowerLawPotential;
+
+        fn potential(&self, coupling: f64) -> Self::Potential {
+            crate::NonminimalPowerLawPotential {
+                scale: crate::EnergyDensity::new(1.0e-10),
+                lambda: self.lambda,
+                coupling,
+                planck_mass: Mass::new(1.0),
+            }
+        }
+
+        fn slow_roll(&self, _phi: f64) -> (f64, f64) {
+            (self.lambda * self.lambda / 2.0, self.lambda * self.lambda)
+        }
+
+        fn slow_roll_e_folds(&self, phi: f64) -> f64 {
+            (self.paper_phi_e() - phi) / self.lambda
+        }
+
+        fn paper_phi_e(&self) -> f64 {
+            72.0 * self.lambda
+        }
+
+        fn phi_bracket(&self) -> (f64, f64) {
+            (-100.0, self.paper_phi_e())
+        }
+
+        fn end_of_inflation(&self) -> EndOfInflation {
+            EndOfInflation::FieldValue {
+                field: 0,
+                value: Field::new(self.paper_phi_e()),
+            }
+        }
+
+        fn class_one(&self) -> bool {
+            false
+        }
+    }
+
+    /// Hybrid inflation, Sec. 4.3: Class II, ended by the waterfall at
+    /// phi = phi_e.
+    #[derive(Clone, Copy, Debug)]
+    struct HybridInflaton {
+        mu: f64,
+        phi_e: f64,
+    }
+
+    impl AssistedInflaton for HybridInflaton {
+        type Potential = crate::NonminimalHybridPotential;
+
+        fn potential(&self, coupling: f64) -> Self::Potential {
+            crate::NonminimalHybridPotential {
+                scale: crate::EnergyDensity::new(1.0e-10),
+                mu: self.mu,
+                coupling,
+                planck_mass: Mass::new(1.0),
+            }
+        }
+
+        fn slow_roll(&self, phi: f64) -> (f64, f64) {
+            let ratio = phi / self.mu;
+            let factor = 1.0 + ratio * ratio;
+            (
+                2.0 * ratio * ratio / (self.mu * self.mu * factor * factor),
+                2.0 / (self.mu * self.mu * factor),
+            )
+        }
+
+        fn slow_roll_e_folds(&self, phi: f64) -> f64 {
+            // N = int V_J / V_J' dphi = (mu^2 / 2) ln(phi / phi_e) + (phi^2 - phi_e^2) / 4.
+            self.mu * self.mu / 2.0 * (phi / self.phi_e).ln()
+                + (phi * phi - self.phi_e * self.phi_e) / 4.0
+        }
+
+        fn paper_phi_e(&self) -> f64 {
+            self.phi_e
+        }
+
+        fn phi_bracket(&self) -> (f64, f64) {
+            (self.phi_e * 1.0001, 100.0 * self.mu)
+        }
+
+        fn end_of_inflation(&self) -> EndOfInflation {
+            EndOfInflation::FieldValue {
+                field: 0,
+                value: Field::new(self.phi_e),
+            }
+        }
+
+        fn class_one(&self) -> bool {
+            false
+        }
+    }
+
+    fn assisted_start<P: crate::MultifieldPotential<2>>(
+        system: &CovariantMultifieldSystem<P, crate::NonminimalAssistedFieldSpace, 2>,
+        phi: f64,
+        s: f64,
+    ) -> MultifieldState<2> {
         let resting = MultifieldState::new(
             [Field::new(phi), Field::new(s)],
             [FieldVelocity::new(0.0); 2],
@@ -4122,7 +4422,12 @@ mod tests {
         two_b: f64,
     }
 
-    fn assisted_slow_roll(alpha: f64, xi: f64, phi: f64, s: f64) -> AssistedSlowRoll {
+    fn assisted_slow_roll<I: AssistedInflaton>(
+        inflaton: &I,
+        xi: f64,
+        phi: f64,
+        s: f64,
+    ) -> AssistedSlowRoll {
         let kappa = 1.0;
         let denominator = 1.0 + xi * s * s * (1.0 + 6.0 * kappa * xi);
         let epsilon_sigma = 8.0 * xi * xi * s * s / denominator;
@@ -4131,10 +4436,7 @@ mod tests {
             * (-1.0 + 3.0 * xi * s * s + 4.0 * xi * xi * s.powi(4) * (1.0 + 6.0 * kappa * xi))
             / (denominator * denominator);
         let eta_b = -16.0 * xi * (1.0 + xi * s * s) / (denominator * denominator);
-        let loop_factor = 1.0 + alpha * phi.ln();
-        // Corrected Eq. (4.2): phi^2, not phi, in epsilon^(0).
-        let epsilon_zero = alpha * alpha / (2.0 * phi * phi * loop_factor * loop_factor);
-        let eta_zero = -alpha / (phi * phi * loop_factor);
+        let (epsilon_zero, eta_zero) = inflaton.slow_roll(phi);
         let two_b = -(1.0 + xi * s * s).ln();
         AssistedSlowRoll {
             epsilon_sigma,
@@ -4147,16 +4449,25 @@ mod tests {
         }
     }
 
-    /// Eqs. (3.1) and (3.5) of arXiv:2302.05866, with the Class I end
-    /// condition epsilon^phi_e = 1 - epsilon^sigma_e. Returns `(n_s, f_NL)`
+    /// Eqs. (3.1) and (3.5) of arXiv:2302.05866. With `class_one`, the Class I
+    /// end condition epsilon^phi_e = 1 - epsilon^sigma_e replaces the end
+    /// value of epsilon^phi; Class II uses it directly. Returns `(n_s, f_NL)`
     /// with `f_NL` converted to the Maldacena/Planck sign used here: the
     /// printed Eq. (3.5) gives `-(6/5) f_NL`, and its single-field limit is
     /// `-(5/6)(2 epsilon - eta)`, the opposite of the Planck-sign delta N
     /// result `(5/6)(2 epsilon - eta)`.
-    fn assisted_delta_n_prediction(star: &AssistedSlowRoll, end: &AssistedSlowRoll) -> (f64, f64) {
+    fn assisted_delta_n_prediction(
+        star: &AssistedSlowRoll,
+        end: &AssistedSlowRoll,
+        class_one: bool,
+    ) -> (f64, f64) {
         let signs = 1.0; // s^b s^sigma: both derivatives are negative for s > 0
         let epsilon_sigma_e = end.epsilon_sigma;
-        let epsilon_phi_e = 1.0 - epsilon_sigma_e;
+        let epsilon_phi_e = if class_one {
+            1.0 - epsilon_sigma_e
+        } else {
+            end.epsilon_phi
+        };
         let epsilon_e = epsilon_sigma_e + epsilon_phi_e;
         let u = epsilon_sigma_e / epsilon_e;
         let v = epsilon_phi_e / epsilon_e;
@@ -4189,55 +4500,42 @@ mod tests {
         (n_s, 5.0 / 6.0 * minus_six_fifths_f_nl)
     }
 
-    struct CalibratedAssistedLoop {
-        alpha: f64,
+    struct CalibratedAssisted<I: AssistedInflaton> {
+        inflaton: I,
         s_star: f64,
         coupling: f64,
-        system: AssistedSystem,
+        system: CovariantMultifieldSystem<I::Potential, crate::NonminimalAssistedFieldSpace, 2>,
         initial: MultifieldState<2>,
         trajectory: BackgroundTrajectory,
         end: f64,
         settings: SpectrumRunSettings,
     }
 
-    /// Loop inflation with the given alpha and kappa = 1, with the initial s
-    /// tuned so that s = s_star at the pivot, 60 e-folds before epsilon_H = 1.
-    fn calibrated_assisted_loop(alpha: f64, s_star: f64, coupling: f64) -> CalibratedAssistedLoop {
-        calibrated_assisted_loop_with_output(alpha, s_star, coupling, 1.0e-3)
-    }
-
-    /// As [`calibrated_assisted_loop`], with the output slice
-    /// `output_before_end` e-folds before epsilon_H = 1.
-    fn calibrated_assisted_loop_with_output(
-        alpha: f64,
+    /// The assisted model with `kappa = 1`, started about 72 e-folds of phi
+    /// slow roll before the end, with the initial s tuned so that s = s_star
+    /// at the pivot 60 e-folds before the end. The output slice lies
+    /// `output_before_end` e-folds before the end.
+    fn calibrated_assisted<I: AssistedInflaton>(
+        inflaton: I,
         s_star: f64,
         coupling: f64,
         output_before_end: f64,
-    ) -> CalibratedAssistedLoop {
-        let system = assisted_loop(alpha, coupling);
+    ) -> CalibratedAssisted<I> {
+        let system = CovariantMultifieldSystem::in_planck_units(
+            inflaton.potential(coupling),
+            crate::NonminimalAssistedFieldSpace::new(coupling, 1.0, Mass::new(1.0)).unwrap(),
+        );
         let settings = SpectrumRunSettings {
             pivot_e_folds_before_end: 60.0,
             output_e_folds_before_end: output_before_end,
             k_min_over_pivot: 1.0,
             k_max_over_pivot: 1.0,
             k_count: 1,
+            end_of_inflation: inflaton.end_of_inflation(),
             ..SpectrumRunSettings::default()
         };
-        // Start about 72 e-folds before the end of phi slow roll, using
-        // N(phi) = [phi^2/2 + alpha (phi^2 ln phi / 2 - phi^2 / 4)] / alpha.
-        let n_phi = |phi: f64| {
-            (phi * phi / 2.0 + alpha * (phi * phi * phi.ln() / 2.0 - phi * phi / 4.0)) / alpha
-        };
-        let (mut low, mut high) = (1.0_f64, 50.0_f64);
-        for _ in 0..100 {
-            let middle = 0.5 * (low + high);
-            if n_phi(middle) - n_phi(0.1) > 72.0 {
-                high = middle;
-            } else {
-                low = middle;
-            }
-        }
-        let phi0 = 0.5 * (low + high);
+        let (low, high) = inflaton.phi_bracket();
+        let phi0 = bisect(&|phi| inflaton.slow_roll_e_folds(phi) - 72.0, low, high);
         let mut s0 = 0.35 * s_star;
         let mut survey = system
             .survey_background(assisted_start(&system, phi0, s0), &settings)
@@ -4250,8 +4548,8 @@ mod tests {
                 .unwrap();
         }
         let (_, trajectory, end) = survey;
-        CalibratedAssistedLoop {
-            alpha,
+        CalibratedAssisted {
+            inflaton,
             s_star,
             coupling,
             system,
@@ -4262,7 +4560,24 @@ mod tests {
         }
     }
 
-    impl CalibratedAssistedLoop {
+    fn calibrated_assisted_loop(
+        alpha: f64,
+        s_star: f64,
+        coupling: f64,
+    ) -> CalibratedAssisted<LoopInflaton> {
+        calibrated_assisted(LoopInflaton { alpha }, s_star, coupling, 1.0e-3)
+    }
+
+    fn calibrated_assisted_loop_with_output(
+        alpha: f64,
+        s_star: f64,
+        coupling: f64,
+        output_before_end: f64,
+    ) -> CalibratedAssisted<LoopInflaton> {
+        calibrated_assisted(LoopInflaton { alpha }, s_star, coupling, output_before_end)
+    }
+
+    impl<I: AssistedInflaton> CalibratedAssisted<I> {
         fn pivot(&self) -> MultifieldState<2> {
             self.trajectory.state_at(self.end - 60.0)
         }
@@ -4325,7 +4640,7 @@ mod tests {
             let state = self.trajectory.state_at(n_star);
             let h = [
                 1.0e-4 * state.phi[0].into_value(),
-                1.0e-2 * state.phi[1].into_value(),
+                (1.0e-2 * state.phi[1].into_value()).min(1.0e-5),
             ];
             let value = |i: i32, j: i32| {
                 self.e_folds_to_output(&state, [f64::from(i) * h[0], f64::from(j) * h[1]])
@@ -4379,62 +4694,45 @@ mod tests {
             )
         }
 
-        /// Eqs. (3.1) and (3.5) with the numerical pivot and s_e, and phi_e
-        /// from epsilon^(0) = 1 as prescribed by the reference.
+        /// Eqs. (3.1) and (3.5) with the numerical pivot and s_e. For Class I
+        /// the end value of phi follows the reference, epsilon^(0) = 1; for
+        /// Class II it is the numerical end, the field-value event itself.
         fn analytic_prediction(&self) -> (f64, f64) {
             let pivot = self.pivot();
             let final_state = self.trajectory.state_at(self.end);
-            let alpha = self.alpha;
-            // phi_e = [sqrt(2) W_0(e^{1/alpha} / sqrt(2))]^{-1}; W_0 by Newton.
-            let argument = (1.0 / alpha).exp() / 2.0_f64.sqrt();
-            let mut w = argument.ln();
-            for _ in 0..50 {
-                w -= (w * w.exp() - argument) / (w.exp() * (w + 1.0));
-            }
-            let phi_e = 1.0 / (2.0_f64.sqrt() * w);
+            let phi_e = if self.inflaton.class_one() {
+                self.inflaton.paper_phi_e()
+            } else {
+                final_state.phi[0].into_value()
+            };
             assisted_delta_n_prediction(
                 &assisted_slow_roll(
-                    self.alpha,
+                    &self.inflaton,
                     self.coupling,
                     pivot.phi[0].into_value(),
                     pivot.phi[1].into_value(),
                 ),
                 &assisted_slow_roll(
-                    self.alpha,
+                    &self.inflaton,
                     self.coupling,
                     phi_e,
                     final_state.phi[1].into_value(),
                 ),
+                self.inflaton.class_one(),
             )
         }
 
         /// Eqs. (3.1) and (3.5) evaluated entirely with the prescription of
-        /// the reference: phi_* from 60 e-folds of phi slow roll from
-        /// epsilon^(0) = 1, and s_e from Eq. (3.9) with N_e = 60.
+        /// the reference: phi_* from 60 e-folds of phi slow roll, and s_e from
+        /// Eq. (3.9) with N_e = 60.
         fn paper_prescription(&self) -> (f64, f64, f64) {
-            let (alpha, xi, s_star) = (self.alpha, self.coupling, self.s_star);
-            let bisect = |f: &dyn Fn(f64) -> f64, mut low: f64, mut high: f64| {
-                for _ in 0..200 {
-                    let middle = 0.5 * (low + high);
-                    if f(low) * f(middle) <= 0.0 {
-                        high = middle;
-                    } else {
-                        low = middle;
-                    }
-                }
-                0.5 * (low + high)
-            };
-            let argument = (1.0 / alpha).exp() / 2.0_f64.sqrt();
-            let mut w = argument.ln().max(0.5);
-            for _ in 0..50 {
-                w -= (w * w.exp() - argument) / (w.exp() * (w + 1.0));
-            }
-            let phi_e = 1.0 / (2.0_f64.sqrt() * w);
-            // N(phi) = int V_J / V_J' dphi = [phi^2/2 + alpha (phi^2 ln phi / 2 - phi^2 / 4)] / alpha.
-            let n_phi = |phi: f64| {
-                (phi * phi / 2.0 + alpha * (phi * phi * phi.ln() / 2.0 - phi * phi / 4.0)) / alpha
-            };
-            let phi_star = bisect(&|phi| n_phi(phi) - n_phi(phi_e) - 60.0, phi_e * 1.01, 50.0);
+            let (xi, s_star) = (self.coupling, self.s_star);
+            let (low, high) = self.inflaton.phi_bracket();
+            let phi_star = bisect(
+                &|phi| self.inflaton.slow_roll_e_folds(phi) - 60.0,
+                low,
+                high,
+            );
             let e_folds = |s_e: f64| {
                 ((s_e / s_star).ln()
                     + 3.0 * xi * ((1.0 + xi * s_e * s_e) / (1.0 + xi * s_star * s_star)).ln())
@@ -4443,8 +4741,9 @@ mod tests {
             };
             let s_e = bisect(&e_folds, s_star, 100.0);
             let (n_s, f_nl) = assisted_delta_n_prediction(
-                &assisted_slow_roll(alpha, xi, phi_star, s_star),
-                &assisted_slow_roll(alpha, xi, phi_e, s_e),
+                &assisted_slow_roll(&self.inflaton, xi, phi_star, s_star),
+                &assisted_slow_roll(&self.inflaton, xi, self.inflaton.paper_phi_e(), s_e),
+                self.inflaton.class_one(),
             );
             (n_s, f_nl, s_e)
         }
@@ -4566,7 +4865,7 @@ mod tests {
         }
     }
 
-    impl CalibratedAssistedLoop {
+    impl<I: AssistedInflaton> CalibratedAssisted<I> {
         /// e-folds from a phase-space point to the output uniform-density surface.
         fn e_folds_from_phase_space(&self, point: [f64; 4]) -> f64 {
             let precise = SpectrumRunSettings {
@@ -4610,7 +4909,7 @@ mod tests {
             ];
             let h = [
                 1.0e-4 * x0[0].abs(),
-                1.0e-2 * x0[1].abs(),
+                (1.0e-2 * x0[1].abs()).min(1.0e-5),
                 velocity_scale * x0[2].abs(),
                 velocity_scale * x0[3].abs(),
             ];
@@ -4807,5 +5106,149 @@ mod tests {
                 "{alpha} {s_star}: delta N {delta_n} vs transport {transport}"
             );
         }
+    }
+
+    /// Checks one Class II branch of Sec. 4.2/4.3 of arXiv:2302.05866 at the
+    /// numerical coupling that gives n_s = 0.965 at the end of inflation.
+    fn check_class_two_branch<I: AssistedInflaton>(
+        label: &str,
+        inflaton: I,
+        s_star: f64,
+        xi: f64,
+        paper_range: (f64, f64),
+    ) {
+        let model = calibrated_assisted(inflaton, s_star, xi, 1.0e-3);
+        let end_state = model.trajectory.state_at(model.end);
+        // Inflation ends on the field-value surface, not by slow-roll violation.
+        assert!(model.system.epsilon_h(&end_state) < 1.0, "{label} {s_star}");
+        let numerical = 1.0 + model.mode_solver_tilt(model.output());
+        let (analytic, _) = model.analytic_prediction();
+        assert!(
+            (numerical - 0.965).abs() < 2.0e-3,
+            "{label} {s_star}: n_s {numerical}"
+        );
+        assert!(
+            (numerical - analytic).abs() < 1.5e-3,
+            "{label} {s_star}: {numerical} vs Eq. (3.1) {analytic}"
+        );
+        assert!(
+            paper_range.0 <= xi && xi <= paper_range.1,
+            "{label} {s_star}: coupling {xi} outside {paper_range:?}"
+        );
+    }
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn assisted_class_two_branches_follow_eq_3_1() {
+        let power_law = |lambda| PowerLawInflaton { lambda };
+        check_class_two_branch(
+            "power-law",
+            power_law(0.01),
+            1.0e-3,
+            0.0110,
+            (0.0105, 0.0111),
+        );
+        check_class_two_branch("power-law", power_law(0.01), 0.1, 0.00516, (0.0045, 0.0056));
+        check_class_two_branch(
+            "power-law",
+            power_law(0.05),
+            1.0e-3,
+            0.01353,
+            (0.0129, 0.0136),
+        );
+        check_class_two_branch("power-law", power_law(0.05), 0.1, 0.00662, (0.0060, 0.0069));
+        let hybrid = |mu, phi_e| HybridInflaton { mu, phi_e };
+        check_class_two_branch(
+            "hybrid",
+            hybrid(10.0, 1.0),
+            1.0e-3,
+            0.01077,
+            (0.0100, 0.0110),
+        );
+        check_class_two_branch("hybrid", hybrid(10.0, 1.0), 0.1, 0.00486, (0.0043, 0.0053));
+        check_class_two_branch(
+            "hybrid",
+            hybrid(6.0, 0.06),
+            1.0e-3,
+            0.00558,
+            (0.0053, 0.0059),
+        );
+        check_class_two_branch("hybrid", hybrid(6.0, 0.06), 0.1, 0.00340, (0.0022, 0.0043));
+    }
+
+    /// Transport f_NL of one Class II branch against phase-space delta N one
+    /// hundredth of an e-fold before the end; returns the end-of-inflation
+    /// transport value and the crossing-time massless delta N value.
+    fn check_class_two_f_nl<I: AssistedInflaton>(
+        label: &str,
+        inflaton: I,
+        s_star: f64,
+        xi: f64,
+    ) -> (f64, f64) {
+        let model = calibrated_assisted(inflaton, s_star, xi, 1.0e-3);
+        let k = model.k_pivot();
+        let bench = sourced_benchmark_with(
+            model.system,
+            model.initial,
+            [1.0, 1.0, 1.0],
+            Some(k),
+            &model.settings,
+        );
+        let transport_end = project_benchmark(&bench, 5.0, model.output()).reduced_f_nl();
+        let early = calibrated_assisted(inflaton, s_star, xi, 1.0e-2);
+        let (_, _, crossing) = early.delta_n_at_crossing(early.end - 60.0);
+        let early_bench = sourced_benchmark_with(
+            early.system,
+            early.initial,
+            [1.0, 1.0, 1.0],
+            Some(k),
+            &early.settings,
+        );
+        let transport = project_benchmark(&early_bench, 5.0, early.output()).reduced_f_nl();
+        let (delta_n, _, _) =
+            early.phase_space_delta_n(k, [1.0, 1.0, 1.0], early.end - 57.0, 1.0e-2);
+        assert!(
+            (delta_n - transport).abs() < (3.0e-3 * transport.abs()).max(1.0e-4),
+            "{label} {s_star}: delta N {delta_n} vs transport {transport}"
+        );
+        (transport_end, crossing)
+    }
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn assisted_class_two_transport_matches_phase_space_delta_n() {
+        let (power_law, power_law_crossing) = check_class_two_f_nl(
+            "power-law",
+            PowerLawInflaton { lambda: 0.01 },
+            1.0e-3,
+            0.0110,
+        );
+        let (hybrid, hybrid_crossing) = check_class_two_f_nl(
+            "hybrid",
+            HybridInflaton {
+                mu: 10.0,
+                phi_e: 1.0,
+            },
+            1.0e-3,
+            0.01077,
+        );
+        // With s_* = 1e-3 the tachyonic assistant makes crossing-time massless
+        // delta N underestimate |f_NL| by about 8%.
+        for (end, crossing) in [(power_law, power_law_crossing), (hybrid, hybrid_crossing)] {
+            assert!(
+                end < 0.0 && crossing.abs() < 0.95 * end.abs(),
+                "{end} vs {crossing}"
+            );
+        }
+        check_class_two_f_nl("power-law", PowerLawInflaton { lambda: 0.05 }, 0.1, 0.00662);
+        check_class_two_f_nl(
+            "hybrid",
+            HybridInflaton {
+                mu: 6.0,
+                phi_e: 0.06,
+            },
+            0.1,
+            0.00340,
+        );
     }
 }

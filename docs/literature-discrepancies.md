@@ -206,7 +206,10 @@ numerical $s_e$, Eq. (3.1) itself agrees with the exact tilt to
 $5\times10^{-4}$ for $0.021\le\xi_2\le0.025$. The other three branches of
 Sec. 4.1 behave the same way: the $n_s=0.965$ coupling moves up by
 1.6--3.2%, and it stays inside the quoted ranges except at the upper edge
-for $(\alpha,s_*)=(1,10^{-3})$.
+for $(\alpha,s_*)=(1,10^{-3})$. For the Class II power-law and hybrid examples
+of Secs. 4.2 and 4.3 the shift is at most 1.6% in either direction, and every
+numerical coupling lies inside the quoted ranges, because $\epsilon^{(\phi)}$ is
+small and nearly constant there.
 
 ### 9. Crossing-time statistics in [HKKPT] Eq. (3.5) — approximation note
 
@@ -218,7 +221,11 @@ $\delta N$ then agree with each other ($-0.216$ and $-0.199$ in the Planck sign)
 but underestimate $|f_{\mathrm{NL}}|$ by about 20%. A phase-space $\delta N$ from a
 later slice, which uses the evolved covariance, reproduces the tree-level
 transport value $-0.2514$ to 0.05%. The conclusion of the reference that
-$|f_{\mathrm{NL}}|\ll1$ is unaffected.
+$|f_{\mathrm{NL}}|\ll1$ is unaffected. The Class II examples with $s_*=10^{-3}$
+show the same effect with a deficit of about 8%: for the power-law model with
+$\lambda=0.01$ and $\xi_2=0.011$, the crossing-time $\delta N$ gives $-1.51$ and the
+transport $-1.635$; for the hybrid model with $\mu=10$ and $\xi_2=0.0108$, $-12.3$
+and $-13.36$.
 
 ## Agreements checked
 
@@ -244,6 +251,9 @@ reproduced here:
 - [HKKPT] Eq. (3.1), given the numerical $s_e$ (entry 8), against the mode
   solver and a numerical $\delta N$ for loop inflation; and Eq. (3.5), with the
   sign of entry 7, against a numerical $\delta N$ to 9%.
+- [HKKPT] Eq. (3.1) for the Class II power-law and hybrid examples, given the
+  numerical end surface and $s_e$, against the mode solver to
+  $1.5\times10^{-3}$.
 
 ## Beyond the printed formulas
 
