@@ -137,30 +137,37 @@ $\eta^{\phi\phi}_e$. Evaluating it at the numerical $\epsilon_H=1$ point instead
 $\phi_e=0.007$, gives $\eta^{\phi\phi}_e\approx-4\times10^3$ and
 $f_{\mathrm{NL}}=-0.55$.
 
-The two $\delta N$ values agree with each other to 9%. The transport differs from
-them by 25% (equilateral) to 80% ($k_3/k_1=0.1$). Although the transport result
-is converged in start depth, the difference is not yet understood, for three
-reasons:
+The two crossing-time values agree with each other to 9% but fall about
+20% short of the transport. The reason is identified by a phase-space
+$\delta N$ on a later slice $N_c$. It differentiates the e-fold number to the
+output uniform-density surface in all four background variables
+$(\phi,s,\dot\phi,\dot s)$. It then contracts with the Gaussian covariance
+evolved to $N_c$, and adds the field three-point term
+$N_aN_bN_c\alpha^{abc}(N_c)$, both taken from the transport in the velocity
+basis. Coordinate perturbations are formed at linear order,
+$\delta\dot\phi^I=V^I-\Gamma^I{}_{JK}\dot\phi^JQ^K$; second-order connection
+terms are negligible because $\Gamma\sim\xi_2s$.
 
-- $\delta N$ assumes massless, uncorrelated field perturbations at horizon
-  crossing. The assistant direction is tachyonic, with
-  $\eta^{\sigma\sigma}\approx-4\xi_2$. In a calibration run with the target
-  half an e-fold before the end, applying the same formula 3 e-folds after
-  crossing instead of at crossing changed $f_{\mathrm{NL}}$ by a factor of two.
-  Its crossing-time error is therefore not small.
-- At the end of inflation the intrinsic and gauge parts of $B_\zeta$ cancel
-  to about 1%: the intrinsic fraction is 105. Such a cancellation is sensitive
-  to the representation of the gauge transformation, although the result
-  shows no sensitivity to start depth.
-- The squeezed limit of a multifield model with a light, evolving isocurvature
-  direction need not approach the shape-independent $\delta N$ value.
+| Slice $N_c$ | pivot + 1 | + 2 | + 3 | + 5 | + 10 | transport |
+| --- | --- | --- | --- | --- | --- | --- |
+| equilateral, total | $-0.25014$ | $-0.25116$ | $-0.25127$ | $-0.25128$ | $-0.25127$ | $-0.25141$ |
+| equilateral, Gaussian part | $-0.25038$ | $-0.25131$ | $-0.25131$ | $-0.25105$ | $-0.25028$ | |
+| $k_3/k_1=0.1$, total | | | $-0.35668$ | $-0.35667$ | | $-0.35686$ |
 
-Resolving this requires an independent calculation of the full shape, for
-example $\delta N$ with the numerically evolved field covariance and field
-three-point function on a later slice, or the local gauge representation of
-Eqs. (2.33a)--(2.33b) of arXiv:1410.3491 with its curvature terms. It is an
-open item. Regardless of which value holds, $|f_{\mathrm{NL}}|\lesssim0.4$, well
-inside the Planck bound quoted by the reference.
+From two e-folds after exit, the total is independent of the slice and equal
+to the transport to 0.05%, for both shapes. The field three-point term is
+below 1%. It is also independent of the velocity step. This is a
+separate-universe confirmation of the tree-level transport in curved field
+space. The shape dependence comes entirely from the different superhorizon
+growth of $\Sigma(k)$ at different $k$.
+
+The crossing-time $\delta N$ and the reference's Eq. (3.5) instead assume
+massless, uncorrelated perturbations with $(H_*/2\pi)^2G^{IJ}$ at horizon
+crossing. In this model the assistant direction is tachyonic,
+$\eta^{\sigma\sigma}\approx-4\xi_2$, so its perturbation keeps growing
+relative to that estimate. The approximation therefore underestimates
+$|f_{\mathrm{NL}}|$ by about 20%. The reference's conclusion that
+$|f_{\mathrm{NL}}|$ is small is unaffected.
 
 ## Tests
 
@@ -169,14 +176,35 @@ The ignored release-mode tests are:
 
 - `assisted_loop_spectral_index_agrees_with_delta_n_and_eq_3_1`;
 - `assisted_loop_eq_3_1_tracks_the_numerical_tilt_across_xi`;
-- `assisted_loop_f_nl_is_converged_and_bracketed_by_delta_n`, which fixes the
-  transport convergence and the $\delta N$/Eq. (3.5) agreement, and bounds the
-  open transport difference at 40%.
+- `assisted_loop_crossing_delta_n_underestimates_the_converged_f_nl`, which
+  fixes the transport start-depth convergence, the agreement of the
+  crossing-time $\delta N$ with Eq. (3.5), and their 20% deficit;
+- `assisted_loop_transport_matches_phase_space_delta_n`, the phase-space
+  $\delta N$ check above for both shapes and two slices.
 
-## Next steps
+## Plan
 
-1. Resolve the transport-versus-$\delta N$ difference in $f_{\mathrm{NL}}$ as
-   described above.
-2. Reproduce the $s_*=0.1$ and $\alpha=1$ branches of the reference.
-3. Add a general end-of-inflation event for the Class II power-law and hybrid
-   examples.
+The remaining work proceeds in this order; each step is accepted before the
+next begins.
+
+1. **Resolve the $f_{\mathrm{NL}}$ difference. (Completed.)** The crossing-time $\delta N$
+   assumes massless, uncorrelated field perturbations, which is inaccurate
+   for the tachyonic assistant direction. A phase-space $\delta N$ on a later
+   slice $N_c$ removes that assumption. It differentiates the e-fold number in
+   all four background variables $(\phi,s,\dot\phi,\dot s)$ and contracts with
+   the Gaussian covariance evolved to $N_c$. Adding the field three-point term
+   $N_aN_bN_c\alpha^{abc}(N_c)$ taken from the transport must give a total that
+   is independent of $N_c$ and equal to the transport result. That is a
+   separate-universe consistency test of the transport. The Gaussian term
+   alone then shows how much the crossing-time approximation misses.
+2. **Other branches of the reference.** Repeat the $n_s$ and $f_{\mathrm{NL}}$
+   comparison for $(\alpha,s_*)=(0.1,0.1)$, $(1,0.001)$, and $(1,0.1)$. Compare
+   the numerical couplings for $n_s=0.965$ with the ranges quoted in Sec. 4.1:
+   $(1.2$--$1.4)\times10^{-2}$, $(1.9$--$2.1)\times10^{-2}$, and
+   $(1.1$--$1.3)\times10^{-2}$, respectively.
+3. **Class II.** Replace the fixed $\epsilon_H=1$ end of the background survey
+   with a selectable end-of-inflation event, including a field-value
+   crossing. Then reproduce the power-law ($V_J=\Lambda^4e^{-\lambda\phi}$, end
+   by a separate sector) and hybrid ($V_J=\Lambda^4[1+(\phi/\mu)^2]$, end at the
+   waterfall $\phi=\phi_e$) examples of Secs. 4.2 and 4.3 with the
+   corresponding Class II expressions.
