@@ -8,6 +8,13 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `EndOfInflation` in `SpectrumRunSettings`: the background survey can end on
+  a field-value crossing instead of `epsilon_H = 1`, with
+  `SpectrumRunError::SlowRollEndedFirst` when slow roll ends first.
+- `NonminimalPowerLawPotential` and `NonminimalHybridPotential`, the Class II
+  examples of arXiv:2302.05866 Secs. 4.2 and 4.3. At the numerical `n_s =
+  0.965` couplings, which all lie inside the quoted ranges, Eq. (3.1) matches
+  the exact tilt, and the transport `f_NL` matches phase-space delta N.
 - All four loop-inflation branches of arXiv:2302.05866 Sec. 4.1: given the
   exact end-of-inflation value of `s`, Eq. (3.1) matches the numerical tilt,
   and the transport `f_NL` matches a phase-space delta N.

@@ -48,7 +48,7 @@ The repository currently has two distinct scientific boundaries:
 | Three-point transport (P3d) | complete | sourced canonical evolution converges on the reference benchmark and transforms as a tensor under field redefinitions |
 | Curvature projection (P3e) | complete | $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ are validated in single-field limits and against the published axion-quartic result, with labeled CSV output and grid convergence |
 | Primordial bispectrum prediction | available within scope | tree level, during inflation, no reheating; see `curvature-projection.md` |
-| Nonminimally assisted inflation | in progress | all four loop-inflation branches reproduced; Class II remains |
+| Nonminimally assisted inflation | complete | the loop-inflation (Class I) and power-law and hybrid (Class II) examples of arXiv:2302.05866 reproduced; see `nonminimal-assisted-inflation.md` |
 
 Consequently, the crate can presently make power-spectrum predictions within
 its documented inflation/no-reheating scope. It must not yet describe its
@@ -56,39 +56,36 @@ three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
 
 ### Next-session handoff
 
-The implementation boundary is the branch `feat/nonminimal-assisted-inflation`,
-based on merge commit `6ec9e7e` (PR #28). The validated state is 212 unit
-tests plus 24 compile-fail cases, with ten expensive ignored tests that pass in
-release mode (`cargo test --release -- --ignored`; they are not run by CI).
-Clippy with warnings denied, rustfmt, and rustdoc pass locally.
+The implementation boundary is the branch `feat/end-of-inflation-events`,
+based on merge commit `7aa840f` (PR #31). The validated state is 214 unit
+tests plus 24 compile-fail cases, with fifteen expensive ignored tests that
+pass in release mode (`cargo test --release -- --ignored`; they are not run by
+CI). Clippy with warnings denied, rustfmt, and rustdoc pass locally.
 
-The first external model validation after P3 is under way; see
+The first external model validation after P3 is complete; see
 [`nonminimal-assisted-inflation.md`](nonminimal-assisted-inflation.md):
 
-1. `NonminimalAssistedFieldSpace` and `NonminimalLoopInflationPotential`
-   implement the Einstein-frame model of arXiv:2302.05866 as ordinary
-   providers. Finite-difference tests check every geometric quantity.
+1. `NonminimalAssistedFieldSpace` with `NonminimalLoopInflationPotential`,
+   `NonminimalPowerLawPotential`, and `NonminimalHybridPotential` implement
+   the Einstein-frame models of arXiv:2302.05866 as ordinary providers.
+   Finite-difference and closed-form tests check the geometry and potentials.
 2. $\zeta$ is not conserved until the end of inflation, so observables are
-   evaluated at the end. There, the mode solver, a numerical $\delta N$, and the
-   reference's Eq. (3.1) agree on $n_s$. They agree across the coupling range
-   once the exact $s_e$ is used. The slow-roll e-fold relation shifts the
-   $n_s=0.965$ coupling from 0.0228 to 0.0222.
-3. The reference's Eq. (4.2) typo and its Lyth--Rodriguez $f_{\mathrm{NL}}$ sign
-   are recorded in [`literature-discrepancies.md`](literature-discrepancies.md),
-   entries 6--9.
+   evaluated at the end. `EndOfInflation::FieldValue` ends the survey on a
+   field-value surface (Class II) instead of $\epsilon_H=1$.
+3. For all four loop branches and eight Class II branches, Eq. (3.1) with the
+   numerical $s_e$ matches the exact tilt to $1.5\times10^{-3}$. The reference's
+   slow-roll relation (3.9) shifts the $n_s=0.965$ coupling by 1.6--3.2% for
+   loop inflation and by at most 1.6% for Class II.
+4. The transport $f_{\mathrm{NL}}$ is confirmed by phase-space $\delta N$ in every
+   tested branch. The crossing-time $\delta N$ and Eq. (3.5) underestimate
+   $|f_{\mathrm{NL}}|$ for $s_*=10^{-3}$ (about 20% for loop, 8% for Class II)
+   because the assistant direction is tachyonic.
+5. The reference's Eq. (4.2) typo, its Lyth--Rodriguez $f_{\mathrm{NL}}$ sign, and
+   the two approximation notes are
+   [`literature-discrepancies.md`](literature-discrepancies.md) entries 6--9.
 
-4. The $f_{\mathrm{NL}}$ difference is resolved: a phase-space $\delta N$ with the
-   evolved covariance reproduces the transport to 0.05% for equilateral and
-   squeezed shapes. The crossing-time $\delta N$ and Eq. (3.5) underestimate
-   $|f_{\mathrm{NL}}|$ by about 20% because the assistant direction is tachyonic.
-
-5. All four $(\alpha,s_*)$ branches of Sec. 4.1 follow the same pattern. The
-   $n_s=0.965$ coupling moves up by 1.6--3.2% relative to the reference's
-   slow-roll prescription. The transport $f_{\mathrm{NL}}$ is confirmed by
-   phase-space $\delta N$ in every branch.
-
-Resume with step 3 of the plan in that document: a general end-of-inflation
-event and the Class II power-law and hybrid examples.
+Resume with the next P3 extension below (reheating and post-inflationary
+transfer, or a model that needs dynamically sized field spaces).
 
 ### Reading order for the active P3 work
 
@@ -253,9 +250,8 @@ turn and the complete 41-point benchmark.
   ordinary `FieldSpaceGeometry` and potential providers, not as exceptions in
   the solver. Acceptance requires the existing dimension types, index
   variance, Riemann identities, and covariant perturbation tests to remain
-  active. The loop-inflation Class-I trajectory is the first reproduction
-  target; Class-II power-law and hybrid cases additionally require a general
-  end-of-inflation event;
+  active. The loop-inflation Class-I trajectory and the Class-II power-law
+  and hybrid cases, with a general end-of-inflation event, are reproduced;
 - reheating and post-inflationary transfer;
 - dynamically sized field spaces if a concrete model requires more than the
   current const-generic representation.
