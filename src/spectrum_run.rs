@@ -3967,4 +3967,149 @@ mod tests {
         assert!(fine.abs() < 1.0e-2, "relative deviation {fine:e}");
         assert!(fine.abs() < 0.5 * coarse.abs(), "{coarse:e} then {fine:e}");
     }
+
+    /// The axion-quartic model of Elliston et al. (arXiv:1203.6844), with the
+    /// parameters of Dias, Frazer, Mulryne, and Seery (arXiv:1609.00379, §9.1).
+    #[derive(Clone, Copy, Debug)]
+    struct AxionQuarticPotential {
+        quartic: f64,
+        axion_scale: f64,
+        decay_constant: f64,
+    }
+
+    impl AxionQuarticPotential {
+        fn dfms() -> Self {
+            let quartic = 1.0e-10;
+            Self {
+                quartic,
+                axion_scale: (25.0 / (2.0 * PI)).powi(2) * quartic,
+                decay_constant: 1.0,
+            }
+        }
+    }
+
+    impl<V> crate::MultifieldPotentialValue<V, 2> for AxionQuarticPotential
+    where
+        V: From<f64>
+            + Clone
+            + core::ops::Add<V, Output = V>
+            + core::ops::Sub<V, Output = V>
+            + core::ops::Mul<V, Output = V>
+            + core::ops::Mul<f64, Output = V>
+            + crate::Transcendental,
+    {
+        fn value(&self, fields: [Field<V>; 2]) -> crate::EnergyDensity<V> {
+            let [phi, chi] = fields.map(crate::Quantity::into_value);
+            let squared = phi.clone() * phi;
+            let angle = (chi * (2.0 * PI / self.decay_constant)).cos();
+            crate::EnergyDensity::new(
+                squared.clone() * squared * (self.quartic / 4.0)
+                    + (V::from(1.0) - angle) * self.axion_scale,
+            )
+        }
+    }
+
+    type AxionSystem = CovariantMultifieldSystem<AxionQuarticPotential, FlatFieldSpace, 2>;
+
+    fn axion_start(system: &AxionSystem, phi: f64, chi: f64) -> MultifieldState<2> {
+        let resting = MultifieldState::new(
+            [Field::new(phi), Field::new(chi)],
+            [FieldVelocity::new(0.0); 2],
+            ScaleFactor::new(1.0),
+        );
+        MultifieldState {
+            pi: system.slow_roll_velocity(&resting),
+            ..resting
+        }
+    }
+
+    /// Samples of the equilateral reduced bispectrum in Fig. 7 of Dias, Frazer,
+    /// Mulryne, and Seery (arXiv:1609.00379v2), read from the vector path of
+    /// the published figure by `docs/derivations/digitize_dfms_figure7.py`.
+    const DFMS_FIGURE7_F_NL: [(f64, f64); 9] = [
+        (59.8400, -1.5825),
+        (61.2000, -22.1643),
+        (62.0160, -39.2245),
+        (63.1040, -13.3209),
+        (64.6000, 6.1135),
+        (65.5520, 16.9603),
+        (66.2320, 12.7325),
+        (67.0480, 13.1427),
+        (68.0000, 13.1162),
+    ];
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn axion_quartic_bispectrum_matches_dfms_and_numerical_delta_n() {
+        let system = CovariantMultifieldSystem::in_planck_units(
+            AxionQuarticPotential::dfms(),
+            FlatFieldSpace,
+        );
+        let initial = axion_start(&system, 23.5, 0.5 - 1.0e-3);
+        let settings = SpectrumRunSettings {
+            output_e_folds_before_end: 0.5,
+            ..quick_settings()
+        };
+        let (_, trajectory, _) = system.survey_background(initial, &settings).unwrap();
+        // As in DFMS, k_t/3 exits 14 e-folds after the initial time.
+        let exit = trajectory.state_at(14.0);
+        let k = (exit.a * system.hubble(&exit)).into_value();
+        let bench = sourced_benchmark_with(system, initial, [1.0, 1.0, 1.0], Some(k), &settings);
+
+        for (e_folds, published) in DFMS_FIGURE7_F_NL {
+            let f_nl = project_benchmark(&bench, 5.0, e_folds).reduced_f_nl();
+            assert!(
+                (f_nl - published).abs() < 5.0e-3 * published.abs().max(10.0),
+                "N={e_folds}: {f_nl} against the published {published}"
+            );
+        }
+
+        // Numerical delta N from a flat slice six e-folds after exit to the
+        // uniform-density surface of the output slice. It uses only the
+        // background equations, so it is independent of the transport.
+        let base = trajectory.state_at(20.0);
+        let target_hubble = system.hubble(&trajectory.state_at(bench.output));
+        let precise = SpectrumRunSettings {
+            tolerances: ErrorTolerances::new(
+                crate::ConformalTwoFieldPerturbationTolerance::background_in_planck_units(1.0e-24),
+                1.0e-13,
+            ),
+            ..settings
+        };
+        let remaining = |shift: [f64; 2]| {
+            let start = axion_start(
+                &system,
+                base.phi[0].into_value() + shift[0],
+                base.phi[1].into_value() + shift[1],
+            );
+            let (_, perturbed, _) = system.survey_background(start, &precise).unwrap();
+            perturbed
+                .crossing(|state| (system.hubble(state) - target_hubble).into_value())
+                .unwrap()
+        };
+        // The step is a small fraction of the axion's distance from its hilltop.
+        let h = 1.0e-2 * (0.5 - base.phi[1].into_value());
+        let value = |i: i32, j: i32| remaining([f64::from(i) * h, f64::from(j) * h]);
+        let centre = value(0, 0);
+        let first = [
+            (value(1, 0) - value(-1, 0)) / (2.0 * h),
+            (value(0, 1) - value(0, -1)) / (2.0 * h),
+        ];
+        let mixed = (value(1, 1) - value(1, -1) - value(-1, 1) + value(-1, -1)) / (4.0 * h * h);
+        let second = [
+            [(value(1, 0) - 2.0 * centre + value(-1, 0)) / (h * h), mixed],
+            [mixed, (value(0, 1) - 2.0 * centre + value(0, -1)) / (h * h)],
+        ];
+        let contraction: f64 = (0..4)
+            .map(|m| first[m / 2] * first[m % 2] * second[m / 2][m % 2])
+            .sum();
+        let norm = first[0] * first[0] + first[1] * first[1];
+        let delta_n = 5.0 / 6.0 * contraction / (norm * norm);
+        let transported = project_benchmark(&bench, 5.0, bench.output).reduced_f_nl();
+
+        assert!(
+            (transported - delta_n).abs() < 5.0e-3 * delta_n.abs(),
+            "transport {transported} against delta N {delta_n}"
+        );
+    }
 }

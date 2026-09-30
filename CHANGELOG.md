@@ -8,6 +8,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A turning two-field benchmark: the axion-quartic model reproduces the
+  equilateral `f_NL` of Fig. 7 of Dias, Frazer, Mulryne, and Seery at nine
+  samples digitized from the figure's vector path, and a numerical delta N
+  calculation agrees to 0.1%.
 - The P3e curvature projection: covariant second-order gauge coefficients on
   a superhorizon slice, `P_zeta`, `B_zeta` with the operator-ordered gauge
   term, `k^3 P / (2 pi^2)`, and `f_NL` in the Maldacena/Planck convention.

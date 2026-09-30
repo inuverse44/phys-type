@@ -16,15 +16,14 @@ Implemented:
 - the dimensionless $\mathcal{P}_\zeta$ and a reduced $f_{\mathrm{NL}}$ with a
   stated convention;
 - validation against the linear mode solver, superhorizon conservation,
-  Maldacena's single-field result, the squeezed consistency relation, and a
-  field redefinition.
+  Maldacena's single-field result, the squeezed consistency relation, a field
+  redefinition, the published axion-quartic result of Dias, Frazer, Mulryne,
+  and Seery, and a numerical $\delta N$ calculation.
 
 Not implemented yet:
 
 - CSV output of $\alpha^{abc}$, $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ with
   gauge, slice, shape, normalization, and no-reheating metadata;
-- a comparison of a turning two-field model with a published numerical
-  transport result;
 - triangle-grid convergence.
 
 The repository still does not describe its output as a prediction of
@@ -177,8 +176,55 @@ $$
 evaluated with $\epsilon$ and $\eta$ at the crossing of $k_t/3$. The consistency
 relation is exact in slow roll, so it is the sharper check. The first
 comparison runs in the regular test suite. The others are ignored release-mode
-tests (about two minutes together with the P3d convergence tests); run them
+tests (about three minutes together with the P3d convergence tests); run them
 with `cargo test --release -- --ignored`.
+
+### Turning two-field benchmark: the axion-quartic model
+
+Section 9.1 of Dias, Frazer, Mulryne, and Seery
+([arXiv:1609.00379v2](https://arxiv.org/abs/1609.00379), JCAP 12 (2016) 033)
+evolves the axion-quartic model of Elliston et al.
+([arXiv:1203.6844](https://arxiv.org/abs/1203.6844)),
+
+$$
+V=\frac14g\phi^4+\Lambda^4\Bigl(1-\cos\frac{2\pi\chi}{f}\Bigr),\qquad
+g=10^{-10},\quad\Lambda^4=\Bigl(\frac{25}{2\pi}\Bigr)^2gM_{\mathrm{Pl}}^4,\quad
+f=M_{\mathrm{Pl}},
+$$
+
+from $\phi=23.5M_{\mathrm{Pl}}$ and $\chi=f/2-10^{-3}M_{\mathrm{Pl}}$ with
+slow-roll velocities. The axion leaves its hilltop about 60 e-folds after the
+start. That turn drives $f_{\mathrm{NL}}$ through a minimum near $-39$ and a
+maximum near $+17$ before it settles at about $13$. Their Fig. 7 plots the
+equilateral $f_{\mathrm{NL}}$ for $k_t/3$ leaving the horizon 14 e-folds
+after the start. The figure is a vector graphic, so its plotted samples
+are recovered exactly by
+[`derivations/digitize_dfms_figure7.py`](derivations/digitize_dfms_figure7.py).
+
+The same model and configuration here, started 5 e-folds before exit, give
+
+| $N$ | Fig. 7 of DFMS | this repository |
+| --- | --- | --- |
+| 59.84 | $-1.5825$ | $-1.5795$ |
+| 61.20 | $-22.164$ | $-22.134$ |
+| 62.02 | $-39.2245$ | $-39.2236$ |
+| 63.10 | $-13.321$ | $-13.340$ |
+| 64.60 | $6.1135$ | $6.1067$ |
+| 65.55 | $16.9603$ | $16.9593$ |
+| 66.23 | $12.7325$ | $12.7328$ |
+| 67.05 | $13.1427$ | $13.1430$ |
+| 68.00 | $13.1162$ | $13.1161$ |
+
+The differences are of the size expected from reading a plotted curve.
+Independently of the transport, a numerical $\delta N$ calculation perturbs the
+flat slice 6 e-folds after exit, integrates the background to the
+uniform-density surface of the output slice, and forms
+$\tfrac65f_{\mathrm{NL}}=N_IN_JN^{IJ}/(N_KN^K)^2$. Its step is 1% of the
+axion's distance from the hilltop, and the result is stable to $10^{-4}$ under
+changes of that step. It gives $13.106$, against $13.120$ from the transport;
+the 0.1% difference is of the size of the intrinsic and slow-roll-velocity
+corrections that $\delta N$ omits. Both comparisons are in the ignored test
+`axion_quartic_bispectrum_matches_dfms_and_numerical_delta_n`.
 
 ## Remaining P3e work
 
@@ -186,10 +232,10 @@ with `cargo test --release -- --ignored`.
    whose metadata names the gauge representation, output slice, triangle
    convention, normalization, $f_{\mathrm{NL}}$ convention, model provenance,
    and the absence of reheating.
-2. Compare a turning two-field model with a published numerical transport
-   result, for example the double-quadratic example of Dias, Frazer, Mulryne,
-   and Seery.
-3. Demonstrate triangle-grid convergence of any reported shape.
+2. Demonstrate triangle-grid convergence of any reported shape.
+
+The published-result comparison is complete; see the axion-quartic benchmark
+above.
 
 The limitations recorded in
 [`three-point-transport.md`](three-point-transport.md) carry over: the start
