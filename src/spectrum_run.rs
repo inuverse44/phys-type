@@ -4586,8 +4586,8 @@ mod tests {
                 row[a] = 1.0;
             }
             for i in 0..2 {
-                for kk in 0..2 {
-                    map[2 + i][kk] = -(0..2)
+                for (kk, entry) in map[2 + i].iter_mut().take(2).enumerate() {
+                    *entry = -(0..2)
                         .map(|j| connection.components()[i][j][kk].value() * x0[2 + j])
                         .sum::<f64>();
                 }
