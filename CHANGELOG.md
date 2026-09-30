@@ -8,6 +8,11 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `NonminimalAssistedFieldSpace` and `NonminimalLoopInflationPotential`, the
+  Einstein-frame model of nonminimally assisted inflation (arXiv:2302.05866)
+  in `(phi, s)` coordinates. Their geometry is checked against
+  finite-difference constructions. Its spectral index agrees with the
+  reference's Eq. (3.1) once the exact end-of-inflation value of `s` is used.
 - `CovariantMultifieldSystem::run_bispectrum`, which projects the tree-level
   bispectrum of Fergusson--Shellard `TriangleShape`s on a superhorizon output
   slice, with CSV writers for the projected rows and the canonical

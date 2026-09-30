@@ -48,6 +48,7 @@ The repository currently has two distinct scientific boundaries:
 | Three-point transport (P3d) | complete | sourced canonical evolution converges on the reference benchmark and transforms as a tensor under field redefinitions |
 | Curvature projection (P3e) | complete | $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ are validated in single-field limits and against the published axion-quartic result, with labeled CSV output and grid convergence |
 | Primordial bispectrum prediction | available within scope | tree level, during inflation, no reheating; see `curvature-projection.md` |
+| Nonminimally assisted inflation | in progress | Einstein-frame geometry and loop potential implemented; $n_s$ agrees with the reference given the exact $s_e$; an $f_{\mathrm{NL}}$ difference between transport and $\delta N$ is open |
 
 Consequently, the crate can presently make power-spectrum predictions within
 its documented inflation/no-reheating scope. It must not yet describe its
@@ -55,31 +56,30 @@ three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
 
 ### Next-session handoff
 
-The implementation boundary is merge commit `ac42e76` (PR #27). The validated
-state is 206 unit tests plus 24 compile-fail cases, with seven expensive
-ignored tests that pass in release mode (`cargo test --release -- --ignored`,
-about two minutes; they are not run by CI). Clippy with warnings denied,
-rustfmt, rustdoc, and both GitHub CI jobs (`msrv` and `test`) pass.
+The implementation boundary is the branch `feat/nonminimal-assisted-inflation`,
+based on merge commit `6ec9e7e` (PR #28). The validated state is 212 unit
+tests plus 24 compile-fail cases, with ten expensive ignored tests that pass in
+release mode (`cargo test --release -- --ignored`; they are not run by CI).
+Clippy with warnings denied, rustfmt, and rustdoc pass locally.
 
-P3e, and with it the non-Gaussianity milestone, is complete within its
-documented scope; see [`curvature-projection.md`](curvature-projection.md):
+The first external model validation after P3 is under way; see
+[`nonminimal-assisted-inflation.md`](nonminimal-assisted-inflation.md):
 
-1. `curvature_gauge_coefficients` and `curvature_correlators` project the
-   canonical transport to $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$;
-2. the projection matches the mode solver, Maldacena's single-field result,
-   and the squeezed consistency relation, and it is invariant under a field
-   redefinition;
-3. the axion-quartic model reproduces the equilateral $f_{\mathrm{NL}}$ of DFMS
-   Fig. 7 at nine plotted samples and a numerical $\delta N$ result to 0.1%;
-4. `run_bispectrum` writes convention-labeled CSV output, and an isosceles grid
-   of spacing 0.1 resolves the shape to 0.6%;
-5. every departure from a published formula is recorded with references in
-   [`literature-discrepancies.md`](literature-discrepancies.md).
+1. `NonminimalAssistedFieldSpace` and `NonminimalLoopInflationPotential`
+   implement the Einstein-frame model of arXiv:2302.05866 as ordinary
+   providers. Finite-difference tests check every geometric quantity.
+2. $\zeta$ is not conserved until the end of inflation, so observables are
+   evaluated at the end. There, the mode solver, a numerical $\delta N$, and the
+   reference's Eq. (3.1) agree on $n_s$. They agree across the coupling range
+   once the exact $s_e$ is used. The slow-roll e-fold relation shifts the
+   $n_s=0.965$ coupling from 0.0228 to 0.0222.
+3. The reference's Eq. (4.2) typo and its Lyth--Rodriguez $f_{\mathrm{NL}}$ sign
+   are recorded in [`literature-discrepancies.md`](literature-discrepancies.md),
+   entries 6--8.
 
-Candidate next milestones: reducing the start-depth error of the odd-momentum
-initial blocks, caching or reducing the per-stage vertex cost, reheating and
-post-inflationary transfer, and the nonminimal assisted inflation
-reproduction target listed under P3.
+Resume with the open $f_{\mathrm{NL}}$ item: the converged transport value
+(equilateral $-0.251$) differs from $\delta N$ ($-0.199$) and the reference's
+Eq. (3.5) ($-0.216$).
 
 ### Reading order for the active P3 work
 

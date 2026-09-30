@@ -12,6 +12,7 @@ pub mod dimension;
 pub mod field_space;
 pub mod integrate;
 pub mod multifield;
+pub mod nonminimal;
 pub mod observation;
 pub mod perturbation;
 pub mod potential;
@@ -57,6 +58,9 @@ pub use integrate::{
 pub use multifield::{
     CovariantMultifieldSystem, MultifieldState, MultifieldStateDelta, MultifieldStateDerivative,
     MultifieldSystem, TwoFieldKinematics,
+};
+pub use nonminimal::{
+    NonminimalAssistedFieldSpace, NonminimalLoopInflationPotential, NonminimalParameterError,
 };
 pub use num_complex::Complex64;
 pub use observation::{

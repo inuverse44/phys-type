@@ -23,6 +23,9 @@ differ from the typeset numbering.
 - **[BS]** S. Butchers and D. Seery, *Numerical evaluation of inflationary
   3-point functions on curved field space*,
   [arXiv:1803.10563](https://arxiv.org/abs/1803.10563).
+- **[HKKPT]** S. C. Hyun, J. Kim, T. Kodama, S. C. Park, and T. Takahashi,
+  *Nonminimally Assisted Inflation: A General Analysis*,
+  [arXiv:2302.05866v2](https://arxiv.org/abs/2302.05866).
 - **[M]** J. Maldacena, *Non-Gaussian features of primordial fluctuations in
   single field inflationary models*, JHEP 05 (2003) 013,
   [arXiv:astro-ph/0210603](https://arxiv.org/abs/astro-ph/0210603).
@@ -164,6 +167,44 @@ An earlier revision of this repository transposed the covariance on legs to
 the left of the insertion. The corrected source, and the same ordering in the
 curvature projection, follow Eq. (5.14).
 
+### 6. Slow-roll parameter of loop inflation, [HKKPT] Eq. (4.2)
+
+**Printed.** For $V_J=\Lambda^4(1+\alpha\log\phi)$,
+$\epsilon^{(0)}=\alpha^2/[2\phi(1+\alpha\log\phi)^2]$.
+
+**Used here.** $\epsilon^{(0)}=\tfrac12(V_J'/V_J)^2=\alpha^2/[2\phi^2(1+\alpha\log\phi)^2]$.
+
+**Reason.** $V_J'=\alpha\Lambda^4/\phi$. The end-of-inflation value printed
+in the same section, $\phi_e=[\sqrt2\,W_0(e^{1/\alpha}/\sqrt2)]^{-1}$, solves
+$\epsilon^{(0)}=1$ only with $\phi^2$. The accompanying
+$\eta^{(0)}=-\alpha/[\phi^2(1+\alpha\log\phi)]$ is correct. With $\phi^2$,
+Eq. (3.1) reproduces the numerical $n_s$ to $5\times10^{-4}$; see
+[`nonminimal-assisted-inflation.md`](nonminimal-assisted-inflation.md).
+
+### 7. Sign convention of $f_{\mathrm{NL}}$, [HKKPT] Eq. (3.5) — convention note
+
+The printed left-hand side is $-\tfrac65f^{(\mathrm{local})}_{\mathrm{NL}}$, and the
+single-field limit of the right-hand side is $2\epsilon-\eta$. The reference
+therefore uses the Lyth--Rodriguez sign,
+$\zeta=\zeta_g-\tfrac35f_{\mathrm{NL}}\zeta_g^2$. That is the opposite of the
+Maldacena/Planck sign used by this repository
+($f_{\mathrm{NL}}\to+\tfrac{5}{12}(1-n_s)$ in the squeezed single-field limit).
+The reference compares its values with the Planck bound
+$-11.1<f_{\mathrm{NL}}<9.3$, which is stated in the Planck sign. For the small
+values found there the bound is not affected. Comparisons here multiply the
+printed $f_{\mathrm{NL}}$ by $-1$.
+
+### 8. The slow-roll e-fold relation, [HKKPT] Eqs. (3.9) and (3.12) — approximation note
+
+This is not an error. [HKKPT] fixes $s_e$ from $s_*$ through the slow-roll
+relation (3.9), or its small-coupling form (3.12). On the exact loop-inflation
+background with $\alpha=0.1$, $s_*=10^{-3}$, and $\xi_2=0.022$, the numerical
+$s_*$ and $s_e$ satisfy Eq. (3.9) with 58.3 rather than 60 e-folds. Because
+$s_e\propto e^{4\xi_2N}$, this 3% difference changes $s_e$ by 16%. It moves the
+coupling that gives $n_s=0.965$ from $\xi_2\approx0.0222$ to $0.0228$. Given the
+numerical $s_e$, Eq. (3.1) itself agrees with the exact tilt to
+$5\times10^{-4}$ for $0.021\le\xi_2\le0.025$.
+
 ## Agreements checked
 
 Recording these makes clear which published results have been independently
@@ -184,6 +225,10 @@ reproduced here:
   with the samples recovered from its vector path by
   `docs/derivations/digitize_dfms_figure7.py`. The agreement also confirms
   that the printed $1/3$ of entry 1 is not what their code uses.
+
+- [HKKPT] Eq. (3.1), given the numerical $s_e$ (entry 8), against the mode
+  solver and a numerical $\delta N$ for loop inflation; and Eq. (3.5), with the
+  sign of entry 7, against a numerical $\delta N$ to 9%.
 
 ## Beyond the printed formulas
 
