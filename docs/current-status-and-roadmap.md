@@ -55,11 +55,11 @@ three-point output as a prediction for $B_\zeta$ or $f_{\mathrm{NL}}$.
 
 ### Next-session handoff
 
-The implementation boundary is the branch `feat/bispectrum-run`, based on
-merge commit `50724df` (PR #26). The validated state is 206 unit tests plus 24
-compile-fail cases, with seven expensive ignored tests that pass in release
-mode (`cargo test --release -- --ignored`, about four minutes). Clippy with
-warnings denied, rustfmt, and rustdoc pass locally.
+The implementation boundary is merge commit `ac42e76` (PR #27). The validated
+state is 206 unit tests plus 24 compile-fail cases, with seven expensive
+ignored tests that pass in release mode (`cargo test --release -- --ignored`,
+about two minutes; they are not run by CI). Clippy with warnings denied,
+rustfmt, rustdoc, and both GitHub CI jobs (`msrv` and `test`) pass.
 
 P3e, and with it the non-Gaussianity milestone, is complete within its
 documented scope; see [`curvature-projection.md`](curvature-projection.md):
