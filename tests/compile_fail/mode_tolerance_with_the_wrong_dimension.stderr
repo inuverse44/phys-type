@@ -2,7 +2,7 @@ error[E0308]: mismatched types
  --> tests/compile_fail/mode_tolerance_with_the_wrong_dimension.rs:7:36
   |
 7 |     tolerance.rescaled_amplitude = ModeVelocity::<f64>::new(1.0e-20);
-  |     ----------------------------   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Quantity<MassPower<NInt<...>>, f64>`, found `Quantity<MassPower<PInt<...>>, f64>`
+  |     ----------------------------   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Quantity<MassPower<NInt<_>>, f64>`, found `Quantity<MassPower<PInt<_>>, f64>`
   |     |
   |     expected due to the type of this binding
   |

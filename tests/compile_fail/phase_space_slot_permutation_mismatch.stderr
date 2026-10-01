@@ -6,5 +6,5 @@ error[E0308]: mismatched types
    |            |
    |            expected due to this
    |
-   = note: expected struct `TwoPointBlock<FieldPerturbation, FieldPerturbation, MassPower<typenum::int::Z0>, f64, 1>`
-              found struct `TwoPointBlock<FieldPerturbation, MomentumPerturbation, MassPower<typenum::int::Z0>, f64, 1>`
+   = note: expected struct `TwoPointBlock<FieldPerturbation, FieldPerturbation, MassPower<Z0>, f64, 1>`
+              found struct `TwoPointBlock<FieldPerturbation, MomentumPerturbation, MassPower<Z0>, f64, 1>`

@@ -2,7 +2,7 @@ error[E0308]: mismatched types
  --> tests/compile_fail/mix_observational_and_internal_wavenumber.rs:6:31
   |
 6 |     takes_internal_wavenumber(ComovingWavenumberMpcInverse::try_new(0.05).unwrap());
-  |     ------------------------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Quantity<MassPower<PInt<...>>, f64>`, found `ComovingWavenumberMpcInverse`
+  |     ------------------------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Quantity<MassPower<PInt<_>>, f64>`, found `ComovingWavenumberMpcInverse`
   |     |
   |     arguments to this function are incorrect
   |
