@@ -8,6 +8,9 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `examples/constant_turn_spectra.rs` and `plots/constant_turn.py`, with the
+  tracked figure `docs/figures/constant_turn_spectra.png`: mode-solver spectra
+  on a constant-turn orbit over the exact solutions of arXiv:2606.18248.
 - `PolarFieldSpace`, flat field space in polar coordinates, with
   finite-difference checks of its connection and curvature.
 - A strong-mixing benchmark: on a constant-turn circular orbit the mode
