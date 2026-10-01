@@ -676,6 +676,89 @@ impl<const N: usize> CurvatureDerivativeGeometry<N> for FlatFieldSpace {
     }
 }
 
+/// Euclidean field space in polar coordinates `(phi^1, phi^2) = (rho, theta)`.
+///
+/// The line element is
+///
+/// ```text
+/// ds^2 = (drho)^2 + rho^2 (dtheta)^2,
+/// ```
+///
+/// so the Riemann tensor vanishes while the connection does not. Circular
+/// orbits at fixed `rho` are the simplest trajectories of constant turn rate,
+/// with `rho` normal and `theta` tangent to the motion. The angle `theta` is
+/// measured in units of the reduced Planck mass, like every field coordinate.
+///
+/// The coordinates degenerate at `rho = 0`, where `G_22` vanishes and the
+/// inverse metric diverges. Keep trajectories away from the origin.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PolarFieldSpace;
+
+impl FieldSpaceGeometry<2> for PolarFieldSpace {
+    fn metric(&self, position: &[Field; 2]) -> FieldMetric<2> {
+        let rho = position[0].into_value();
+
+        FieldMetric::new([
+            [Quantity::new(1.0), Quantity::new(0.0)],
+            [Quantity::new(0.0), Quantity::new(rho * rho)],
+        ])
+    }
+
+    fn inverse_metric(&self, position: &[Field; 2]) -> InverseFieldMetric<2> {
+        let rho = position[0].into_value();
+
+        InverseFieldMetric::new([
+            [Quantity::new(1.0), Quantity::new(0.0)],
+            [Quantity::new(0.0), Quantity::new(1.0 / (rho * rho))],
+        ])
+    }
+
+    fn christoffel(&self, position: &[Field; 2]) -> ChristoffelSymbols<2> {
+        let rho = position[0].into_value();
+        let mut components = [[[Quantity::<MMinus1, f64>::new(0.0); 2]; 2]; 2];
+
+        // Gamma^1_22 = -rho
+        components[0][1][1] = Quantity::new(-rho);
+        // Gamma^2_12 = Gamma^2_21 = 1 / rho
+        let connection = Quantity::new(1.0 / rho);
+        components[1][0][1] = connection;
+        components[1][1][0] = connection;
+
+        ChristoffelSymbols::new(components)
+    }
+}
+
+impl CurvedFieldSpaceGeometry<2> for PolarFieldSpace {
+    fn riemann(&self, _position: &[Field; 2]) -> RiemannTensor<2> {
+        RiemannTensor::zero()
+    }
+}
+
+impl ThirdOrderFieldSpaceGeometry<2> for PolarFieldSpace {
+    fn christoffel_derivative(&self, position: &[Field; 2]) -> ChristoffelDerivatives<2> {
+        let rho = position[0].into_value();
+        let mut components = [[[[Quantity::<MMinus2, f64>::new(0.0); 2]; 2]; 2]; 2];
+
+        // partial_1 Gamma^1_22 = -1
+        components[0][1][1][0] = Quantity::new(-1.0);
+        // partial_1 Gamma^2_12 = partial_1 Gamma^2_21 = -1 / rho^2
+        let angular = Quantity::new(-1.0 / (rho * rho));
+        components[1][0][1][0] = angular;
+        components[1][1][0][0] = angular;
+
+        ChristoffelDerivatives::new(components)
+    }
+}
+
+impl CurvatureDerivativeGeometry<2> for PolarFieldSpace {
+    fn covariant_riemann_derivative(
+        &self,
+        _position: &[Field; 2],
+    ) -> CovariantRiemannDerivative<2> {
+        CovariantRiemannDerivative::zero()
+    }
+}
+
 /// A maximally symmetric field space of constant negative curvature.
 ///
 /// In coordinates `(phi^1, phi^2)` the line element is
@@ -1295,6 +1378,131 @@ mod tests {
                 .flatten()
                 .all(|component| component.into_value() == 0.0)
         );
+    }
+
+    #[test]
+    fn the_polar_metric_and_its_inverse_are_reciprocal() {
+        let position = [Field::new(0.3), Field::new(2.0)];
+        let metric = PolarFieldSpace.metric(&position);
+        let inverse = PolarFieldSpace.inverse_metric(&position);
+
+        for row in 0..2 {
+            for column in 0..2 {
+                let product: f64 = (0..2)
+                    .map(|index| {
+                        metric.components()[row][index].into_value()
+                            * inverse.components()[index][column].into_value()
+                    })
+                    .sum();
+
+                assert!((product - f64::from(row == column)).abs() < 1.0e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn the_polar_connection_is_the_levi_civita_connection_of_its_metric() {
+        // Gamma^I_JK = G^IL (partial_J G_LK + partial_K G_LJ - partial_L G_JK) / 2
+        let position = [Field::new(0.3), Field::new(2.0)];
+        let step = 1.0e-6;
+        let metric_derivative = |derivative: usize| {
+            let mut ahead = position;
+            let mut behind = position;
+            ahead[derivative] = Field::new(position[derivative].into_value() + step);
+            behind[derivative] = Field::new(position[derivative].into_value() - step);
+            let forward = PolarFieldSpace.metric(&ahead);
+            let backward = PolarFieldSpace.metric(&behind);
+            core::array::from_fn::<_, 2, _>(|first| {
+                core::array::from_fn::<_, 2, _>(|second| {
+                    (forward.components()[first][second].into_value()
+                        - backward.components()[first][second].into_value())
+                        / (2.0 * step)
+                })
+            })
+        };
+        let derivatives = [metric_derivative(0), metric_derivative(1)];
+        let partial =
+            |derivative: usize, first: usize, second: usize| derivatives[derivative][first][second];
+        let inverse = PolarFieldSpace.inverse_metric(&position);
+        let connection = PolarFieldSpace.christoffel(&position);
+
+        for upper in 0..2 {
+            for first in 0..2 {
+                for second in 0..2 {
+                    let expected: f64 = (0..2)
+                        .map(|index| {
+                            0.5 * inverse.components()[upper][index].into_value()
+                                * (partial(first, index, second) + partial(second, index, first)
+                                    - partial(index, first, second))
+                        })
+                        .sum();
+                    let analytic = connection.components()[upper][first][second].into_value();
+
+                    assert!((analytic - expected).abs() < 1.0e-8);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn polar_connection_derivative_matches_finite_differences() {
+        let position = [Field::new(0.3), Field::new(2.0)];
+        let analytic = PolarFieldSpace.christoffel_derivative(&position);
+        let step = 1.0e-6;
+
+        for derivative in 0..2 {
+            let mut forward = position;
+            let mut backward = position;
+            forward[derivative] = Field::new(position[derivative].value() + step);
+            backward[derivative] = Field::new(position[derivative].value() - step);
+            let forward_connection = PolarFieldSpace.christoffel(&forward);
+            let backward_connection = PolarFieldSpace.christoffel(&backward);
+
+            for upper in 0..2 {
+                for first in 0..2 {
+                    for second in 0..2 {
+                        let numerical = (forward_connection.components()[upper][first][second]
+                            .value()
+                            - backward_connection.components()[upper][first][second].value())
+                            / (2.0 * step);
+                        let expected =
+                            analytic.components()[upper][first][second][derivative].value();
+
+                        assert!((numerical - expected).abs() < 1.0e-7);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_polar_connection_has_vanishing_curvature() {
+        // R^I_JKL = partial_K Gamma^I_LJ - partial_L Gamma^I_KJ
+        //         + Gamma^I_KM Gamma^M_LJ - Gamma^I_LM Gamma^M_KJ
+        let position = [Field::new(0.3), Field::new(2.0)];
+        let gamma = PolarFieldSpace.christoffel(&position);
+        let partial = PolarFieldSpace.christoffel_derivative(&position);
+        let g = |upper: usize, first: usize, second: usize| {
+            gamma.components()[upper][first][second].into_value()
+        };
+        let dg = |upper: usize, first: usize, second: usize, derivative: usize| {
+            partial.components()[upper][first][second][derivative].into_value()
+        };
+
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    for l in 0..2 {
+                        let quadratic: f64 = (0..2)
+                            .map(|m| g(i, k, m) * g(m, l, j) - g(i, l, m) * g(m, k, j))
+                            .sum();
+                        let riemann = dg(i, l, j, k) - dg(i, k, j, l) + quadratic;
+
+                        assert!(riemann.abs() < 1.0e-12, "R^{i}_{j}{k}{l} = {riemann}");
+                    }
+                }
+            }
+        }
     }
 
     #[test]

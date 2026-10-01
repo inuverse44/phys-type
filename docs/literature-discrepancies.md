@@ -26,6 +26,11 @@ differ from the typeset numbering.
 - **[HKKPT]** S. C. Hyun, J. Kim, T. Kodama, S. C. Park, and T. Takahashi,
   *Nonminimally Assisted Inflation: A General Analysis*,
   [arXiv:2302.05866v2](https://arxiv.org/abs/2302.05866).
+- **[HMPS]** J. Huenupi, C. Muñoz, G. A. Palma, and S. Sypsas, *Pushing the
+  Primordial Frontier: Exact Linear Solutions in Multifield Inflation*,
+  [arXiv:2606.18248v2](https://arxiv.org/abs/2606.18248); companion article
+  *Pushing the Primordial Frontier: Cosmological Collider Signatures at
+  Strong Mixing*, [arXiv:2607.14529](https://arxiv.org/abs/2607.14529).
 - **[M]** J. Maldacena, *Non-Gaussian features of primordial fluctuations in
   single field inflationary models*, JHEP 05 (2003) 013,
   [arXiv:astro-ph/0210603](https://arxiv.org/abs/astro-ph/0210603).
@@ -227,6 +232,29 @@ $\lambda=0.01$ and $\xi_2=0.011$, the crossing-time $\delta N$ gives $-1.51$ and
 transport $-1.635$; for the hybrid model with $\mu=10$ and $\xi_2=0.0108$, $-12.3$
 and $-13.36$.
 
+### 10. Logarithm of the massless constant-turn spectrum, [HMPS] Eq. (39)
+
+[HMPS] Eq. (39) gives the superhorizon $\Delta_\zeta/\Delta_0$ for a massless entropy
+field with the growing factor
+$\left[2+\ln(2/z_{\mathrm{end}})-2\gamma_E-\operatorname{Re}\psi(i\lambda/2)\right]^2$. The
+repository uses $\ln(1/2z_{\mathrm{end}})$ in place of $\ln(2/z_{\mathrm{end}})$. The
+evidence:
+
+- the $\mathcal H_w$ of [HMPS] Eq. (38), from which (39) follows, contains
+  $-2\ln(2z)$, that is $+2\ln(1/2z)$;
+- an independent integration of [HMPS] Eqs. (8)–(9)
+  ([`derivations/constant_turn_exact_solutions.py`](derivations/constant_turn_exact_solutions.py))
+  agrees with the corrected form to $5\times10^{-4}$ for $0.02\le\lambda\le3$, the
+  residual being the $\mathcal O(z_0^{-1})$ of its initial condition; the printed
+  form is 1–46% high;
+- the covariant mode solver on a constant-turn orbit agrees with the
+  corrected form to $4\times10^{-4}$ for $\lambda=0.5$, 1, and 2
+  ([`constant-turn-exact-solutions.md`](constant-turn-exact-solutions.md)).
+
+The corrected form has the small-$\lambda$ limit
+$1+\lambda^2(N+2-\ln2-\gamma_E)^2$ with $N=\ln(1/z_{\mathrm{end}})$. The massive results,
+Eqs. (43)–(45), are unaffected. The equation was read from the typeset PDF.
+
 ## Agreements checked
 
 Recording these makes clear which published results have been independently
@@ -251,6 +279,9 @@ reproduced here:
 - [HKKPT] Eq. (3.1), given the numerical $s_e$ (entry 8), against the mode
   solver and a numerical $\delta N$ for loop inflation; and Eq. (3.5), with the
   sign of entry 7, against a numerical $\delta N$ to 9%.
+- [HMPS] Eqs. (43)–(45), the massive constant-turn spectra, against the mode
+  solver on a circular orbit to $3.5\times10^{-4}$ for $0.5\le\lambda\le2$ and
+  $1.25\le\mu^2/H^2\le9$.
 - [HKKPT] Eq. (3.1) for the Class II power-law and hybrid examples, given the
   numerical end surface and $s_e$, against the mode solver to
   $1.5\times10^{-3}$.
