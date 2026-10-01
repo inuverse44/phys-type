@@ -8,6 +8,14 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `assisted_slow_roll`, the slow-roll delta N predictions of arXiv:2302.05866
+  (Eqs. (3.1), (3.5), (3.9)) for the nonminimally assisted subclass, moved
+  out of the tests so the example can share them.
+- `examples/assisted_inflation.rs` and `plots/assisted_inflation.py`, with the
+  tracked figure `docs/figures/assisted_inflation.png`: trajectories, `n_s`
+  against `xi_2`, and `f_NL` against `n_s` for the loop, power-law, and
+  hybrid examples, the counterpart of Figs. 9-10, 13-14, and 17-18 of the
+  reference.
 - `examples/constant_turn_spectra.rs` and `plots/constant_turn.py`, with the
   tracked figure `docs/figures/constant_turn_spectra.png`: mode-solver spectra
   on a constant-turn orbit over the exact solutions of arXiv:2606.18248.

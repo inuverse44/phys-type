@@ -118,6 +118,20 @@ Its reference figure is tracked as
 with a vector [`PDF`](docs/figures/constant_turn_spectra.pdf); see
 [`docs/constant-turn-exact-solutions.md`](docs/constant-turn-exact-solutions.md).
 
+The nonminimally assisted inflation examples of arXiv:2302.05866 (loop,
+power-law, and hybrid inflatons; one subclass of nonminimal inflation) take
+about five minutes:
+
+```sh
+cargo run --release --example assisted_inflation
+uv run plots/assisted_inflation.py diagnostics
+```
+
+Its reference figure is tracked as
+[`docs/figures/assisted_inflation.png`](docs/figures/assisted_inflation.png)
+with a vector [`PDF`](docs/figures/assisted_inflation.pdf); see
+[`docs/nonminimal-assisted-inflation.md`](docs/nonminimal-assisted-inflation.md).
+
 Generate every diagnostic CSV and publication-quality PNG/PDF figure with one
 command:
 
@@ -136,6 +150,7 @@ uv run plots/two_field_spectra.py diagnostics
 uv run plots/final_spectra.py diagnostics/two_field_spectra.csv
 uv run plots/pivot_mode_evolution.py diagnostics
 uv run plots/constant_turn.py diagnostics
+uv run plots/assisted_inflation.py diagnostics
 ```
 
 The plotting scripts declare their own Python dependencies, so `uv` creates an

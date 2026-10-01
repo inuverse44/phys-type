@@ -4,6 +4,7 @@
 //! dimensionally invalid expressions fail to compile. See `docs/mvp-design.md`
 //! for the design that this implements.
 
+pub mod assisted_slow_roll;
 pub mod autodiff;
 pub mod background;
 pub mod bispectrum_run;

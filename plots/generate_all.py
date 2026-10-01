@@ -27,6 +27,7 @@ TWO_FIELD_PLOT = ("two_field_spectra.py", "two_field_spectra")
 FINAL_SPECTRUM_PLOT = ("final_spectra.py", "two_field_final_spectra")
 PIVOT_EVOLUTION_PLOT = ("pivot_mode_evolution.py", "two_field_pivot_evolution")
 CONSTANT_TURN_PLOT = ("constant_turn.py", "constant_turn_spectra")
+ASSISTED_PLOT = ("assisted_inflation.py", "assisted_inflation")
 
 
 def run(command: list[str], cwd: Path) -> None:
@@ -58,7 +59,14 @@ def main() -> None:
     scripts = Path(__file__).resolve().parent
     output = args.output.resolve()
 
-    for example in ("diagnostics", "two_field_spectra", "constant_turn_spectra"):
+    # The assisted-inflation grid runs the three-point transport for 72
+    # couplings and takes about five minutes.
+    for example in (
+        "diagnostics",
+        "two_field_spectra",
+        "constant_turn_spectra",
+        "assisted_inflation",
+    ):
         run(
             ["cargo", "run", "--release", "--example", example, "--", str(output)],
             repository,
@@ -86,11 +94,11 @@ def main() -> None:
     )
     verify(output, stem)
 
-    script, stem = CONSTANT_TURN_PLOT
-    run([sys.executable, str(scripts / script), str(output)], repository)
-    verify(output, stem)
+    for script, stem in (CONSTANT_TURN_PLOT, ASSISTED_PLOT):
+        run([sys.executable, str(scripts / script), str(output)], repository)
+        verify(output, stem)
 
-    print(f"verified {(len(PLOTS) + 4) * 2} plot files in {output}")
+    print(f"verified {(len(PLOTS) + 5) * 2} plot files in {output}")
 
 
 if __name__ == "__main__":
