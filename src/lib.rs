@@ -47,8 +47,8 @@ pub use field_space::{
     CurvedFieldSpaceGeometry, FieldMetric, FieldSpaceGeometry, FieldTensor2, FieldTensor3,
     FieldTensor4, FieldTensor5, FieldVector, FlatFieldSpace, GeometryValidationError,
     HyperbolicFieldSpace, InvalidCurvatureRadius, InverseFieldMetric, KinematicBasis2,
-    KinematicBasisError, Lower, LowerFirst, LoweredRiemannTensor, RaiseFirst, RiemannIdentity,
-    RiemannTensor, Tensor3Components, Tensor4Components, Tensor5Components,
+    KinematicBasisError, Lower, LowerFirst, LoweredRiemannTensor, PolarFieldSpace, RaiseFirst,
+    RiemannIdentity, RiemannTensor, Tensor3Components, Tensor4Components, Tensor5Components,
     ThirdOrderFieldSpaceGeometry, Upper, validate_riemann_symmetries,
 };
 pub use integrate::{

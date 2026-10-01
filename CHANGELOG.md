@@ -8,6 +8,12 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `PolarFieldSpace`, flat field space in polar coordinates, with
+  finite-difference checks of its connection and curvature.
+- A strong-mixing benchmark: on a constant-turn circular orbit the mode
+  solver reproduces the exact power spectra of arXiv:2606.18248, Eqs.
+  (43)-(45), to 3.5e-4 for mixing up to 2, and the massless Eq. (39) with
+  `ln(1 / (2 z_end))` in place of its printed `ln(2 / z_end)`.
 - `EndOfInflation` in `SpectrumRunSettings`: the background survey can end on
   a field-value crossing instead of `epsilon_H = 1`, with
   `SpectrumRunError::SlowRollEndedFirst` when slow roll ends first.

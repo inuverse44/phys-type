@@ -49,6 +49,7 @@ The repository currently has two distinct scientific boundaries:
 | Curvature projection (P3e) | complete | $P_\zeta$, $B_\zeta$, and $f_{\mathrm{NL}}$ are validated in single-field limits and against the published axion-quartic result, with labeled CSV output and grid convergence |
 | Primordial bispectrum prediction | available within scope | tree level, during inflation, no reheating; see `curvature-projection.md` |
 | Nonminimally assisted inflation | complete | the loop-inflation (Class I) and power-law and hybrid (Class II) examples of arXiv:2302.05866 reproduced; see `nonminimal-assisted-inflation.md` |
+| Exact constant-turn solutions (arXiv:2606.18248) | complete | the mode solver reproduces the closed-form strong-mixing power spectra; the printed massless Eq. (39) has a logarithm typo; see `constant-turn-exact-solutions.md` |
 
 Consequently, the crate can presently make power-spectrum predictions and
 tree-level predictions of $B_\zeta$ and $f_{\mathrm{NL}}$ within its documented
@@ -57,7 +58,8 @@ are outside that scope; see [`curvature-projection.md`](curvature-projection.md)
 
 ### Next-session handoff
 
-The implementation boundary is `main` at merge commit `e115481` (PR #32). The validated state is 214 unit
+The implementation boundary is the branch `feat/constant-turn-exact-solutions`,
+based on merge commit `907bf4f` (PR #33). The validated state is 221 unit
 tests plus 24 compile-fail cases, with fifteen expensive ignored tests that
 pass in release mode (`cargo test --release -- --ignored`; they are not run by
 CI). Clippy with warnings denied, rustfmt, and rustdoc pass locally.
@@ -83,6 +85,15 @@ The first external model validation after P3 is complete; see
 5. The reference's Eq. (4.2) typo, its Lyth--Rodriguez $f_{\mathrm{NL}}$ sign, and
    the two approximation notes are
    [`literature-discrepancies.md`](literature-discrepancies.md) entries 6--9.
+
+6. The exact constant-turn solutions of arXiv:2606.18248 are a new
+   strong-mixing benchmark of the mode solver; see
+   [`constant-turn-exact-solutions.md`](constant-turn-exact-solutions.md).
+   On a circular orbit in `PolarFieldSpace`, the massive closed forms,
+   Eqs. (43)–(45), agree to $3.5\times10^{-4}$ for $\lambda\le2$. The massless
+   Eq. (39) agrees only with $\ln(1/2z_{\mathrm{end}})$ in place of the printed
+   $\ln(2/z_{\mathrm{end}})$ ([`literature-discrepancies.md`](literature-discrepancies.md)
+   entry 10).
 
 Resume with the next P3 extension below (reheating and post-inflationary
 transfer, or a model that needs dynamically sized field spaces).
