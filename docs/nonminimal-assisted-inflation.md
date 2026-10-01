@@ -18,6 +18,16 @@ same model exactly: the full background, the linear modes, and the tree-level
 bispectrum, with no slow-roll approximation after the initial conditions. It
 then compares with those expressions.
 
+**Scope.** Nonminimally assisted inflation is one small class of nonminimal
+inflation: a single assistant field with $f(s)=(M_{\mathrm{pl}}^2/2)(1+\xi_2s^2)$
+and a minimally coupled inflaton, in the metric formulation ($\kappa=1$; the
+Palatini $\kappa=0$ geometry exists but is not validated). Nothing here
+validates nonminimal inflation in general, for example an inflaton coupled to
+curvature as in Higgs inflation, a general $f(\phi,s)$, several nonminimal
+fields, or the Palatini predictions. `NonminimalAssistedFieldSpace` and the
+formulas in `assisted_slow_roll` are deliberately named for this subclass; a
+general nonminimal provider is separate, unfinished work.
+
 ## Model
 
 With $f(s)=\tfrac{M_{\mathrm{Pl}}^2}{2}[1+\xi_2(s/M_{\mathrm{Pl}})^2]$ (Eq. (2.5)),
@@ -274,6 +284,67 @@ $-13.348$).
 The phase-space $\delta N$ uses the step $h_s=\min(10^{-2}s,10^{-5})$ in $s$.
 A purely relative step fails for $s_*=10^{-3}$: $10^{-2}s$ is too coarse for
 $N_{ss}$, and $10^{-4}s$ loses precision to roundoff.
+
+## Figures
+
+![Nonminimally assisted inflation](figures/assisted_inflation.png)
+
+[`figures/assisted_inflation.png`](figures/assisted_inflation.png)
+([PDF](figures/assisted_inflation.pdf)) is generated, in about five minutes,
+by
+
+```sh
+cargo run --release --example assisted_inflation
+uv run plots/assisted_inflation.py diagnostics
+```
+
+Each branch is evaluated at six couplings, 0.8–1.1 times the one that gives
+$n_s=0.965$. Rows are the loop, power-law, and hybrid models. Columns are:
+
+1. the trajectory from the pivot to the end at $n_s\simeq0.965$, the
+   counterpart of Figs. 9, 13, and 17 of [HKKPT];
+2. $n_s$ against $\xi_2$: the exact tilt (markers), Eq. (3.1) with the numerical
+   $\phi_*$, $s_e$, and end surface (dotted), and the reference's slow-roll
+   prescription (dashed);
+3. and 4. $f_{\mathrm{NL}}$ against $n_s$ for $s_*=10^{-3}$ and $0.1$, with the same three
+   evaluations, the counterpart of Figs. 10, 14, and 18. The vertical axis
+   uses the reference's sign, $-f_{\mathrm{NL}}^{\mathrm{Planck}}$, so the panels can be laid
+   next to the published ones; the CSV keeps the Planck sign.
+
+The figure shows four things.
+
+- The trajectories match the published ones in their $s$ range and end
+  points. For the hybrid model with $\phi_e=0.1\mu$, the curve of Fig. 17 labeled
+  $\mu=30$ coincides with the $\mu=10$ trajectory here, and the one labeled
+  $\mu=10$ ends near $\phi=3=0.1\times30$; the two labels appear to be swapped
+  ([`literature-discrepancies.md`](literature-discrepancies.md), entry 11).
+- Eq. (3.1) with numerical inputs follows the exact tilt, while the
+  prescription's curve is displaced toward smaller $\xi_2$. The displacement is
+  largest for loop inflation with $s_*=10^{-3}$, where at the exact
+  $n_s=0.965$ coupling the prescription gives $n_s=0.954$ ($\alpha=0.1$) and
+  $0.958$ ($\alpha=1$); this is entry 8.
+- For $s_*=10^{-3}$ the exact $|f_{\mathrm{NL}}|$ exceeds Eq. (3.5) with numerical inputs
+  in every model: by 17% for loop with $\alpha=0.1$, 9% with $\alpha=1$, and
+  6–9% for power-law and hybrid. This is the crossing-time deficit of entry 9.
+- For $s_*=10^{-3}$, the hybrid model with $\mu=6$ and $\phi_e=0.06$ has
+  $f_{\mathrm{NL}}^{\mathrm{Planck}}=-22.8$ at $n_s=0.965$ (Eq. (3.5) with numerical inputs
+  $-21.6$, the prescription $-20.8$), outside the Planck interval quoted by
+  the reference, as its Fig. 18 indicates. The $s_*=0.1$ branches keep
+  $|f_{\mathrm{NL}}|\lesssim0.1$.
+
+At the $n_s\simeq0.965$ couplings:
+
+| model, $s_*$, $\xi_2$ | exact $n_s$ | prescription $n_s$ | exact $f_{\mathrm{NL}}^{\mathrm{Planck}}$ | Eq. (3.5), numerical | prescription |
+| --- | --- | --- | --- | --- | --- |
+| loop $\alpha=0.1$, $10^{-3}$, 0.02282 | 0.9654 | 0.9541 | $-0.731$ | $-0.627$ | $-1.365$ |
+| loop $\alpha=1$, $10^{-3}$, 0.02138 | 0.9662 | 0.9576 | $-1.034$ | $-0.946$ | $-1.944$ |
+| power-law $\lambda=0.01$, $10^{-3}$, 0.0110 | 0.9652 | 0.9623 | $-1.635$ | $-1.540$ | $-1.708$ |
+| power-law $\lambda=0.05$, $10^{-3}$, 0.01353 | 0.9651 | 0.9603 | $-6.010$ | $-5.540$ | $-6.753$ |
+| hybrid $\mu=10$, $10^{-3}$, 0.01077 | 0.9652 | 0.9621 | $-13.36$ | $-12.51$ | $-13.17$ |
+| hybrid $\mu=6$, $10^{-3}$, 0.00558 | 0.9649 | 0.9674 | $-22.83$ | $-21.61$ | $-20.84$ |
+
+The trajectories in the figure are those of the transport runs, so the figure
+contains no curve that the tests do not also exercise.
 
 ## Tests
 

@@ -255,6 +255,21 @@ The corrected form has the small-$\lambda$ limit
 $1+\lambda^2(N+2-\ln2-\gamma_E)^2$ with $N=\ln(1/z_{\mathrm{end}})$. The massive results,
 Eqs. (43)–(45), are unaffected. The equation was read from the typeset PDF.
 
+### 11. Curve labels of [HKKPT] Fig. 17, left panel — figure note
+
+The left panel of [HKKPT] Fig. 17 shows hybrid trajectories with
+$\phi_e=0.1\mu$ for $\mu=7.5$, 10, 15, and 30. Inflation ends at $\phi=\phi_e$, so a
+$\mu=30$ trajectory must end at $\phi=3$ and a $\mu=10$ one at $\phi=1$. The curves
+labeled $\mu=30$ (blue) end at $\phi\approx1$, and the curves labeled $\mu=10$
+(magenta) end near $\phi\approx3$. The exact $\mu=10$ trajectories here, at the
+couplings that give $n_s=0.965$, reproduce the blue curves: from $\phi\approx3.2$,
+$s=10^{-3}$ to $\phi=1$, $s=0.013$ for $s_*=10^{-3}$, and from $\phi\approx3.2$,
+$s=0.1$ to $\phi=1$, $s\approx0.32$ for $s_*=0.1$. The two labels, and the
+colors in the caption, therefore appear to be swapped. The curves for
+$\mu=7.5$ and 15 end at $\phi_e$, and the right panel is consistent. The $\mu=30$
+trajectory itself was not computed here. See
+[`nonminimal-assisted-inflation.md`](nonminimal-assisted-inflation.md), Figures.
+
 ## Agreements checked
 
 Recording these makes clear which published results have been independently
@@ -279,6 +294,9 @@ reproduced here:
 - [HKKPT] Eq. (3.1), given the numerical $s_e$ (entry 8), against the mode
   solver and a numerical $\delta N$ for loop inflation; and Eq. (3.5), with the
   sign of entry 7, against a numerical $\delta N$ to 9%.
+- [HKKPT] Figs. 9, 10, 13, 14, 17, and 18: the trajectories (up to entry 11)
+  and the $f_{\mathrm{NL}}$–$n_s$ curves of the prescription, reproduced from Eqs.
+  (3.1), (3.5), and (3.9), in [`figures/assisted_inflation.png`](figures/assisted_inflation.png).
 - [HMPS] Eqs. (43)–(45), the massive constant-turn spectra, against the mode
   solver on a circular orbit to $3.5\times10^{-4}$ for $0.5\le\lambda\le2$ and
   $1.25\le\mu^2/H^2\le9$.
