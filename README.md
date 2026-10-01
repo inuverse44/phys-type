@@ -103,6 +103,21 @@ The corresponding pivot-mode history is tracked as
 with a vector
 [`PDF`](docs/figures/two_field_pivot_evolution.pdf).
 
+The strong-mixing benchmark against the exact constant-turn solutions of
+arXiv:2606.18248 writes the mode-solver spectra for massive and massless
+entropy fields and overlays the closed forms, including the corrected
+logarithm of Eq. (39):
+
+```sh
+cargo run --release --example constant_turn_spectra
+uv run plots/constant_turn.py diagnostics
+```
+
+Its reference figure is tracked as
+[`docs/figures/constant_turn_spectra.png`](docs/figures/constant_turn_spectra.png)
+with a vector [`PDF`](docs/figures/constant_turn_spectra.pdf); see
+[`docs/constant-turn-exact-solutions.md`](docs/constant-turn-exact-solutions.md).
+
 Generate every diagnostic CSV and publication-quality PNG/PDF figure with one
 command:
 
@@ -120,6 +135,7 @@ uv run plots/oscillation.py diagnostics/oscillation.csv
 uv run plots/two_field_spectra.py diagnostics
 uv run plots/final_spectra.py diagnostics/two_field_spectra.csv
 uv run plots/pivot_mode_evolution.py diagnostics
+uv run plots/constant_turn.py diagnostics
 ```
 
 The plotting scripts declare their own Python dependencies, so `uv` creates an
