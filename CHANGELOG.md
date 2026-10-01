@@ -8,6 +8,12 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A squeezed-bispectrum benchmark on the constant-turn orbit: the transport
+  `f_NL(k, k, r k)` scales as `r^(3/2 - nu)` with `nu` set by the entropy mass
+  `mu`, not by `m_eff`, as arXiv:2607.14529 states. Adds the ignored test
+  `constant_turn_squeezed_bispectrum_scales_with_mu_not_the_effective_mass`,
+  `examples/constant_turn_squeezed.rs`, `plots/constant_turn_squeezed.py`,
+  and the tracked figure `docs/figures/constant_turn_squeezed.png`.
 - `assisted_slow_roll`, the slow-roll delta N predictions of arXiv:2302.05866
   (Eqs. (3.1), (3.5), (3.9)) for the nonminimally assisted subclass, moved
   out of the tests so the example can share them.
