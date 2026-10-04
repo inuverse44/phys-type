@@ -8,6 +8,13 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The mode solver for any number of fields: `PerturbationSystem<P, G, N>`,
+  `ConformalPerturbationSystem<P, G, N>`, `Modes<N>`, `PerturbationState<N>`,
+  and their tolerances, with a Bunch-Davies frame built by Gram-Schmidt from
+  the background tangent.
+- `InvariantSpectra<N>` and `invariant_spectra`: the curvature spectrum, the
+  total and principal entropy spectra, the norm of the curvature-entropy
+  cross vector, and `r_C`, without an entropy basis.
 - `Kinematics<N>` and `CovariantMultifieldSystem::kinematics` for any number
   of fields: the unit tangent, the entropy projector
   `perp^IJ = G^IJ - e_sigma^I e_sigma^J`, the turn vector `D_t e_sigma`, and
@@ -28,6 +35,12 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Two-field names lose "TwoField" in one break: `TwoFieldModes` becomes
+  `Modes<2>`, `TwoFieldPerturbationState` becomes `PerturbationState<2>`,
+  `ConformalTwoFieldPerturbationSystem<P, G>` becomes
+  `ConformalPerturbationSystem<P, G, 2>`, `ComplexMatrix2` becomes
+  `ComplexMatrix<2>`, and likewise for the derivative, delta, tolerance, and
+  conformal types; `ModeCovariance` and `FieldPowerSpectrum` take `N`.
 - The oriented two-field basis is now `oriented_kinematics`; `kinematics`
   returns the general `Kinematics<N>`.
 - The core no longer exports the assisted model or its paper's formulas:

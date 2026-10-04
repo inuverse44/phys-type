@@ -1,14 +1,14 @@
 use phys_type::{
     Complex64, Field, FieldVelocity, Mass, ModeAmplitude, ModeVelocity, MultifieldState,
-    ScaleFactor, TwoFieldModes, TwoFieldPerturbationState, field_power_spectrum, mode_covariance,
+    ScaleFactor, Modes, PerturbationState, field_power_spectrum, mode_covariance,
 };
 
 fn main() {
-    let modes = TwoFieldModes {
+    let modes = Modes {
         rescaled_amplitude: [[ModeAmplitude::new(Complex64::new(1.0, 0.0)); 2]; 2],
         rescaled_velocity: [[ModeVelocity::new(Complex64::new(0.0, 0.0)); 2]; 2],
     };
-    let state = TwoFieldPerturbationState {
+    let state = PerturbationState {
         background: MultifieldState::new(
             [Field::new(1.0); 2],
             [FieldVelocity::new(0.0); 2],

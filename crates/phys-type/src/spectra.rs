@@ -13,15 +13,15 @@ use num_complex::Complex64;
 use crate::{
     ComplexMagnitude, ContravariantField, CovariantField, CurvedFieldSpaceGeometry, Dimensionless,
     FieldMetric, FieldTensor2, Hubble, KinematicBasis2, KinematicBasisError, M0, M2, MMinus1,
-    MMinusHalf, Mass, ModeAmplitude, Quantity, ScaleFactor, TwiceDifferentiableMultifieldPotential,
-    TwoFieldModes, TwoFieldPerturbationState, TwoFieldPerturbationSystem, Upper,
+    MMinusHalf, Mass, ModeAmplitude, Modes, PerturbationState, PerturbationSystem, Quantity,
+    ScaleFactor, TwiceDifferentiableMultifieldPotential, Upper,
 };
 
 /// Mode covariance `Sigma^{IJ} = sum_A U^I_A U^{J*}_A`.
-pub type ModeCovariance = FieldTensor2<Upper, Upper, MMinus1, Complex64, 2>;
+pub type ModeCovariance<const N: usize> = FieldTensor2<Upper, Upper, MMinus1, Complex64, N>;
 
 /// Field power spectrum matrix `P_Q^{IJ} = k^3 Sigma^{IJ} / (2 pi^2)`.
-pub type FieldPowerSpectrum = FieldTensor2<Upper, Upper, M2, Complex64, 2>;
+pub type FieldPowerSpectrum<const N: usize> = FieldTensor2<Upper, Upper, M2, Complex64, N>;
 
 /// A dimensionless spectrum of the curvature or entropy perturbation.
 pub type DimensionlessSpectrum = Dimensionless;
@@ -125,16 +125,19 @@ pub struct ProjectedSpectra {
 /// independent vacuum oscillators, so the result is Hermitian by construction
 /// up to floating-point rounding. Taking the complete state prevents modes
 /// from accidentally being paired with a scale factor from another time.
-pub fn mode_covariance(state: &TwoFieldPerturbationState) -> ModeCovariance {
+pub fn mode_covariance<const N: usize>(state: &PerturbationState<N>) -> ModeCovariance<N> {
     mode_covariance_from_modes(&state.modes, state.background.a)
 }
 
-fn mode_covariance_from_modes(modes: &TwoFieldModes, scale_factor: ScaleFactor) -> ModeCovariance {
+fn mode_covariance_from_modes<const N: usize>(
+    modes: &Modes<N>,
+    scale_factor: ScaleFactor,
+) -> ModeCovariance<N> {
     let squared = scale_factor * scale_factor;
 
     ModeCovariance::new(core::array::from_fn(|row| {
         core::array::from_fn(|column| {
-            let rescaled = (0..2).fold(
+            let rescaled = (0..N).fold(
                 Quantity::<MMinus1, Complex64>::new(Complex64::new(0.0, 0.0)),
                 |sum, mode| {
                     let conjugate =
@@ -150,7 +153,10 @@ fn mode_covariance_from_modes(modes: &TwoFieldModes, scale_factor: ScaleFactor) 
 }
 
 /// Applies the `k^3 / (2 pi^2)` normalization to a mode covariance.
-pub fn field_power_spectrum(k: Mass, covariance: &ModeCovariance) -> FieldPowerSpectrum {
+pub fn field_power_spectrum<const N: usize>(
+    k: Mass,
+    covariance: &ModeCovariance<N>,
+) -> FieldPowerSpectrum<N> {
     let normalization = k * k * k / (2.0 * PI * PI);
 
     FieldPowerSpectrum::new(
@@ -162,7 +168,7 @@ pub fn field_power_spectrum(k: Mass, covariance: &ModeCovariance) -> FieldPowerS
 
 /// The largest modulus in a spectrum matrix, used as the scale for every
 /// relative tolerance.
-pub(crate) fn spectrum_scale(spectrum: &FieldPowerSpectrum) -> f64 {
+pub(crate) fn spectrum_scale<const N: usize>(spectrum: &FieldPowerSpectrum<N>) -> f64 {
     spectrum
         .components()
         .iter()
@@ -175,7 +181,7 @@ pub(crate) fn spectrum_scale(spectrum: &FieldPowerSpectrum) -> f64 {
 ///
 /// A matrix whose entries all vanish is Hermitian, and reports zero rather
 /// than dividing by an empty scale.
-pub fn hermiticity_residual(spectrum: &FieldPowerSpectrum) -> f64 {
+pub fn hermiticity_residual<const N: usize>(spectrum: &FieldPowerSpectrum<N>) -> f64 {
     let scale = spectrum_scale(spectrum);
     if scale == 0.0 {
         return 0.0;
@@ -197,7 +203,7 @@ pub fn hermiticity_residual(spectrum: &FieldPowerSpectrum) -> f64 {
 ///
 /// Both indices of `P^{IJ}` are upper, so only covectors can be supplied.
 fn project_complex(
-    spectrum: &FieldPowerSpectrum,
+    spectrum: &FieldPowerSpectrum<2>,
     left: &CovariantField<M0, f64, 2>,
     right: &CovariantField<M0, f64, 2>,
 ) -> Quantity<M2, Complex64> {
@@ -251,7 +257,7 @@ pub type ModeProjections = [[Complex64; 2]; 2];
 
 /// Projects each independent mode onto the curvature and entropy directions.
 fn project_modes_in_basis(
-    modes: &TwoFieldModes,
+    modes: &Modes<2>,
     scale_factor: ScaleFactor,
     metric: &FieldMetric<2>,
     basis: &KinematicBasis2,
@@ -289,7 +295,7 @@ fn project_modes_in_basis(
 /// speed `dot_sigma` supplies the `H / dot_sigma` normalization that makes the
 /// curvature and entropy spectra dimensionless.
 pub fn project(
-    spectrum: &FieldPowerSpectrum,
+    spectrum: &FieldPowerSpectrum<2>,
     metric: &FieldMetric<2>,
     basis: &KinematicBasis2,
     hubble: Hubble,
@@ -369,7 +375,7 @@ fn correlation_coefficient(
     Ok(value.clamp(-1.0, 1.0))
 }
 
-impl<P, G> TwoFieldPerturbationSystem<P, G>
+impl<P, G> PerturbationSystem<P, G, 2>
 where
     P: TwiceDifferentiableMultifieldPotential<2>,
     G: CurvedFieldSpaceGeometry<2>,
@@ -382,7 +388,7 @@ where
     /// cannot be combined accidentally.
     pub fn mode_projections(
         &self,
-        state: &TwoFieldPerturbationState,
+        state: &PerturbationState<2>,
         previous_normal: Option<&ContravariantField<M0, f64, 2>>,
     ) -> Result<ModeProjections, SpectrumError> {
         let kinematics = self
@@ -409,7 +415,7 @@ where
     /// output times, exactly as for the background kinematics.
     pub fn spectra(
         &self,
-        state: &TwoFieldPerturbationState,
+        state: &PerturbationState<2>,
         previous_normal: Option<&ContravariantField<M0, f64, 2>>,
         tolerances: SpectrumTolerances,
     ) -> Result<ProjectedSpectra, SpectrumError> {
@@ -425,6 +431,196 @@ where
     }
 }
 
+/// Spectra of any number of fields, defined without an entropy basis.
+///
+/// With the field spectrum `P^{IJ}`, the tangent `e_sigma`, the entropy
+/// projector `perp^{IJ}`, and `H / dot_sigma`, the curvature spectrum is the
+/// adiabatic projection and `S^{IJ} = (H/dot_sigma)^2 perp^I_K perp^J_L P^{KL}`
+/// is the entropy covariance. Its trace, its eigenvalues (the principal
+/// entropy spectra, along axes set by the perturbations), and the norm of
+/// the cross vector `C^I = (H/dot_sigma)^2 perp^I_K e_sigma_L Re P^{KL}` are
+/// invariant under changes of field coordinates; see
+/// `docs/n-field-perturbations.md`. For two fields they equal the oriented
+/// [`ProjectedSpectra`] up to the sign of the cross spectrum.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct InvariantSpectra<const N: usize> {
+    /// `P_R`.
+    pub curvature: DimensionlessSpectrum,
+    /// `P_S = S^I_I`, the total entropy power.
+    pub entropy: DimensionlessSpectrum,
+    /// Eigenvalues of `S^I_J` in decreasing order. The last one belongs to
+    /// the adiabatic direction and vanishes up to round-off; the first
+    /// `N - 1` are the principal entropy spectra.
+    pub principal_entropy: [f64; N],
+    /// `|C_RS| = sqrt(G_IJ C^I C^J)`.
+    pub cross_norm: DimensionlessSpectrum,
+    /// `r_C = |C_RS| / sqrt(P_R P_S)`; `None` for one field, where there is
+    /// no entropy.
+    pub correlation: Option<f64>,
+}
+
+/// Eigenvalues of a real symmetric matrix by cyclic Jacobi rotations, in
+/// decreasing order.
+fn symmetric_eigenvalues<const N: usize>(mut matrix: [[f64; N]; N]) -> [f64; N] {
+    for _ in 0..100 {
+        let off: f64 = (0..N)
+            .flat_map(|i| (0..N).filter(move |&j| j != i).map(move |j| (i, j)))
+            .map(|(i, j)| matrix[i][j] * matrix[i][j])
+            .sum();
+        let scale: f64 = (0..N).map(|i| matrix[i][i] * matrix[i][i]).sum::<f64>() + off;
+        if off <= 1.0e-30 * scale {
+            break;
+        }
+        for p in 0..N {
+            for q in (p + 1)..N {
+                if matrix[p][q] == 0.0 {
+                    continue;
+                }
+                let theta = (matrix[q][q] - matrix[p][p]) / (2.0 * matrix[p][q]);
+                let t = theta.signum() / (theta.abs() + (theta * theta + 1.0).sqrt());
+                let t = if theta == 0.0 { 1.0 } else { t };
+                let c = 1.0 / (t * t + 1.0).sqrt();
+                let s = t * c;
+                for row in matrix.iter_mut() {
+                    let (kp, kq) = (row[p], row[q]);
+                    row[p] = c * kp - s * kq;
+                    row[q] = s * kp + c * kq;
+                }
+                let (row_p, row_q) = (matrix[p], matrix[q]);
+                matrix[p] = core::array::from_fn(|k| c * row_p[k] - s * row_q[k]);
+                matrix[q] = core::array::from_fn(|k| s * row_p[k] + c * row_q[k]);
+            }
+        }
+    }
+    let mut values: [f64; N] = core::array::from_fn(|i| matrix[i][i]);
+    values.sort_by(|a, b| b.total_cmp(a));
+    values
+}
+
+/// Projects a field spectrum of `N` fields onto basis-free curvature and
+/// entropy spectra.
+pub fn invariant_spectra<const N: usize>(
+    spectrum: &FieldPowerSpectrum<N>,
+    metric: &FieldMetric<N>,
+    kinematics: &crate::Kinematics<N>,
+    hubble: Hubble,
+    tolerances: SpectrumTolerances,
+) -> Result<InvariantSpectra<N>, SpectrumError> {
+    let residual = hermiticity_residual(spectrum);
+    if residual > tolerances.hermiticity {
+        return Err(SpectrumError::NotHermitian {
+            residual,
+            tolerance: tolerances.hermiticity,
+        });
+    }
+    let g = |i: usize, j: usize| metric.components()[i][j].into_value();
+    let p = |i: usize, j: usize| spectrum.components()[i][j].into_value().re;
+    let e: [f64; N] = kinematics.tangent.components().map(Quantity::into_value);
+    let transfer = (hubble / kinematics.speed).into_value();
+    let weight = transfer * transfer;
+    // Lowered tangent and the mixed projector perp^I_J = delta^I_J - e^I e_J.
+    let e_lower: [f64; N] = core::array::from_fn(|i| (0..N).map(|j| g(i, j) * e[j]).sum());
+    let perp = |i: usize, j: usize| f64::from(i == j) - e[i] * e_lower[j];
+    let curvature: f64 = weight
+        * (0..N)
+            .flat_map(|i| (0..N).map(move |j| (i, j)))
+            .map(|(i, j)| e_lower[i] * e_lower[j] * p(i, j))
+            .sum::<f64>();
+    let entropy_upper: [[f64; N]; N] = core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            weight
+                * (0..N)
+                    .flat_map(|k| (0..N).map(move |l| (k, l)))
+                    .map(|(k, l)| perp(i, k) * perp(j, l) * p(k, l))
+                    .sum::<f64>()
+        })
+    });
+    let cross: [f64; N] = core::array::from_fn(|i| {
+        weight
+            * (0..N)
+                .flat_map(|k| (0..N).map(move |l| (k, l)))
+                .map(|(k, l)| perp(i, k) * e_lower[l] * p(k, l))
+                .sum::<f64>()
+    });
+    // S^I_I = S^{IJ} G_JI.
+    let entropy: f64 = (0..N)
+        .flat_map(|i| (0..N).map(move |j| (i, j)))
+        .map(|(i, j)| entropy_upper[i][j] * g(j, i))
+        .sum();
+    let cross_norm = (0..N)
+        .flat_map(|i| (0..N).map(move |j| (i, j)))
+        .map(|(i, j)| g(i, j) * cross[i] * cross[j])
+        .sum::<f64>()
+        .max(0.0)
+        .sqrt();
+    // Eigenvalues of S^I_J equal those of L^T S L for G = L L^T.
+    let mut cholesky = [[0.0; N]; N];
+    for i in 0..N {
+        for j in 0..=i {
+            let sum: f64 = (0..j).map(|k| cholesky[i][k] * cholesky[j][k]).sum();
+            if i == j {
+                cholesky[i][i] = (g(i, i) - sum).max(0.0).sqrt();
+            } else {
+                cholesky[i][j] = (g(i, j) - sum) / cholesky[j][j];
+            }
+        }
+    }
+    let symmetric: [[f64; N]; N] = core::array::from_fn(|a| {
+        core::array::from_fn(|b| {
+            (0..N)
+                .flat_map(|i| (0..N).map(move |j| (i, j)))
+                .map(|(i, j)| cholesky[i][a] * entropy_upper[i][j] * cholesky[j][b])
+                .sum()
+        })
+    });
+    let principal_entropy = symmetric_eigenvalues(symmetric);
+    let correlation = if N == 1 {
+        None
+    } else {
+        if !(curvature > 0.0 && entropy > 0.0) {
+            return Err(SpectrumError::NonPositiveSpectrum { curvature, entropy });
+        }
+        let value = cross_norm / (curvature * entropy).sqrt();
+        if value > 1.0 + tolerances.correlation_overshoot {
+            return Err(SpectrumError::CorrelationOutOfRange {
+                value,
+                tolerance: tolerances.correlation_overshoot,
+            });
+        }
+        Some(value.min(1.0))
+    };
+    Ok(InvariantSpectra {
+        curvature: Quantity::new(curvature),
+        entropy: Quantity::new(entropy),
+        principal_entropy,
+        cross_norm: Quantity::new(cross_norm),
+        correlation,
+    })
+}
+
+impl<P, G, const N: usize> PerturbationSystem<P, G, N>
+where
+    P: TwiceDifferentiableMultifieldPotential<N>,
+    G: CurvedFieldSpaceGeometry<N>,
+{
+    /// Projects one evolved state onto basis-free curvature and entropy
+    /// spectra, for any number of fields.
+    pub fn invariant_spectra(
+        &self,
+        state: &PerturbationState<N>,
+        tolerances: SpectrumTolerances,
+    ) -> Result<InvariantSpectra<N>, SpectrumError> {
+        let kinematics = self
+            .background
+            .kinematics(&state.background)
+            .map_err(SpectrumError::KinematicBasis)?;
+        let metric = self.background.geometry.metric(&state.background.phi);
+        let hubble = self.background.hubble(&state.background);
+        let spectrum = field_power_spectrum(self.k, &mode_covariance(state));
+        invariant_spectra(&spectrum, &metric, &kinematics, hubble, tolerances)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -433,12 +629,12 @@ mod tests {
         MultifieldState, QuadraticMultifieldPotential, ScaleFactor, Time, rk4_step,
     };
 
-    fn system() -> TwoFieldPerturbationSystem<QuadraticMultifieldPotential<2>, FlatFieldSpace> {
+    fn system() -> PerturbationSystem<QuadraticMultifieldPotential<2>, FlatFieldSpace, 2> {
         let background = CovariantMultifieldSystem::in_planck_units(
             QuadraticMultifieldPotential::new([Mass::new(1.0e-6), Mass::new(1.5e-6)]),
             FlatFieldSpace,
         );
-        TwoFieldPerturbationSystem::new(background, Mass::new(1.0e-2))
+        PerturbationSystem::new(background, Mass::new(1.0e-2))
     }
 
     fn background() -> MultifieldState<2> {
@@ -449,7 +645,7 @@ mod tests {
         )
     }
 
-    fn spectrum_from(entries: [[Complex64; 2]; 2]) -> FieldPowerSpectrum {
+    fn spectrum_from(entries: [[Complex64; 2]; 2]) -> FieldPowerSpectrum<2> {
         FieldPowerSpectrum::new(entries.map(|row| row.map(Quantity::new)))
     }
 
@@ -691,5 +887,230 @@ mod tests {
         state.modes.rescaled_velocity = [[ModeVelocity::new(Complex64::new(7.0, -3.0)); 2]; 2];
 
         assert_eq!(mode_covariance(&state), before);
+    }
+    fn close(a: f64, b: f64, tolerance: f64) -> bool {
+        (a - b).abs() <= tolerance * a.abs().max(b.abs()).max(1.0e-300)
+    }
+
+    /// Evolves a Bunch-Davies state with fixed RK4 steps.
+    fn evolve<P, G, const N: usize>(
+        system: &PerturbationSystem<P, G, N>,
+        background: MultifieldState<N>,
+        steps: usize,
+    ) -> PerturbationState<N>
+    where
+        P: TwiceDifferentiableMultifieldPotential<N>,
+        G: CurvedFieldSpaceGeometry<N>,
+    {
+        let mut state = system.bunch_davies_state(background, 100.0).unwrap();
+        for _ in 0..steps {
+            state = rk4_step(system, Time::new(0.0), &state, Time::new(2.0));
+        }
+        state
+    }
+
+    #[test]
+    fn invariant_spectra_reproduce_the_oriented_two_field_projection() {
+        let background_system = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0e-6), Mass::new(7.0e-6)]),
+            crate::HyperbolicFieldSpace::new(Field::new(5.0)).unwrap(),
+        );
+        let system = PerturbationSystem::new(background_system, Mass::new(1.0e-2));
+        let state = evolve(&system, background(), 40);
+        let oriented = system
+            .spectra(&state, None, SpectrumTolerances::default())
+            .unwrap();
+        let general = system
+            .invariant_spectra(&state, SpectrumTolerances::default())
+            .unwrap();
+        assert!(close(
+            general.curvature.into_value(),
+            oriented.curvature.into_value(),
+            1.0e-12
+        ));
+        assert!(close(
+            general.entropy.into_value(),
+            oriented.entropy.into_value(),
+            1.0e-12
+        ));
+        assert!(close(
+            general.principal_entropy[0],
+            oriented.entropy.into_value(),
+            1.0e-10
+        ));
+        assert!(general.principal_entropy[1].abs() < 1.0e-10 * general.entropy.into_value());
+        // Inside the horizon the cross spectrum is tiny, so it is compared on
+        // the scale sqrt(P_R P_S) that bounds it.
+        let bound = (general.curvature.into_value() * general.entropy.into_value()).sqrt();
+        assert!(
+            (general.cross_norm.into_value() - oriented.cross.into_value().abs()).abs()
+                < 1.0e-12 * bound
+        );
+        assert!((general.correlation.unwrap() - oriented.correlation.abs()).abs() < 1.0e-12);
+    }
+
+    /// `V = sum_i m_i^2 (R phi)_i^2 / 2` for a fixed rotation `R`.
+    #[derive(Clone, Copy, Debug)]
+    struct RotatedQuadratic {
+        masses: [f64; 3],
+        rotation: [[f64; 3]; 3],
+    }
+
+    impl<V> crate::MultifieldPotentialValue<V, 3> for RotatedQuadratic
+    where
+        V: From<f64>
+            + Clone
+            + core::ops::Add<V, Output = V>
+            + core::ops::Mul<V, Output = V>
+            + core::ops::Mul<f64, Output = V>,
+    {
+        fn value(&self, fields: [Field<V>; 3]) -> crate::EnergyDensity<V> {
+            let phi = fields.map(Quantity::into_value);
+            let rotated: [V; 3] = core::array::from_fn(|i| {
+                (0..3).fold(V::from(0.0), |sum, j| {
+                    sum + phi[j].clone() * self.rotation[i][j]
+                })
+            });
+            crate::EnergyDensity::new((0..3).fold(V::from(0.0), |sum, i| {
+                sum + rotated[i].clone()
+                    * rotated[i].clone()
+                    * (0.5 * self.masses[i] * self.masses[i])
+            }))
+        }
+    }
+
+    #[test]
+    fn invariant_spectra_do_not_depend_on_the_field_coordinates() {
+        let masses = [1.0e-6, 2.3e-6, 4.1e-6];
+        let (a, b) = (0.6_f64, 0.3_f64);
+        // A rotation about z by a, then about x by b.
+        let rz = [
+            [a.cos(), -a.sin(), 0.0],
+            [a.sin(), a.cos(), 0.0],
+            [0.0, 0.0, 1.0],
+        ];
+        let rx = [
+            [1.0, 0.0, 0.0],
+            [0.0, b.cos(), -b.sin()],
+            [0.0, b.sin(), b.cos()],
+        ];
+        let rotation: [[f64; 3]; 3] = core::array::from_fn(|i| {
+            core::array::from_fn(|j| (0..3).map(|k| rx[i][k] * rz[k][j]).sum())
+        });
+        let identity: [[f64; 3]; 3] =
+            core::array::from_fn(|i| core::array::from_fn(|j| f64::from(i == j)));
+        let k = Mass::new(1.0e-2);
+        let original = PerturbationSystem::new(
+            CovariantMultifieldSystem::in_planck_units(
+                RotatedQuadratic {
+                    masses,
+                    rotation: identity,
+                },
+                FlatFieldSpace,
+            ),
+            k,
+        );
+        let rotated = PerturbationSystem::new(
+            CovariantMultifieldSystem::in_planck_units(
+                RotatedQuadratic { masses, rotation },
+                FlatFieldSpace,
+            ),
+            k,
+        );
+        // The same physical state in both coordinates: phi' = R^T phi.
+        let phi = [10.0, 7.0, 4.0];
+        let velocity = [-3.0e-6, -4.0e-6, -2.0e-6];
+        let back = |v: [f64; 3]| -> [f64; 3] {
+            core::array::from_fn(|j| (0..3).map(|i| rotation[i][j] * v[i]).sum())
+        };
+        let state_in = |p: [f64; 3], v: [f64; 3]| {
+            MultifieldState::new(
+                p.map(Field::new),
+                v.map(FieldVelocity::new),
+                ScaleFactor::new(1.0),
+            )
+        };
+        let a_state = evolve(&original, state_in(phi, velocity), 40);
+        let b_state = evolve(&rotated, state_in(back(phi), back(velocity)), 40);
+        let a = original
+            .invariant_spectra(&a_state, SpectrumTolerances::default())
+            .unwrap();
+        let b = rotated
+            .invariant_spectra(&b_state, SpectrumTolerances::default())
+            .unwrap();
+        assert!(close(
+            a.curvature.into_value(),
+            b.curvature.into_value(),
+            1.0e-9
+        ));
+        assert!(close(
+            a.entropy.into_value(),
+            b.entropy.into_value(),
+            1.0e-9
+        ));
+        let bound = (a.curvature.into_value() * a.entropy.into_value()).sqrt();
+        assert!((a.cross_norm.into_value() - b.cross_norm.into_value()).abs() < 1.0e-9 * bound);
+        for i in 0..2 {
+            assert!(close(
+                a.principal_entropy[i],
+                b.principal_entropy[i],
+                1.0e-9
+            ));
+        }
+        // The entropy eigenvalues add up to the trace; the last one vanishes.
+        let sum: f64 = a.principal_entropy.iter().sum();
+        assert!(close(sum, a.entropy.into_value(), 1.0e-10));
+        assert!(a.principal_entropy[2].abs() < 1.0e-10 * a.entropy.into_value());
+    }
+
+    #[test]
+    fn one_field_matches_two_fields_with_a_decoupled_spectator() {
+        let k = Mass::new(1.0e-2);
+        let single = PerturbationSystem::new(
+            CovariantMultifieldSystem::in_planck_units(
+                QuadraticMultifieldPotential::new([Mass::new(1.0e-6)]),
+                FlatFieldSpace,
+            ),
+            k,
+        );
+        let pair = PerturbationSystem::new(
+            CovariantMultifieldSystem::in_planck_units(
+                QuadraticMultifieldPotential::new([Mass::new(1.0e-6), Mass::new(3.0e-5)]),
+                FlatFieldSpace,
+            ),
+            k,
+        );
+        let one = evolve(
+            &single,
+            MultifieldState::new(
+                [Field::new(12.0)],
+                [FieldVelocity::new(-3.0e-6)],
+                ScaleFactor::new(1.0),
+            ),
+            40,
+        );
+        let two = evolve(
+            &pair,
+            MultifieldState::new(
+                [Field::new(12.0), Field::new(0.0)],
+                [FieldVelocity::new(-3.0e-6), FieldVelocity::new(0.0)],
+                ScaleFactor::new(1.0),
+            ),
+            40,
+        );
+        let a = single
+            .invariant_spectra(&one, SpectrumTolerances::default())
+            .unwrap();
+        let b = pair
+            .invariant_spectra(&two, SpectrumTolerances::default())
+            .unwrap();
+        assert!(close(
+            a.curvature.into_value(),
+            b.curvature.into_value(),
+            1.0e-13
+        ));
+        assert_eq!(a.correlation, None);
+        assert_eq!(a.entropy.into_value(), 0.0);
+        assert!(b.cross_norm.into_value() < 1.0e-12 * b.curvature.into_value());
     }
 }

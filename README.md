@@ -289,11 +289,16 @@ $M^2$. The shared `Transcendental` trait provides `exp`, `ln`, `cos`, and
 alpha-attractor formulas use the same automatic-differentiation path as
 polynomials.
 
-`TwoFieldPerturbationSystem` evolves the background together with two
-independent complex vacuum modes for one comoving `k`. Its mass matrix includes
+`PerturbationSystem<P, G, N>` (and its conformal-time counterpart
+`ConformalPerturbationSystem`) evolves the background together with `N`
+independent complex vacuum modes for one comoving `k`, for any number of
+fields `N`. Its mass matrix includes
 the covariant potential Hessian, field-space Riemann term, and gravitational
 correction. Bunch-Davies initialization checks `k/(aH)` explicitly, and the
-canonical Wronskian is available as a numerical invariant.
+canonical Wronskian is available as a numerical invariant. `invariant_spectra`
+projects the result onto the curvature spectrum and basis-free entropy
+spectra (total, principal, and the curvature-entropy correlation) for any
+`N`; the oriented two-field projection keeps the signed cross spectrum.
 
 Mode values are specified as `Quantity<D, Complex64>` so complex conjugation
 and Hermitian products remain explicit without sacrificing compile-time
