@@ -8,6 +8,12 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Engine API for analyses outside the crate: `CovariantMultifieldSystem::survey`
+  with `BackgroundSurvey` and a public `BackgroundTrajectory` (`state_at`,
+  `crossing`), `mode_spectrum`, and `three_point_state` with
+  `ThreePointEvolutionError`.
+- The nonminimally assisted and constant-turn validations now run in
+  `phys-type-models/tests` against `AssistedTheory` and the public API.
 - The `phys-type-models` workspace crate: nonminimally assisted inflation as
   `AssistedTheory` (loop, power-law, and hybrid inflatons) on the theory
   layer, the HKKPT slow-roll prescription (`hkkpt`), the constant-turn orbit,

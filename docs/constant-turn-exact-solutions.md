@@ -178,11 +178,12 @@ independent in-in evaluation; that is the next step.
 
 ## Tests
 
-The regular suite runs:
+The core's regular suite runs the `PolarFieldSpace` checks in
+`crates/phys-type/src/field_space.rs`: inverse metric, Levi-Civita
+connection and its derivative against finite differences, and vanishing
+curvature built from the connection. The validation against the papers is in
+`crates/phys-type-models/tests/constant_turn.rs`:
 
-- the `PolarFieldSpace` checks in `crates/phys-type/src/field_space.rs`: inverse metric,
-  Levi-Civita connection and its derivative against finite differences, and
-  vanishing curvature built from the connection;
 - `closed_form_gamma_and_digamma_match_known_values`, for the complex
   $\ln|\Gamma|$ and $\operatorname{Re}\psi$ helpers used by the closed forms;
 - `constant_turn_spectrum_matches_the_exact_massive_solutions`, the table of

@@ -357,7 +357,7 @@ pub(crate) fn evolve_three_point<P, G>(
     target_e_folds: f64,
     relative_tolerance: f64,
     max_steps: usize,
-) -> Result<(f64, CanonicalThreePointTransportState), EvolutionError>
+) -> Result<(f64, CanonicalThreePointTransportState), ThreePointEvolutionError>
 where
     P: ThriceDifferentiableMultifieldPotential<2> + Copy,
     G: ThirdOrderFieldSpaceGeometry<2> + CurvatureDerivativeGeometry<2> + Copy,
@@ -366,7 +366,7 @@ where
     let shortest = Mass::new(triangle.canonical_wavenumbers()[2]);
     let start = trajectory
         .crossing(|state| (shortest / (state.a * system.hubble(state))).into_value() - depth)
-        .ok_or(EvolutionError::StartNotFound)?;
+        .ok_or(ThreePointEvolutionError::StartNotFound)?;
     // The crossing is found by root refinement, so allow its rounding.
     let mut state = canonical_three_point_transport_initial_state(
         system,
@@ -374,7 +374,7 @@ where
         triangle,
         depth * (1.0 - 1.0e-6),
     )
-    .map_err(EvolutionError::InitialCondition)?;
+    .map_err(ThreePointEvolutionError::InitialCondition)?;
     let transport = CanonicalThreePointTransportSystem::new(system, trajectory, triangle);
     let tolerances = ErrorTolerances::new(
         CanonicalThreePointTransportTolerance::pure_relative(),
@@ -407,16 +407,38 @@ where
         step = next_step_size(attempted, outcome.error_ratio, &limits);
     }
 
-    Err(EvolutionError::StepLimit)
+    Err(ThreePointEvolutionError::StepLimit)
 }
 
-/// Failure of [`evolve_three_point`].
+/// Failure of [`CovariantMultifieldSystem::three_point_state`].
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) enum EvolutionError {
+pub enum ThreePointEvolutionError {
+    /// The shortest leg never reached the requested subhorizon depth.
     StartNotFound,
+    /// The subhorizon initial condition could not be built.
     InitialCondition(ThreePointInitialConditionError),
+    /// The transport exhausted its step budget.
     StepLimit,
 }
+
+impl fmt::Display for ThreePointEvolutionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StartNotFound => {
+                formatter.write_str("the triangle never reached its subhorizon start")
+            }
+            Self::InitialCondition(source) => {
+                write!(
+                    formatter,
+                    "invalid three-point initial condition: {source:?}"
+                )
+            }
+            Self::StepLimit => formatter.write_str("the three-point transport hit its step limit"),
+        }
+    }
+}
+
+impl std::error::Error for ThreePointEvolutionError {}
 
 const BLOCK_NAMES: [&str; 8] = ["QQQ", "QQP", "QPQ", "PQQ", "QPP", "PQP", "PPQ", "PPP"];
 
@@ -485,6 +507,31 @@ where
     P: ThriceDifferentiableMultifieldPotential<2> + Copy,
     G: ThirdOrderFieldSpaceGeometry<2> + CurvatureDerivativeGeometry<2> + Copy,
 {
+    /// The canonical two- and three-point state of `triangle` at
+    /// `e_folds_at_output`, evolved on a surveyed `trajectory` from the
+    /// subhorizon initial condition where the shortest leg has
+    /// `k/(aH) = exp(e_folds_before_exit)`.
+    pub fn three_point_state(
+        &self,
+        trajectory: &BackgroundTrajectory,
+        triangle: MomentumTriangle,
+        e_folds_before_exit: f64,
+        e_folds_at_output: f64,
+        relative_tolerance: f64,
+        max_steps: usize,
+    ) -> Result<CanonicalThreePointTransportState, ThreePointEvolutionError> {
+        evolve_three_point(
+            self,
+            trajectory,
+            triangle,
+            e_folds_before_exit,
+            e_folds_at_output,
+            relative_tolerance,
+            max_steps,
+        )
+        .map(|(_, state)| state)
+    }
+
     /// Surveys the background, fixes `k_pivot = a H` as in the spectrum run,
     /// and projects the tree-level bispectrum of every shape on the output
     /// slice.
@@ -555,12 +602,18 @@ where
                 settings.max_steps,
             )
             .map_err(|error| match error {
-                EvolutionError::StartNotFound => BispectrumRunError::StartNotFound { shape: index },
-                EvolutionError::InitialCondition(source) => BispectrumRunError::InitialCondition {
-                    shape: index,
-                    source,
-                },
-                EvolutionError::StepLimit => BispectrumRunError::StepLimit { shape: index },
+                ThreePointEvolutionError::StartNotFound => {
+                    BispectrumRunError::StartNotFound { shape: index }
+                }
+                ThreePointEvolutionError::InitialCondition(source) => {
+                    BispectrumRunError::InitialCondition {
+                        shape: index,
+                        source,
+                    }
+                }
+                ThreePointEvolutionError::StepLimit => {
+                    BispectrumRunError::StepLimit { shape: index }
+                }
             })?;
             let projected = curvature_correlators(
                 self,
