@@ -1,6 +1,6 @@
 # Step 5: perturbations for any number of fields
 
-Status: design, for review before implementation. It is step 5 of
+Status: design, reviewed; implementation proceeds in steps 5a–5f. It is step 5 of
 [`architecture.md`](architecture.md).
 
 ## Goal
@@ -63,19 +63,44 @@ segments). The kinematics therefore return
 - the turn vector $\omega^I=D_te_\sigma^I/H$ and its norm $|\eta_\perp|$;
 - for $N=2$ only, the oriented normal $e_s$ and the signed $\eta_\perp$, as now.
 
-**4. Observables are defined without an entropy basis.** The reported
-spectra are
+**4. Observables are defined without an entropy basis.** With the field
+power spectrum $\mathcal P^{IJ}(k)$, the tangent $e_\sigma$, the projector
+$\perp^{IJ}=G^{IJ}-e_\sigma^Ie_\sigma^J$, and the normalization $H/\dot\sigma$,
 
-| quantity | definition | $N=1$ | $N=2$ |
-| --- | --- | --- | --- |
-| $\mathcal P_{\mathcal R}$ | adiabatic projection | as now | as now |
-| $\mathcal P_{\mathcal S}$ | trace of the entropy block, $\perp_{IJ}\,\mathcal P^{IJ}$ in the normalization of $\mathcal R$ | $0$ | equals today's $\mathcal P_{\mathcal S}$ |
-| $\mathcal C_{\mathcal R\mathcal S}$ | norm of the adiabatic–entropy cross vector | $0$ | magnitude of today's signed $\mathcal C_{\mathcal{RS}}$ |
-| $r_C$ | $\mathcal C_{\mathcal{RS}}/\sqrt{\mathcal P_{\mathcal R}\mathcal P_{\mathcal S}}$ | not defined | as now |
+$$
+\mathcal P_{\mathcal R}=\Big(\tfrac{H}{\dot\sigma}\Big)^2e_{\sigma I}e_{\sigma J}\mathcal P^{IJ},\qquad
+S^{IJ}=\Big(\tfrac{H}{\dot\sigma}\Big)^2\perp^I{}_K\perp^J{}_L\mathcal P^{KL},\qquad
+C^I=\Big(\tfrac{H}{\dot\sigma}\Big)^2\perp^I{}_Ke_{\sigma L}\,\mathrm{Re}\,\mathcal P^{KL}.
+$$
 
-For $N=2$ the signed cross spectrum and the oriented $e_s$ stay in the
-records and CSV files, so existing columns keep their meaning; the files for
-other $N$ omit the columns that do not apply. The CSV header records $N$.
+$S^{IJ}$ is the entropy covariance, an $N\times N$ tensor of rank at most $N-1$
+(it vanishes along $e_\sigma$). The reported quantities are invariant under any
+change of field coordinates and need no entropy basis:
+
+| quantity | definition | meaning |
+| --- | --- | --- |
+| $\mathcal P_{\mathcal R}$ | above | curvature power |
+| $\mathcal P_{\mathcal S}$ | $S^I{}_I$ | total entropy power |
+| $\mathcal P_{\mathcal S,1}\ge\dots\ge\mathcal P_{\mathcal S,N-1}$ | eigenvalues of $S^I{}_J$, dropping the zero along $e_\sigma$ | principal entropy spectra, along axes set by the perturbations themselves |
+| $\lvert\mathcal C_{\mathcal{RS}}\rvert$ | $\sqrt{G_{IJ}C^IC^J}$ | strength of the curvature–entropy correlation |
+| $r_C$ | $\lvert\mathcal C_{\mathcal{RS}}\rvert/\sqrt{\mathcal P_{\mathcal R}\mathcal P_{\mathcal S}}$ | correlation coefficient, in $[0,1]$ |
+
+The eigenvalues are computed from the $N\times N$ matrix, so nothing is sized
+$N-1$; unlike a Frenet basis, the principal axes exist on straight segments
+too. The CSV columns are
+
+| $N$ | columns |
+| --- | --- |
+| 1 | `P_R` |
+| 2 | `P_R, P_S, C_RS, r_C`, as now, with the signed `C_RS` |
+| $\ge3$ | `P_R, P_S, P_S_1, …, P_S_{N-1}, C_RS_norm, r_C` |
+
+For $N=2$ the single eigenvalue equals the trace and $\lvert\mathcal C_{\mathcal{RS}}\rvert$
+is the magnitude of today's signed $\mathcal C_{\mathcal{RS}}$, so the general
+definitions reproduce the current outputs, which is itself a test. Within the
+inflation-only scope these entropy quantities are diagnostics of how much
+non-adiabatic power remains, that is, whether $\zeta$ can still evolve;
+observable isocurvature of a matter species needs reheating.
 
 **5. Tensor modes join the observables.** Single-field validation needs the
 tensor-to-scalar ratio, which the engine does not compute today. A tensor
@@ -122,14 +147,13 @@ $10^{-12}$ at every step.
 
 ## Open questions for review
 
-1. **Reported entropy quantities for $N\ge3$.** Decision 4 reports the
-   entropy trace and the norm of the cross vector, which exist on every
-   trajectory. The Frenet basis of decision 3 would add $N-1$ named entropy
-   spectra where no turn rate vanishes; it can be added later as an extra
-   output.
+None remain; see below.
 
 ## Resolved in review
 
+- **Entropy reporting for $N\ge3$.** The trace, the principal entropy spectra
+  (eigenvalues of the entropy covariance), the norm of the cross vector, and
+  $r_C$ (decision 4); a Frenet basis is not used.
 - **Deprecation.** A clean break at 0.3.0 (decision 2).
 - **Frames and $n_s$ for Higgs inflation.** The physics does not depend on
   the frame. For a single field, $\zeta$ is frame invariant, and $\Omega\to1$
