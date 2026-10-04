@@ -34,7 +34,7 @@ jobs:
       - name: Test
         run: cargo test --all-targets
       - name: Golden data
-        run: python3 scripts/golden.py check
+        run: python3 scripts/golden.py check --portable
       - name: Build release artifacts
         run: cargo build --release --all-targets
       - name: Verify package contents

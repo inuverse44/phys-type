@@ -6,17 +6,25 @@ examples, writes their CSV files into a scratch directory, and compares the
 data rows with the files frozen under ``golden/``. Comment lines (``#``), which
 carry the Git revision and other provenance, are ignored.
 
-    python3 scripts/golden.py check            # fast examples, as in CI
+    python3 scripts/golden.py check            # fast examples
+    python3 scripts/golden.py check --portable # as in CI, across platforms
     python3 scripts/golden.py check --all      # also the slow examples
     python3 scripts/golden.py check --exact    # require identical text
     python3 scripts/golden.py update [--all]   # refreeze after an intended change
 
 Numbers are compared value by value: |a - b| <= rtol * max(|a|, |b|) with
 rtol = 1e-9 by default, so that last-digit differences between platform math
-libraries pass while any physical change fails. Columns that record
+libraries pass while any physical change fails; an absolute floor of
+1e-12 times the column's largest value absorbs quantities that vanish up to
+round-off. Columns that record
 accumulated round-off, such as the imaginary part of an equal-time
 correlator, are instead compared on the scale of a reference column. Large files are frozen with a
 row stride, recorded in their first line, and the row count is checked too.
+Files written once per accepted integration step are only comparable on one
+platform: a last-bit difference in a math library shifts the adaptive step
+sequence, and with it the e-fold of every row. ``--portable`` skips them and
+compares only quantities evaluated at fixed wavenumbers or couplings.
+
 Only the Python standard library is used.
 """
 
@@ -30,6 +38,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GOLDEN = ROOT / "golden"
 MAX_ROWS = 2000
+
+# Written at accepted integration steps; skipped by --portable.
+STEP_SAMPLED = {
+    "trajectory.csv",
+    "attractor.csv",
+    "oscillation.csv",
+    "two_field_background.csv",
+    "two_field_modes.csv",
+    "assisted_trajectories.csv",
+}
 
 # Round-off diagnostics -> the column whose scale bounds them.
 NOISE_COLUMNS = {"Im_P_12": "P_11"}
@@ -118,11 +136,15 @@ def compare(name: str, golden: Path, fresh: Path, rtol: float, exact: bool) -> l
     columns = expected[0].split(",")
     for column, label in enumerate(columns):
         reference = columns.index(NOISE_COLUMNS[label]) if label in NOISE_COLUMNS else None
+        floor = 1.0e-12 * max(
+            (abs(row[column]) for row in table_b if isinstance(row[column], float)),
+            default=0.0,
+        )
         for index, (row_a, row_b) in enumerate(zip(table_a, table_b)):
             a, b = row_a[column], row_b[column]
             if isinstance(a, float) and isinstance(b, float):
                 scale = abs(row_b[reference]) if reference is not None else max(abs(a), abs(b))
-                if abs(a - b) > rtol * scale:
+                if abs(a - b) > rtol * scale + floor:
                     errors.append(
                         f"{name}: column {label}, row {index}: {a!r} vs golden {b!r}"
                     )
@@ -138,6 +160,9 @@ def main() -> int:
     parser.add_argument("command", choices=["check", "update"])
     parser.add_argument("--all", action="store_true", help="include the slow examples")
     parser.add_argument("--exact", action="store_true", help="require identical text")
+    parser.add_argument(
+        "--portable", action="store_true", help="skip files sampled at integration steps"
+    )
     parser.add_argument("--rtol", type=float, default=1.0e-9)
     args = parser.parse_args()
 
@@ -156,6 +181,8 @@ def main() -> int:
                 print(f"froze {name}: {len(rows) - 1} rows, stride {stride}")
             return 0
         errors = []
+        if args.portable:
+            files = [name for name in files if name not in STEP_SAMPLED]
         for name in files:
             errors += compare(name, GOLDEN / name, output / name, args.rtol, args.exact)
         if errors:

@@ -43,17 +43,20 @@ cargo package --locked
 ## Golden data
 
 `golden/` freezes the data rows of the example CSV files. A refactor must
-reproduce them; CI runs
+reproduce them. CI runs
 
 ```sh
-python3 scripts/golden.py check
+python3 scripts/golden.py check --portable
 ```
 
 on the fast examples, comparing every value to a relative tolerance of
-`1e-9` so that last-digit differences between platform math libraries pass;
-round-off diagnostics such as `Im_P_12` are compared on the scale of their
-reference column. Before merging a change that touches the engine, also
-run the slow examples and the identical-text check locally:
+`1e-9`; round-off diagnostics such as `Im_P_12` are compared on the scale of
+their reference column. `--portable` skips files written once per accepted
+integration step (background and mode histories): a last-bit difference in
+the platform math library shifts the adaptive step sequence, so those rows
+are comparable only on one platform. Before merging a change that touches the
+engine, run the full and the identical-text checks locally, on the platform
+where the golden data were frozen (currently macOS, aarch64):
 
 ```sh
 python3 scripts/golden.py check --all
