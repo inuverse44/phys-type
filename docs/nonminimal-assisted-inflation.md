@@ -352,8 +352,13 @@ contains no curve that the tests do not also exercise.
 
 ## Tests
 
-The regular suite runs the geometry and potential tests in `crates/phys-type/src/nonminimal.rs`.
-The ignored release-mode tests are:
+The model and its validation live in the `phys-type-models` crate. The
+regular suite checks the Einstein-frame potentials of `AssistedTheory`
+against $V_J/(1+\xi_2s^2)^2$ and the `hkkpt` prescription against its recorded
+values; the core checks its generic Einstein-frame map against the
+hand-written assisted geometry. The ignored release-mode tests are in
+`crates/phys-type-models/tests/assisted.rs`
+(`cargo test -p phys-type-models --release -- --ignored`):
 
 - `assisted_loop_spectral_index_agrees_with_delta_n_and_eq_3_1`;
 - `assisted_loop_eq_3_1_tracks_the_numerical_tilt_across_xi`;
@@ -370,8 +375,8 @@ The ignored release-mode tests are:
   checks: $n_s$, Eq. (3.1), the quoted coupling ranges, the phase-space
   $\delta N$ agreement, and the crossing-time deficit.
 
-`a_field_value_event_ends_the_survey_at_the_requested_crossing` in the regular
-suite checks the field-value event itself.
+`a_field_value_event_ends_the_survey_at_the_requested_crossing` in the core's
+regular suite checks the field-value event itself.
 
 ## Plan
 

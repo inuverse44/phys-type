@@ -33,7 +33,7 @@ pub use background::{
 };
 pub use bispectrum_run::{
     BispectrumRecord, BispectrumRun, BispectrumRunError, BispectrumRunSettings,
-    PhaseSpaceBispectrumRecord, TriangleShape, write_bispectrum_metadata,
+    PhaseSpaceBispectrumRecord, ThreePointEvolutionError, TriangleShape, write_bispectrum_metadata,
 };
 pub use curvature::{
     CurvatureCorrelators, CurvatureGaugeCoefficients, CurvatureGaugeQuadratic,
@@ -92,8 +92,9 @@ pub use spectra::{
     project,
 };
 pub use spectrum_run::{
-    BackgroundRecord, EndOfInflation, ModeEvolutionRecord, Pivot, SpectrumRecord, SpectrumRun,
-    SpectrumRunError, SpectrumRunSettings, SpectrumRunStage, write_metadata,
+    BackgroundRecord, BackgroundSurvey, BackgroundTrajectory, EndOfInflation, ModeEvolutionRecord,
+    Pivot, SpectrumRecord, SpectrumRun, SpectrumRunError, SpectrumRunSettings, SpectrumRunStage,
+    write_metadata,
 };
 pub use state::{State, StateDelta, StateDerivative};
 pub use theory::{

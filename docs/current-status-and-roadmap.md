@@ -58,11 +58,11 @@ are outside that scope; see [`curvature-projection.md`](curvature-projection.md)
 
 ### Next-session handoff
 
-The implementation boundary is the branch
-`feat/constant-turn-squeezed-bispectrum`, based on merge commit `3ce6975`
-(PR #36). The validated state is 221 unit
-tests plus 24 compile-fail cases, with sixteen expensive ignored tests that
-pass in release mode (`cargo test --release -- --ignored`; they are not run by
+The implementation boundary is `main` after step 4b of
+[`architecture.md`](architecture.md). The validated state is 230 core unit
+tests and 5 model tests plus 24 compile-fail cases, with sixteen expensive
+ignored tests (7 core, 9 models) that
+pass in release mode (`cargo test --workspace --release -- --ignored`; they are not run by
 CI). Clippy with warnings denied, rustfmt, and rustdoc pass locally.
 
 The first external model validation after P3 is complete; see
