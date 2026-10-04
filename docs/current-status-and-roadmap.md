@@ -68,8 +68,8 @@ CI). Clippy with warnings denied, rustfmt, and rustdoc pass locally.
 The first external model validation after P3 is complete; see
 [`nonminimal-assisted-inflation.md`](nonminimal-assisted-inflation.md):
 
-1. `NonminimalAssistedFieldSpace` with `NonminimalLoopInflationPotential`,
-   `NonminimalPowerLawPotential`, and `NonminimalHybridPotential` implement
+1. The assisted model (now `AssistedTheory` with loop, power-law, and hybrid
+   inflatons in `phys-type-models`) implements
    the Einstein-frame models of arXiv:2302.05866 as ordinary providers.
    Finite-difference and closed-form tests check the geometry and potentials.
 2. $\zeta$ is not conserved until the end of inflation, so observables are

@@ -25,7 +25,7 @@ No core module may know about a particular model or paper.
 
 ## Audit of the current boundary
 
-At merge commit `6d6a7dc`:
+At merge commit `6d6a7dc` (resolved by steps 3–4a):
 
 | Item | Where | Problem |
 | --- | --- | --- |
@@ -128,6 +128,13 @@ Partly, at three levels.
 
 ## Public API the models need
 
+**Geometry cost.** A `JetGeometry` evaluates each quantity at the lowest
+order it needs: the metric from the conformal factor through first order,
+the connection and curvature through third, and only $\nabla R$ through fourth.
+With this tiering the assisted examples run 1.2 times slower than with the
+hand-written geometry (5.5 against 4.6 minutes for the reproduction figure);
+evaluating everything at fourth order made them seven times slower.
+
 The assisted validation currently calls crate-private functions of
 `spectrum_run`, such as the background survey and the single-mode evolution.
 Moving the models out forces a decision for each: either it becomes a
@@ -148,7 +155,8 @@ unchanged, which the golden data of step 1 checks bit for bit.
 | 2 | workspace | move the crate to `crates/phys-type`, no code change | CI, golden data |
 | 3a | jet geometry | `FourthOrderJet<N>`; `JetGeometry` derives the inverse metric, connection, curvature, and $\nabla R$ of any metric given with three derivatives | reproduces the polar, hyperbolic, and assisted geometries to $10^{-12}$; Bianchi identities on a generic three-field metric |
 | 3b | theory layer | `GeneralizedNonminimal<N>`, `einstein_frame`, `EinsteinFrame::correspondence`, `FieldSpaceGeometry::check_domain` checked by the background survey, [`frames.md`](frames.md) | the generic map reproduces `NonminimalAssistedFieldSpace` and its loop potential to $10^{-12}$ (metric and Palatini); single-field Higgs metric in closed form; golden data unchanged |
-| 4 | models crate | assisted as an instance of step 3; papers' formulas, example potentials, validation tests, and examples move to `crates/phys-type-models` | golden data |
+| 4a | models crate | `crates/phys-type-models`: assisted as `AssistedTheory` (an instance of step 3b), the HKKPT prescription, the constant-turn orbit, and the three model examples; the core keeps the hand-written assisted model only as a test fixture (`src/test_models/`) | fast golden data bit for bit; assisted golden refrozen after a $2\times10^{-8}$ round-off change of $f_{\mathrm{NL}}$ |
+| 4b | validation suites | the literature validations move from core test modules to `phys-type-models/tests`, with the public engine API they need | the ignored tests pass |
 | 5+ | $N$ fields | the perturbation, transport, and observable pipeline for any $N$, starting with $N=1$ and Higgs inflation | the two-field results unchanged |
 
 Expensive validations remain ignored tests run in release mode; CI checks the

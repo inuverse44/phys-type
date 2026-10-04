@@ -46,8 +46,8 @@ discussed by [Bauer and Demir, arXiv:0803.2664](https://arxiv.org/abs/0803.2664)
 `einstein_frame(theory)` returns the potential and a `JetGeometry` whose
 metric is evaluated with automatic differentiation: $\Omega^2$ four times, so
 that $\nabla R$ (three derivatives of $G$) is exact, and $k_{IJ}$ three times.
-The map reproduces the hand-written `NonminimalAssistedFieldSpace` and its
-potentials to $10^{-12}$, metric and Palatini, through the potential's third
+The map reproduces the hand-written assisted geometry (a core test fixture)
+and its potentials to $10^{-12}$, metric and Palatini, through the potential's third
 derivatives and the covariant Riemann derivative.
 
 **Validity along the trajectory.** The map requires $\Omega^2>0$, and the engine

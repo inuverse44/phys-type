@@ -1,4 +1,4 @@
-//! The constant-turn orbit shared by the constant-turn examples.
+//! A circular orbit of constant turn rate and constant entropy mass.
 //!
 //! `V = V_0 - c theta + m^2 (rho - rho_0)^2 / 2` on `PolarFieldSpace` has a
 //! circular orbit of radius `rho` with turn rate `Omega`, mixing
@@ -6,7 +6,6 @@
 //! background of the exact solutions of arXiv:2606.18248 and 2607.14529.
 
 use std::ops::{Add, Mul};
-use std::process::Command;
 
 use phys_type::{
     CovariantMultifieldSystem, EndOfInflation, EnergyDensity, Field, FieldVelocity,
@@ -14,8 +13,10 @@ use phys_type::{
     SpectrumRunSettings,
 };
 
+/// The Hubble rate of the orbits, in reduced Planck units.
 pub const HUBBLE: f64 = 1.0e-5;
 
+/// `V = V_0 - c theta + m^2 (rho - rho_0)^2 / 2` on `PolarFieldSpace`.
 #[derive(Clone, Copy, Debug)]
 pub struct ConstantTurnPotential {
     v0: f64,
@@ -39,6 +40,7 @@ where
     }
 }
 
+/// The engine system of a constant-turn orbit.
 pub type ConstantTurnSystem = CovariantMultifieldSystem<ConstantTurnPotential, PolarFieldSpace, 2>;
 
 /// The orbit for design values `lambda` and `mu^2 / H^2` at radius
@@ -97,26 +99,4 @@ pub fn radial_mass_squared(lambda: f64, mu_squared: f64) -> f64 {
 /// `epsilon = rho^2 lambda^2 / 8` fixes the orbit radius.
 pub fn radius(lambda: f64, epsilon: f64) -> f64 {
     (8.0 * epsilon).sqrt() / lambda
-}
-
-/// The short Git revision, marked `-dirty` for uncommitted tracked changes.
-pub fn revision() -> Option<String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .ok()?;
-    let revision = output
-        .status
-        .success()
-        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())?;
-    let status = Command::new("git")
-        .args(["status", "--porcelain", "--untracked-files=no"])
-        .output()
-        .ok()?;
-    let dirty = status.status.success() && !status.stdout.is_empty();
-    Some(if dirty {
-        format!("{revision}-dirty")
-    } else {
-        revision
-    })
 }

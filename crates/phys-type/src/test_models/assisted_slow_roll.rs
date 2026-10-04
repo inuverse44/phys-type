@@ -3,7 +3,7 @@
 //! Hyun, Kim, Kodama, Park, and Takahashi,
 //! [*Nonminimally Assisted Inflation: A General Analysis*](https://arxiv.org/abs/2302.05866)
 //! (arXiv:2302.05866v2, HKKPT), predict `n_s` and `f_NL` of the assisted
-//! model of [`crate::nonminimal`] from Eqs. (3.1), (3.5), and (3.9). The
+//! model of [`super::nonminimal`] from Eqs. (3.1), (3.5), and (3.9). The
 //! repository compares them with the exact background, mode, and transport
 //! evolution; see `docs/nonminimal-assisted-inflation.md`.
 //!
@@ -65,10 +65,10 @@ impl LoopInflaton {
 }
 
 impl AssistedInflaton for LoopInflaton {
-    type Potential = crate::NonminimalLoopInflationPotential;
+    type Potential = crate::test_models::NonminimalLoopInflationPotential;
 
     fn potential(&self, coupling: f64) -> Self::Potential {
-        crate::NonminimalLoopInflationPotential {
+        crate::test_models::NonminimalLoopInflationPotential {
             scale: crate::EnergyDensity::new(1.0e-10),
             alpha: self.alpha,
             coupling,
@@ -122,10 +122,10 @@ pub struct PowerLawInflaton {
 }
 
 impl AssistedInflaton for PowerLawInflaton {
-    type Potential = crate::NonminimalPowerLawPotential;
+    type Potential = crate::test_models::NonminimalPowerLawPotential;
 
     fn potential(&self, coupling: f64) -> Self::Potential {
-        crate::NonminimalPowerLawPotential {
+        crate::test_models::NonminimalPowerLawPotential {
             scale: crate::EnergyDensity::new(1.0e-10),
             lambda: self.lambda,
             coupling,
@@ -172,10 +172,10 @@ pub struct HybridInflaton {
 }
 
 impl AssistedInflaton for HybridInflaton {
-    type Potential = crate::NonminimalHybridPotential;
+    type Potential = crate::test_models::NonminimalHybridPotential;
 
     fn potential(&self, coupling: f64) -> Self::Potential {
-        crate::NonminimalHybridPotential {
+        crate::test_models::NonminimalHybridPotential {
             scale: crate::EnergyDensity::new(1.0e-10),
             mu: self.mu,
             coupling,

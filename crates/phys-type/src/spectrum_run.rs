@@ -4282,13 +4282,13 @@ mod tests {
 
     /// The inflaton sector `V_J(phi)` of the assisted model, together with the
     /// prescription arXiv:2302.05866 uses for it.
-    use crate::assisted_slow_roll::{
+    use crate::test_models::assisted_slow_roll::{
         AssistedInflaton, HybridInflaton, LoopInflaton, PowerLawInflaton,
         assisted_delta_n_prediction, assisted_slow_roll, bisect, paper_prescription,
     };
 
     fn assisted_start<P: crate::MultifieldPotential<2>>(
-        system: &CovariantMultifieldSystem<P, crate::NonminimalAssistedFieldSpace, 2>,
+        system: &CovariantMultifieldSystem<P, crate::test_models::NonminimalAssistedFieldSpace, 2>,
         phi: f64,
         s: f64,
     ) -> MultifieldState<2> {
@@ -4307,7 +4307,11 @@ mod tests {
         inflaton: I,
         s_star: f64,
         coupling: f64,
-        system: CovariantMultifieldSystem<I::Potential, crate::NonminimalAssistedFieldSpace, 2>,
+        system: CovariantMultifieldSystem<
+            I::Potential,
+            crate::test_models::NonminimalAssistedFieldSpace,
+            2,
+        >,
         initial: MultifieldState<2>,
         trajectory: BackgroundTrajectory,
         end: f64,
@@ -4326,7 +4330,8 @@ mod tests {
     ) -> CalibratedAssisted<I> {
         let system = CovariantMultifieldSystem::in_planck_units(
             inflaton.potential(coupling),
-            crate::NonminimalAssistedFieldSpace::new(coupling, 1.0, Mass::new(1.0)).unwrap(),
+            crate::test_models::NonminimalAssistedFieldSpace::new(coupling, 1.0, Mass::new(1.0))
+                .unwrap(),
         );
         let settings = SpectrumRunSettings {
             pivot_e_folds_before_end: 60.0,
