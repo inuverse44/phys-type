@@ -233,9 +233,7 @@ impl<I: AssistedInflaton> CalibratedAssisted<I> {
     fn e_folds_to_output(&self, state: &MultifieldState<2>, shift: [f64; 2]) -> f64 {
         let precise = SpectrumRunSettings {
             tolerances: ErrorTolerances::new(
-                phys_type::ConformalTwoFieldPerturbationTolerance::background_in_planck_units(
-                    1.0e-24,
-                ),
+                phys_type::ConformalPerturbationTolerance::<2>::background_in_planck_units(1.0e-24),
                 1.0e-13,
             ),
             ..self.settings
@@ -469,9 +467,7 @@ impl<I: AssistedInflaton> CalibratedAssisted<I> {
     fn e_folds_from_phase_space(&self, point: [f64; 4]) -> f64 {
         let precise = SpectrumRunSettings {
             tolerances: ErrorTolerances::new(
-                phys_type::ConformalTwoFieldPerturbationTolerance::background_in_planck_units(
-                    1.0e-24,
-                ),
+                phys_type::ConformalPerturbationTolerance::<2>::background_in_planck_units(1.0e-24),
                 1.0e-13,
             ),
             ..self.settings

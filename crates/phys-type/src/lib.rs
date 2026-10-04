@@ -70,13 +70,11 @@ pub use observation::{
     PLANCK_2018_TT_TE_EE_LOW_E, write_observational_metadata,
 };
 pub use perturbation::{
-    ComplexMagnitude, ComplexMatrix2, ConformalBackgroundState, ConformalBackgroundTolerance,
-    ConformalTwoFieldPerturbationDelta, ConformalTwoFieldPerturbationDerivative,
-    ConformalTwoFieldPerturbationState, ConformalTwoFieldPerturbationSystem,
-    ConformalTwoFieldPerturbationTolerance, ModeAcceleration, ModeAmplitude,
-    ModeInitializationError, ModeVelocity, TwoFieldModes, TwoFieldPerturbationDelta,
-    TwoFieldPerturbationDerivative, TwoFieldPerturbationState, TwoFieldPerturbationSystem,
-    TwoFieldPerturbationTolerance, normalized_mode_error,
+    ComplexMagnitude, ComplexMatrix, ConformalBackgroundState, ConformalBackgroundTolerance,
+    ConformalPerturbationDelta, ConformalPerturbationDerivative, ConformalPerturbationState,
+    ConformalPerturbationSystem, ConformalPerturbationTolerance, ModeAcceleration, ModeAmplitude,
+    ModeInitializationError, ModeVelocity, Modes, PerturbationDelta, PerturbationDerivative,
+    PerturbationState, PerturbationSystem, PerturbationTolerance, normalized_mode_error,
 };
 pub use potential::{
     MultifieldPotential, MultifieldPotentialValue, Potential, PotentialDerivatives,
@@ -87,9 +85,9 @@ pub use potential::{
 pub use quantity::{Quantity, Sqrt};
 pub use scalar_field::ScalarFieldSystem;
 pub use spectra::{
-    DimensionlessSpectrum, FieldPowerSpectrum, ModeCovariance, ModeProjections, ProjectedSpectra,
-    SpectrumError, SpectrumTolerances, field_power_spectrum, hermiticity_residual, mode_covariance,
-    project,
+    DimensionlessSpectrum, FieldPowerSpectrum, InvariantSpectra, ModeCovariance, ModeProjections,
+    ProjectedSpectra, SpectrumError, SpectrumTolerances, field_power_spectrum,
+    hermiticity_residual, invariant_spectra, mode_covariance, project,
 };
 pub use spectrum_run::{
     BackgroundRecord, BackgroundSurvey, BackgroundTrajectory, EndOfInflation, ModeEvolutionRecord,

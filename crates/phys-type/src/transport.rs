@@ -18,9 +18,8 @@ use crate::{
     ContravariantField, CovariantMultifieldSystem, CurvatureDerivativeGeometry,
     CurvedFieldSpaceGeometry, Dimensionless, FieldSpaceGeometry, Hubble, LowerFirst, M0, M1, M2,
     M3, M4, MMinus1, MMinus2, MMinus3, Mass, ModeAmplitude, ModeVelocity, MultifieldPotential,
-    MultifieldState, Quantity, ThirdOrderFieldSpaceGeometry,
+    MultifieldState, PerturbationState, Quantity, ThirdOrderFieldSpaceGeometry,
     ThriceDifferentiableMultifieldPotential, TwiceDifferentiableMultifieldPotential,
-    TwoFieldPerturbationState,
 };
 
 /// Default relative tolerance for numerical triangle closure.
@@ -900,7 +899,7 @@ fn covariance_block_error_ratio<L, R, D: Copy>(
 /// matrix from being paired with a Hubble value from a different epoch.
 pub fn two_point_covariance_from_mode_state<P, G>(
     system: &CovariantMultifieldSystem<P, G, 2>,
-    state: &TwoFieldPerturbationState,
+    state: &PerturbationState<2>,
 ) -> TwoPointPhaseSpaceCovariance<2>
 where
     P: TwiceDifferentiableMultifieldPotential<2>,
@@ -911,7 +910,7 @@ where
 }
 
 fn phase_space_covariance(
-    modes: &crate::TwoFieldModes,
+    modes: &crate::Modes<2>,
     scale_factor: f64,
     hubble: Hubble,
 ) -> TwoPointPhaseSpaceCovariance<2> {
@@ -3383,7 +3382,7 @@ where
     let background = &neighborhood.center;
     let wavenumbers = triangle.canonical_wavenumbers().map(Mass::new);
     let covariance = |leg: usize| {
-        crate::TwoFieldPerturbationSystem::new(*system, wavenumbers[leg])
+        crate::PerturbationSystem::new(*system, wavenumbers[leg])
             .bunch_davies_state(*background, minimum_k_over_ah)
             .map(|modes| {
                 canonical_two_point_from_velocity_linear(two_point_covariance_from_mode_state(
@@ -3540,8 +3539,8 @@ mod tests {
     use super::*;
     use crate::{
         EnergyDensity, Field, FieldVelocity, FlatFieldSpace, HyperbolicFieldSpace, M0, Mass,
-        MultifieldPotentialValue, MultifieldState, QuadraticMultifieldPotential, ScaleFactor,
-        TwoFieldPerturbationSystem,
+        MultifieldPotentialValue, MultifieldState, PerturbationSystem,
+        QuadraticMultifieldPotential, ScaleFactor,
     };
 
     #[derive(Clone, Copy)]
@@ -3738,7 +3737,7 @@ mod tests {
             FlatFieldSpace,
         );
         let k = Mass::new(1.0e-2);
-        let mode_system = TwoFieldPerturbationSystem::new(background_system, k);
+        let mode_system = PerturbationSystem::new(background_system, k);
         let background = MultifieldState::new(
             [Field::new(12.0), Field::new(8.0)],
             [FieldVelocity::new(-3.0e-6), FieldVelocity::new(-4.0e-6)],
