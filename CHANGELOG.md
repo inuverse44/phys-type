@@ -8,6 +8,22 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The `phys-type-models` workspace crate: nonminimally assisted inflation as
+  `AssistedTheory` (loop, power-law, and hybrid inflatons) on the theory
+  layer, the HKKPT slow-roll prescription (`hkkpt`), the constant-turn orbit,
+  and the `assisted_inflation`, `constant_turn_spectra`, and
+  `constant_turn_squeezed` examples.
+
+### Changed
+
+- The core no longer exports the assisted model or its paper's formulas:
+  `NonminimalAssistedFieldSpace`, the `Nonminimal*Potential` types, and the
+  `assisted_slow_roll` and `nonminimal` modules become test fixtures of the
+  core. Use `phys_type_models::assisted::AssistedTheory` with
+  `phys_type::einstein_frame` instead.
+- `JetGeometry` evaluates each quantity at the lowest derivative order it
+  needs (`MetricJet::metric_values` and `metric_second`), which makes the
+  automatically differentiated geometry about as fast as a hand-written one.
 - The theory layer: `GeneralizedNonminimal<N>` states a theory by its
   Jordan-frame action (`Omega^2(phi) R`, `k_IJ(phi)`, `V_J(phi)`, metric or
   Palatini), `einstein_frame` maps it exactly to the Einstein-frame potential

@@ -21,10 +21,11 @@ use std::path::Path;
 
 use phys_type::SpectrumRunSettings;
 
-#[path = "shared/constant_turn.rs"]
-mod constant_turn;
+#[path = "shared/provenance.rs"]
+mod provenance;
 
-use constant_turn::{HUBBLE, radius, revision};
+use phys_type_models::constant_turn::{self, HUBBLE, radius};
+use provenance::revision;
 
 const BEFORE_EXIT: f64 = 6.0;
 
@@ -86,7 +87,11 @@ fn calibrated_orbit(lambda: f64, mu_squared: f64, radius: f64, after_exit: f64) 
 }
 
 fn header(file: &mut fs::File, entropy_field: &str) -> io::Result<()> {
-    writeln!(file, "# generator: phys-type {}", env!("CARGO_PKG_VERSION"))?;
+    writeln!(
+        file,
+        "# generator: phys-type-models {}",
+        env!("CARGO_PKG_VERSION")
+    )?;
     if let Some(revision) = revision() {
         writeln!(file, "# revision: {revision}")?;
     }

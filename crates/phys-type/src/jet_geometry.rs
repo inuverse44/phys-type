@@ -37,6 +37,20 @@ pub trait MetricJet<const N: usize> {
     /// evaluated at `position`. The matrix must be symmetric.
     fn metric_jet(&self, position: &[Field; N]) -> [[ThirdOrderJet<N>; N]; N];
 
+    /// `G_IJ` with its first two derivatives. The default truncates
+    /// [`Self::metric_jet`]; implementations may supply a cheaper evaluation,
+    /// which the connection and the curvature use.
+    fn metric_second(&self, position: &[Field; N]) -> [[Jet<N>; N]; N] {
+        self.metric_jet(position)
+            .map(|row| row.map(|entry| truncate(&entry)))
+    }
+
+    /// The values `G_IJ`. The default truncates [`Self::metric_second`].
+    fn metric_values(&self, position: &[Field; N]) -> [[f64; N]; N] {
+        self.metric_second(position)
+            .map(|row| row.map(|entry| entry.value))
+    }
+
     /// Checks conditions under which the metric is defined at `position`,
     /// beyond the positive definiteness that [`JetGeometry`] always checks.
     fn check_domain(&self, _position: &[Field; N]) -> Result<(), GeometryDomainError> {
@@ -91,6 +105,29 @@ fn invert<const N: usize>(matrix: [[Jet<N>; N]; N]) -> [[Jet<N>; N]; N] {
     right
 }
 
+/// Gauss--Jordan inverse of a symmetric positive-definite matrix.
+fn invert_values<const N: usize>(matrix: [[f64; N]; N]) -> [[f64; N]; N] {
+    invert(matrix.map(|row| row.map(Jet::constant))).map(|row| row.map(|entry| entry.value))
+}
+
+/// `R^I_JKL` from the connection and its first derivatives.
+fn riemann_from<const N: usize>(connection: &[[[Jet<N>; N]; N]; N]) -> [[[[f64; N]; N]; N]; N] {
+    let g = |i: usize, j: usize, k: usize| connection[i][j][k].value;
+    let dg = |i: usize, j: usize, k: usize, p: usize| connection[i][j][k].gradient[p];
+    core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            core::array::from_fn(|k| {
+                core::array::from_fn(|l| {
+                    dg(i, l, j, k) - dg(i, k, j, l)
+                        + (0..N)
+                            .map(|m| g(i, k, m) * g(m, l, j) - g(i, l, m) * g(m, k, j))
+                            .sum::<f64>()
+                })
+            })
+        })
+    })
+}
+
 /// Connection, Riemann tensor, and its partial derivative at one position.
 struct Curvature<const N: usize> {
     /// `Gamma^I_JK` as a second-order jet.
@@ -102,6 +139,36 @@ struct Curvature<const N: usize> {
 }
 
 impl<M> JetGeometry<M> {
+    /// The connection with its first derivatives, from the metric through
+    /// second order. The returned jets carry no second derivatives.
+    fn connection_first<const N: usize>(&self, position: &[Field; N]) -> [[[Jet<N>; N]; N]; N]
+    where
+        M: MetricJet<N>,
+    {
+        let metric = self.0.metric_second(position);
+        let inverse = invert(metric);
+        let derivative: [[[Jet<N>; N]; N]; N] = core::array::from_fn(|l| {
+            core::array::from_fn(|j| {
+                core::array::from_fn(|k| Jet {
+                    value: metric[j][k].gradient[l],
+                    gradient: metric[j][k].hessian[l],
+                    hessian: [[0.0; N]; N],
+                })
+            })
+        });
+        core::array::from_fn(|i| {
+            core::array::from_fn(|j| {
+                core::array::from_fn(|k| {
+                    (0..N).fold(Jet::constant(0.0), |sum, l| {
+                        sum + inverse[i][l]
+                            * (derivative[j][l][k] + derivative[k][l][j] - derivative[l][j][k])
+                            * 0.5
+                    })
+                })
+            })
+        })
+    }
+
     /// The connection as a second-order jet.
     fn connection<const N: usize>(&self, position: &[Field; N]) -> [[[Jet<N>; N]; N]; N]
     where
@@ -137,18 +204,7 @@ impl<M> JetGeometry<M> {
         let dg = |i: usize, j: usize, k: usize, p: usize| connection[i][j][k].gradient[p];
         let ddg =
             |i: usize, j: usize, k: usize, p: usize, q: usize| connection[i][j][k].hessian[p][q];
-        let riemann: [[[[f64; N]; N]; N]; N] = core::array::from_fn(|i| {
-            core::array::from_fn(|j| {
-                core::array::from_fn(|k| {
-                    core::array::from_fn(|l| {
-                        dg(i, l, j, k) - dg(i, k, j, l)
-                            + (0..N)
-                                .map(|m| g(i, k, m) * g(m, l, j) - g(i, l, m) * g(m, k, j))
-                                .sum::<f64>()
-                    })
-                })
-            })
-        });
+        let riemann = riemann_from(&connection);
         let riemann_derivative = core::array::from_fn(|i| {
             core::array::from_fn(|j| {
                 core::array::from_fn(|k| {
@@ -177,26 +233,22 @@ impl<M> JetGeometry<M> {
 
 impl<M: MetricJet<N>, const N: usize> FieldSpaceGeometry<N> for JetGeometry<M> {
     fn metric(&self, position: &[Field; N]) -> FieldMetric<N> {
-        let metric = self.0.metric_jet(position);
-        FieldMetric::new(core::array::from_fn(|i| {
-            core::array::from_fn(|j| Quantity::new(metric[i][j].value))
-        }))
+        let metric = self.0.metric_values(position);
+        FieldMetric::new(metric.map(|row| row.map(Quantity::new)))
     }
 
     fn inverse_metric(&self, position: &[Field; N]) -> InverseFieldMetric<N> {
-        let metric = self.0.metric_jet(position);
-        let inverse = invert(core::array::from_fn(|i| {
-            core::array::from_fn(|j| truncate(&metric[i][j]))
-        }));
-        InverseFieldMetric::new(core::array::from_fn(|i| {
-            core::array::from_fn(|j| Quantity::new(inverse[i][j].value))
-        }))
+        let inverse = invert_values(self.0.metric_values(position));
+        InverseFieldMetric::new(inverse.map(|row| row.map(Quantity::new)))
     }
 
     fn check_domain(&self, position: &[Field; N]) -> Result<(), GeometryDomainError> {
         self.0.check_domain(position)?;
         // Cholesky factorization: every pivot positive iff G is positive definite.
-        let metric = self.0.metric_jet(position);
+        let metric = self
+            .0
+            .metric_values(position)
+            .map(|row| row.map(Jet::<N>::constant));
         let mut factor = [[0.0; N]; N];
         for i in 0..N {
             for j in 0..=i {
@@ -219,7 +271,7 @@ impl<M: MetricJet<N>, const N: usize> FieldSpaceGeometry<N> for JetGeometry<M> {
     }
 
     fn christoffel(&self, position: &[Field; N]) -> ChristoffelSymbols<N> {
-        let connection = self.connection(position);
+        let connection = self.connection_first(position);
         ChristoffelSymbols::new(core::array::from_fn(|i| {
             core::array::from_fn(|j| {
                 core::array::from_fn(|k| Quantity::new(connection[i][j][k].value))
@@ -230,14 +282,14 @@ impl<M: MetricJet<N>, const N: usize> FieldSpaceGeometry<N> for JetGeometry<M> {
 
 impl<M: MetricJet<N>, const N: usize> CurvedFieldSpaceGeometry<N> for JetGeometry<M> {
     fn riemann(&self, position: &[Field; N]) -> RiemannTensor<N> {
-        let riemann = self.curvature(position).riemann;
+        let riemann = riemann_from(&self.connection_first(position));
         RiemannTensor::new(riemann.map(|a| a.map(|b| b.map(|c| c.map(Quantity::new)))))
     }
 }
 
 impl<M: MetricJet<N>, const N: usize> ThirdOrderFieldSpaceGeometry<N> for JetGeometry<M> {
     fn christoffel_derivative(&self, position: &[Field; N]) -> ChristoffelDerivatives<N> {
-        let connection = self.connection(position);
+        let connection = self.connection_first(position);
         ChristoffelDerivatives::new(core::array::from_fn(|i| {
             core::array::from_fn(|j| {
                 core::array::from_fn(|k| {
@@ -281,9 +333,10 @@ impl<M: MetricJet<N>, const N: usize> CurvatureDerivativeGeometry<N> for JetGeom
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_models::NonminimalAssistedFieldSpace;
     use crate::{
-        HyperbolicFieldSpace, LowerFirst, NonminimalAssistedFieldSpace, PolarFieldSpace,
-        Transcendental, validate_riemann_symmetries,
+        HyperbolicFieldSpace, LowerFirst, PolarFieldSpace, Transcendental,
+        validate_riemann_symmetries,
     };
 
     fn variables<const N: usize>(position: &[Field; N]) -> [ThirdOrderJet<N>; N] {

@@ -14,10 +14,11 @@ use std::path::Path;
 
 use phys_type::{BispectrumRunSettings, TriangleShape};
 
-#[path = "shared/constant_turn.rs"]
-mod constant_turn;
+#[path = "shared/provenance.rs"]
+mod provenance;
 
-use constant_turn::{HUBBLE, radius, revision};
+use phys_type_models::constant_turn::{self, HUBBLE, radius};
+use provenance::revision;
 
 const EPSILON: f64 = 1.0e-5;
 
@@ -27,7 +28,11 @@ fn main() -> io::Result<()> {
     fs::create_dir_all(directory)?;
     let path = directory.join("constant_turn_squeezed.csv");
     let mut file = fs::File::create(&path)?;
-    writeln!(file, "# generator: phys-type {}", env!("CARGO_PKG_VERSION"))?;
+    writeln!(
+        file,
+        "# generator: phys-type-models {}",
+        env!("CARGO_PKG_VERSION")
+    )?;
     if let Some(revision) = revision() {
         writeln!(file, "# revision: {revision}")?;
     }

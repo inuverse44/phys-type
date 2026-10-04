@@ -38,29 +38,29 @@ use crate::{
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum NonminimalParameterError {
     /// The reduced Planck mass was not positive and finite.
-    InvalidPlanckMass(f64),
+    PlanckMass(f64),
     /// The nonminimal coupling `xi_2` was not finite and non-negative.
-    InvalidCoupling(f64),
+    Coupling(f64),
     /// `kappa` was not 0 (Palatini) or 1 (metric).
-    InvalidFormulation(f64),
+    Formulation(f64),
 }
 
 impl fmt::Display for NonminimalParameterError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidPlanckMass(value) => {
+            Self::PlanckMass(value) => {
                 write!(
                     formatter,
                     "the Planck mass must be positive and finite, got {value}"
                 )
             }
-            Self::InvalidCoupling(value) => {
+            Self::Coupling(value) => {
                 write!(
                     formatter,
                     "xi_2 must be finite and non-negative, got {value}"
                 )
             }
-            Self::InvalidFormulation(value) => write!(
+            Self::Formulation(value) => write!(
                 formatter,
                 "kappa must be 0 (Palatini) or 1 (metric formulation), got {value}"
             ),
@@ -88,29 +88,19 @@ impl NonminimalAssistedFieldSpace {
     ) -> Result<Self, NonminimalParameterError> {
         let planck = planck_mass.into_value();
         if !planck.is_finite() || planck <= 0.0 {
-            return Err(NonminimalParameterError::InvalidPlanckMass(planck));
+            return Err(NonminimalParameterError::PlanckMass(planck));
         }
         if !coupling.is_finite() || coupling < 0.0 {
-            return Err(NonminimalParameterError::InvalidCoupling(coupling));
+            return Err(NonminimalParameterError::Coupling(coupling));
         }
         if kappa != 0.0 && kappa != 1.0 {
-            return Err(NonminimalParameterError::InvalidFormulation(kappa));
+            return Err(NonminimalParameterError::Formulation(kappa));
         }
         Ok(Self {
             coupling,
             kappa,
             planck_mass,
         })
-    }
-
-    /// The nonminimal coupling `xi_2`.
-    pub const fn coupling(&self) -> f64 {
-        self.coupling
-    }
-
-    /// `kappa`: 1 for the metric and 0 for the Palatini formulation.
-    pub const fn kappa(&self) -> f64 {
-        self.kappa
     }
 
     /// Values and first three `s` derivatives of `K_1` and `K_2`, in reduced
@@ -659,15 +649,15 @@ mod tests {
     fn invalid_parameters_are_rejected() {
         assert!(matches!(
             NonminimalAssistedFieldSpace::new(0.1, 0.5, Mass::new(1.0)),
-            Err(NonminimalParameterError::InvalidFormulation(_))
+            Err(NonminimalParameterError::Formulation(_))
         ));
         assert!(matches!(
             NonminimalAssistedFieldSpace::new(-0.1, 1.0, Mass::new(1.0)),
-            Err(NonminimalParameterError::InvalidCoupling(_))
+            Err(NonminimalParameterError::Coupling(_))
         ));
         assert!(matches!(
             NonminimalAssistedFieldSpace::new(0.1, 1.0, Mass::new(0.0)),
-            Err(NonminimalParameterError::InvalidPlanckMass(_))
+            Err(NonminimalParameterError::PlanckMass(_))
         ));
     }
 }

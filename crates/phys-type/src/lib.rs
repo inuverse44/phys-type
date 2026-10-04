@@ -4,7 +4,6 @@
 //! dimensionally invalid expressions fail to compile. See `docs/mvp-design.md`
 //! for the design that this implements.
 
-pub mod assisted_slow_roll;
 pub mod autodiff;
 pub mod background;
 pub mod bispectrum_run;
@@ -14,7 +13,6 @@ pub mod field_space;
 pub mod integrate;
 pub mod jet_geometry;
 pub mod multifield;
-pub mod nonminimal;
 pub mod observation;
 pub mod perturbation;
 pub mod potential;
@@ -23,6 +21,8 @@ pub mod scalar_field;
 pub mod spectra;
 pub mod spectrum_run;
 pub mod state;
+#[cfg(test)]
+mod test_models;
 pub mod theory;
 pub mod time;
 pub mod transport;
@@ -62,10 +62,6 @@ pub use jet_geometry::{JetGeometry, MetricJet};
 pub use multifield::{
     CovariantMultifieldSystem, MultifieldState, MultifieldStateDelta, MultifieldStateDerivative,
     MultifieldSystem, TwoFieldKinematics,
-};
-pub use nonminimal::{
-    NonminimalAssistedFieldSpace, NonminimalHybridPotential, NonminimalLoopInflationPotential,
-    NonminimalParameterError, NonminimalPowerLawPotential,
 };
 pub use num_complex::Complex64;
 pub use observation::{

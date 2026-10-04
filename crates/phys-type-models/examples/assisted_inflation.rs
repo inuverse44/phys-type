@@ -21,16 +21,29 @@
 use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
-use std::process::Command;
 
-use phys_type::assisted_slow_roll::{
-    AssistedInflaton, HybridInflaton, LoopInflaton, PowerLawInflaton, assisted_delta_n_prediction,
-    assisted_slow_roll, bisect, paper_prescription,
-};
 use phys_type::{
-    BackgroundRecord, BispectrumRunSettings, CovariantMultifieldSystem, Field, FieldVelocity, Mass,
-    MultifieldState, NonminimalAssistedFieldSpace, ScaleFactor, SpectrumRunSettings, TriangleShape,
+    BackgroundRecord, BispectrumRunSettings, CovariantMultifieldSystem, EinsteinGeometry,
+    EinsteinPotential, Field, FieldVelocity, MultifieldState, ScaleFactor, SpectrumRunSettings,
+    TriangleShape, einstein_frame,
 };
+use phys_type_models::assisted::{
+    AssistedInflaton, AssistedTheory, HybridInflaton, LoopInflaton, PowerLawInflaton, bisect,
+};
+use phys_type_models::hkkpt::{
+    assisted_delta_n_prediction, assisted_slow_roll, paper_prescription,
+};
+
+#[path = "shared/provenance.rs"]
+mod provenance;
+
+use provenance::revision;
+
+type AssistedSystem<I> = CovariantMultifieldSystem<
+    EinsteinPotential<AssistedTheory<I>>,
+    EinsteinGeometry<AssistedTheory<I>>,
+    2,
+>;
 
 const PIVOT_BEFORE_END: f64 = 60.0;
 const OUTPUT_BEFORE_END: f64 = 1.0e-3;
@@ -49,11 +62,7 @@ struct Point {
     background: Vec<BackgroundRecord>,
 }
 
-fn start<I: AssistedInflaton>(
-    system: &CovariantMultifieldSystem<I::Potential, NonminimalAssistedFieldSpace, 2>,
-    phi: f64,
-    s: f64,
-) -> MultifieldState<2> {
+fn start<I: AssistedInflaton>(system: &AssistedSystem<I>, phi: f64, s: f64) -> MultifieldState<2> {
     let resting = MultifieldState::new(
         [Field::new(phi), Field::new(s)],
         [FieldVelocity::new(0.0); 2],
@@ -78,10 +87,8 @@ fn fields_at(rows: &[BackgroundRecord], e_folds: f64) -> [f64; 2] {
 /// The branch at coupling `xi`, with the initial `s` tuned so that `s = s_*`
 /// at the pivot, `PIVOT_BEFORE_END` e-folds before the end.
 fn point<I: AssistedInflaton>(inflaton: I, s_star: f64, xi: f64) -> Result<Point, String> {
-    let system = CovariantMultifieldSystem::in_planck_units(
-        inflaton.potential(xi),
-        NonminimalAssistedFieldSpace::new(xi, 1.0, Mass::new(1.0)).map_err(|e| e.to_string())?,
-    );
+    let (potential, geometry) = einstein_frame(AssistedTheory::metric(inflaton, xi));
+    let system = CovariantMultifieldSystem::in_planck_units(potential, geometry);
     let settings = SpectrumRunSettings {
         pivot_e_folds_before_end: PIVOT_BEFORE_END,
         output_e_folds_before_end: OUTPUT_BEFORE_END,
@@ -142,29 +149,12 @@ fn point<I: AssistedInflaton>(inflaton: I, s_star: f64, xi: f64) -> Result<Point
     })
 }
 
-fn revision() -> Option<String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .ok()?;
-    let revision = output
-        .status
-        .success()
-        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())?;
-    let status = Command::new("git")
-        .args(["status", "--porcelain", "--untracked-files=no"])
-        .output()
-        .ok()?;
-    let dirty = status.status.success() && !status.stdout.is_empty();
-    Some(if dirty {
-        format!("{revision}-dirty")
-    } else {
-        revision
-    })
-}
-
 fn header(file: &mut fs::File) -> io::Result<()> {
-    writeln!(file, "# generator: phys-type {}", env!("CARGO_PKG_VERSION"))?;
+    writeln!(
+        file,
+        "# generator: phys-type-models {}",
+        env!("CARGO_PKG_VERSION")
+    )?;
     if let Some(revision) = revision() {
         writeln!(file, "# revision: {revision}")?;
     }

@@ -32,8 +32,8 @@
 use core::ops::{Add, Div, Mul, Sub};
 
 use crate::{
-    Dimensionless, EnergyDensity, Field, FourthOrderJet, GeometryDomainError, JetGeometry, Mass,
-    MetricJet, MultifieldPotentialValue, MultifieldState, Quantity, Sqrt, ThirdOrderJet,
+    Dimensionless, EnergyDensity, Field, FourthOrderJet, GeometryDomainError, Jet, JetGeometry,
+    Mass, MetricJet, MultifieldPotentialValue, MultifieldState, Quantity, Sqrt, ThirdOrderJet,
     Transcendental,
 };
 
@@ -113,6 +113,17 @@ pub trait GeneralizedNonminimal<const N: usize> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EinsteinMetric<T>(pub T);
 
+impl<T> EinsteinMetric<T> {
+    /// `kappa (3/2) M_pl^2`, the weight of `d_I Omega^2 d_J Omega^2 / Omega^4`.
+    fn gradient_weight<const N: usize>(&self) -> f64
+    where
+        T: GeneralizedNonminimal<N>,
+    {
+        let planck = self.0.planck_mass().into_value();
+        self.0.formulation().kappa() * 1.5 * planck * planck
+    }
+}
+
 /// The Einstein-frame potential `V_J / Omega^4` of a theory.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EinsteinPotential<T>(pub T);
@@ -156,6 +167,54 @@ impl<T: GeneralizedNonminimal<N>, const N: usize> MetricJet<N> for EinsteinMetri
         check_conformal_factor(&self.0, position)
     }
 
+    fn metric_values(&self, position: &[Field; N]) -> [[f64; N]; N] {
+        // The values need Omega^2 through first order only.
+        let theory = &self.0;
+        let omega_squared = theory
+            .conformal_factor(active(position, Jet::<N>::variable))
+            .into_value();
+        let kinetic = theory.kinetic_matrix(*position);
+        let weight = self.gradient_weight();
+        let inverse = 1.0 / omega_squared.value;
+        core::array::from_fn(|i| {
+            core::array::from_fn(|j| {
+                kinetic[i][j].into_value() * inverse
+                    + omega_squared.gradient[i]
+                        * omega_squared.gradient[j]
+                        * inverse
+                        * inverse
+                        * weight
+            })
+        })
+    }
+
+    fn metric_second(&self, position: &[Field; N]) -> [[Jet<N>; N]; N] {
+        // Second derivatives of G need Omega^2 through third order.
+        let theory = &self.0;
+        let omega_squared = theory
+            .conformal_factor(active(position, ThirdOrderJet::<N>::variable))
+            .into_value();
+        let value = Jet {
+            value: omega_squared.value,
+            gradient: omega_squared.gradient,
+            hessian: omega_squared.hessian,
+        };
+        let slope: [Jet<N>; N] = core::array::from_fn(|i| Jet {
+            value: omega_squared.gradient[i],
+            gradient: omega_squared.hessian[i],
+            hessian: omega_squared.third[i],
+        });
+        let kinetic = theory.kinetic_matrix(active(position, Jet::<N>::variable));
+        let weight = self.gradient_weight();
+        let inverse = Jet::constant(1.0) / value;
+        core::array::from_fn(|i| {
+            core::array::from_fn(|j| {
+                kinetic[i][j].into_value() * inverse
+                    + slope[i] * slope[j] * inverse * inverse * weight
+            })
+        })
+    }
+
     fn metric_jet(&self, position: &[Field; N]) -> [[ThirdOrderJet<N>; N]; N] {
         let theory = &self.0;
         let omega_squared = theory
@@ -175,8 +234,7 @@ impl<T: GeneralizedNonminimal<N>, const N: usize> MetricJet<N> for EinsteinMetri
             third: omega_squared.fourth[i],
         });
         let kinetic = theory.kinetic_matrix(active(position, ThirdOrderJet::<N>::variable));
-        let planck = theory.planck_mass().into_value();
-        let gradient_weight = theory.formulation().kappa() * 1.5 * planck * planck;
+        let gradient_weight = self.gradient_weight();
         let inverse = ThirdOrderJet::constant(1.0) / value;
         core::array::from_fn(|i| {
             core::array::from_fn(|j| {
@@ -263,9 +321,9 @@ impl<T> EinsteinFrame<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_models::{NonminimalAssistedFieldSpace, NonminimalLoopInflationPotential};
     use crate::{
-        CurvatureDerivativeGeometry, CurvedFieldSpaceGeometry, FieldSpaceGeometry,
-        NonminimalAssistedFieldSpace, NonminimalLoopInflationPotential, ScaleFactor,
+        CurvatureDerivativeGeometry, CurvedFieldSpaceGeometry, FieldSpaceGeometry, ScaleFactor,
         ThirdOrderFieldSpaceGeometry, ThriceDifferentiableMultifieldPotential,
     };
 

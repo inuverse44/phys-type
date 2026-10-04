@@ -1,3 +1,3 @@
 [workspace]
-members = ["crates/phys-type"]
+members = ["crates/phys-type", "crates/phys-type-models"]
 resolver = "3"

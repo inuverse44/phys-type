@@ -24,9 +24,11 @@ and a minimally coupled inflaton, in the metric formulation ($\kappa=1$; the
 Palatini $\kappa=0$ geometry exists but is not validated). Nothing here
 validates nonminimal inflation in general, for example an inflaton coupled to
 curvature as in Higgs inflation, a general $f(\phi,s)$, several nonminimal
-fields, or the Palatini predictions. `NonminimalAssistedFieldSpace` and the
-formulas in `assisted_slow_roll` are deliberately named for this subclass; a
-general nonminimal provider is separate, unfinished work.
+fields, or the Palatini predictions. Since step 4a of
+[`architecture.md`](architecture.md) the model is an instance of the general
+theory layer, `phys_type_models::assisted::AssistedTheory`, in the
+`phys-type-models` crate, and the reference's formulas are
+`phys_type_models::hkkpt`; the core contains no assisted-specific code.
 
 ## Model
 
@@ -41,10 +43,12 @@ V=\frac{V_J(\phi)}{(1+\xi_2s^2)^2},
 $$
 
 in reduced Planck units, with $\kappa=1$ (metric) or $0$ (Palatini).
-`NonminimalAssistedFieldSpace` implements this geometry, and
-`NonminimalLoopInflationPotential` implements it with
-$V_J=\Lambda^4(1+\alpha\ln\phi)$ (Eq. (4.1)). Both live in
-`crates/phys-type/src/nonminimal.rs`.
+`AssistedTheory` states only $\Omega^2=1+\xi_2s^2$, canonical Jordan kinetic terms,
+and $V_J$, for example $V_J=\Lambda^4(1+\alpha\ln\phi)$ (Eq. (4.1)), and
+`phys_type::einstein_frame` derives this geometry and potential by automatic
+differentiation. The original hand-written geometry and potentials remain as
+test fixtures of the core (`crates/phys-type/src/test_models/`), where the
+generic map is checked against them to $10^{-12}$.
 
 Neither field is canonically normalized, so the geometry supplies every
 connection and curvature term. Since the metric depends only on $s$ in two
@@ -235,11 +239,11 @@ $\epsilon_H=1$ comes first, the run fails with
 
 The two potentials are
 
-- `NonminimalPowerLawPotential`, $V=\Lambda^4e^{-\lambda\phi}/(1+\xi_2 s^2)^2$,
+- the power-law inflaton (`PowerLawInflaton`), $V=\Lambda^4e^{-\lambda\phi}/(1+\xi_2 s^2)^2$,
   starting at $\phi=0$ and ending at $\phi=72\lambda$. $\epsilon^{(\phi)}=\lambda^2/2$
   is constant, so this is 72 e-folds of $\phi$ slow roll. It stands for the
   separate sector that ends inflation.
-- `NonminimalHybridPotential`, $V=\Lambda^4[1+(\phi/\mu)^2]/(1+\xi_2s^2)^2$,
+- the hybrid inflaton (`HybridInflaton`), $V=\Lambda^4[1+(\phi/\mu)^2]/(1+\xi_2s^2)^2$,
   ending at the waterfall $\phi=\phi_e$, with the initial $\phi$ set by bisection
   on the slow-roll $N(\phi)=72$.
 

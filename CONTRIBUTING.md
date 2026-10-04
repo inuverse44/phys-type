@@ -13,6 +13,14 @@ Branch from the latest `main`. Keep commits focused, push the feature branch,
 and merge only after the checks below pass. Prefer fast-forward integration for
 local linear work; use a reviewed pull request when collaborating.
 
+## Layout
+
+The workspace has two crates. `crates/phys-type` is the core: the type
+layer, the theory layer, the engine, and the observables; it knows no
+particular model. `crates/phys-type-models` holds models, the formulas of
+particular papers, benchmark backgrounds, and the examples behind the
+tracked figures. See `docs/architecture.md`.
+
 ## Toolchain
 
 Install the `llvm-tools` component together with `clippy` and `rustfmt`:
