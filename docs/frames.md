@@ -72,9 +72,15 @@ state,
 The field coordinates are the same in both frames; only the metric and the
 time coordinate change.
 
-**E-fold counts depend on the frame.** An interval differs by
-$\Delta N_J=\Delta N_E-\Delta\ln\Omega$. "The pivot leaves the horizon 60
-e-folds before the end" must therefore name its frame. For the assisted
+**E-fold counts depend on the frame; observables at a physical scale do
+not.** An interval differs by $\Delta N_J=\Delta N_E-\Delta\ln\Omega$, so "the pivot
+leaves the horizon 60 e-folds before the end" names different physical
+scales in the two frames. For a single field, $n_s(k)$ at a fixed physical
+wavenumber is frame invariant ($\zeta$ is, and $\Omega\to1$ after inflation); only
+the label changes. For Higgs inflation the pivot-to-end interval differs by
+about 1.8 e-folds, so "$N_*=60$" in the two frames points to scales whose $n_s$
+differ by about $10^{-3}$. Results are therefore reported at a physical $k$,
+with $N_*$ in both frames. For the assisted
 examples of arXiv:2302.05866, $\ln\Omega$ changes between the pivot and the end
 by $\tfrac12\ln[(1+\xi_2s_e^2)/(1+\xi_2s_*^2)]$, below $10^{-3}$ e-folds for
 $s_*=10^{-3}$ but about 0.04 e-folds for loop inflation with $\alpha=0.1$ and
