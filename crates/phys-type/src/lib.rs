@@ -12,6 +12,7 @@ pub mod curvature;
 pub mod dimension;
 pub mod field_space;
 pub mod integrate;
+pub mod jet_geometry;
 pub mod multifield;
 pub mod nonminimal;
 pub mod observation;
@@ -25,7 +26,7 @@ pub mod state;
 pub mod time;
 pub mod transport;
 
-pub use autodiff::{Dual, Jet, ThirdOrderJet, Transcendental};
+pub use autodiff::{Dual, FourthOrderJet, Jet, ThirdOrderJet, Transcendental};
 pub use background::{
     AdaptiveRunSettings, AdaptiveStep, BackgroundRun, Record, RunSettings, Termination,
 };
@@ -56,6 +57,7 @@ pub use integrate::{
     AdaptiveAttempt, AdaptiveSystem, EmbeddedStep, ErrorTolerances, StepSizeLimits, System,
     adaptive_step, component_error_ratio, next_step_size, rk4_step, rk45_step,
 };
+pub use jet_geometry::{JetGeometry, MetricJet};
 pub use multifield::{
     CovariantMultifieldSystem, MultifieldState, MultifieldStateDelta, MultifieldStateDerivative,
     MultifieldSystem, TwoFieldKinematics,

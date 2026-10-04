@@ -82,7 +82,8 @@ It separates three things.
   Palatini formulation.
 - **Observables carry their frame and slice.** The theory layer returns the
   correspondence along the trajectory: the conformal factor, the e-fold
-  numbers $N_J=N_E+\ln\Omega$, the Jordan-frame Hubble rate, and the field
+  numbers $N_J=N_E-\ln\Omega$ (with $g^E=\Omega^2g^J$, so $a_E=\Omega a_J$), the
+  Jordan-frame Hubble rate, and the field
   map. A pivot "60 e-folds before the end" or an end-of-inflation condition
   must name its frame. $\zeta$ is invariant under a field-dependent conformal
   transformation once the evolution is adiabatic; before that, and whenever
@@ -145,7 +146,8 @@ unchanged, which the golden data of step 1 checks bit for bit.
 | 0 | design | this document | review |
 | 1 | golden data | freeze the CSV output of the four examples and test that it is reproduced | — |
 | 2 | workspace | move the crate to `crates/phys-type`, no code change | CI, golden data |
-| 3 | theory layer | `GeneralizedNonminimal<N>` and its exact map, the frame correspondence, run-time admissibility checks, `docs/frames.md` | the generic map reproduces `NonminimalAssistedFieldSpace` to round-off |
+| 3a | jet geometry | `FourthOrderJet<N>`; `JetGeometry` derives the inverse metric, connection, curvature, and $\nabla R$ of any metric given with three derivatives | reproduces the polar, hyperbolic, and assisted geometries to $10^{-12}$; Bianchi identities on a generic three-field metric |
+| 3b | theory layer | `GeneralizedNonminimal<N>` and its exact map, the frame correspondence, run-time admissibility checks, `docs/frames.md` | the generic map reproduces `NonminimalAssistedFieldSpace` to round-off |
 | 4 | models crate | assisted as an instance of step 3; papers' formulas, example potentials, validation tests, and examples move to `crates/phys-type-models` | golden data |
 | 5+ | $N$ fields | the perturbation, transport, and observable pipeline for any $N$, starting with $N=1$ and Higgs inflation | the two-field results unchanged |
 
