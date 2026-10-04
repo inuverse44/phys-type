@@ -124,7 +124,7 @@ fn constant_turn_orbit(
         )
         .unwrap();
     let eta_perp = system
-        .kinematics(&exit, None)
+        .oriented_kinematics(&exit, None)
         .unwrap()
         .eta_perp
         .into_value();

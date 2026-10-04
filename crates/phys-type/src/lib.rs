@@ -60,8 +60,8 @@ pub use integrate::{
 };
 pub use jet_geometry::{JetGeometry, MetricJet};
 pub use multifield::{
-    CovariantMultifieldSystem, MultifieldState, MultifieldStateDelta, MultifieldStateDerivative,
-    MultifieldSystem, TwoFieldKinematics,
+    CovariantMultifieldSystem, Kinematics, MultifieldState, MultifieldStateDelta,
+    MultifieldStateDerivative, MultifieldSystem, TwoFieldKinematics,
 };
 pub use num_complex::Complex64;
 pub use observation::{

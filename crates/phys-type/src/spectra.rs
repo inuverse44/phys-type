@@ -387,7 +387,7 @@ where
     ) -> Result<ModeProjections, SpectrumError> {
         let kinematics = self
             .background
-            .kinematics(&state.background, previous_normal)
+            .oriented_kinematics(&state.background, previous_normal)
             .map_err(SpectrumError::KinematicBasis)?;
         let metric = self.background.geometry.metric(&state.background.phi);
         let hubble = self.background.hubble(&state.background);
@@ -415,7 +415,7 @@ where
     ) -> Result<ProjectedSpectra, SpectrumError> {
         let kinematics = self
             .background
-            .kinematics(&state.background, previous_normal)
+            .oriented_kinematics(&state.background, previous_normal)
             .map_err(SpectrumError::KinematicBasis)?;
         let metric = self.background.geometry.metric(&state.background.phi);
         let hubble = self.background.hubble(&state.background);

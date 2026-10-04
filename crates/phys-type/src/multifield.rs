@@ -390,7 +390,89 @@ where
     }
 }
 
-/// Two-field kinematics attached to a background state.
+/// Kinematics of a background state for any number of fields.
+///
+/// The tangent `e_sigma^I = phidot^I / sigmadot` is unique for every `N`. The
+/// entropy directions form its orthogonal complement, of dimension `N - 1`,
+/// which has no preferred basis for `N >= 3`; it is described by the
+/// projector `perp^IJ = G^IJ - e_sigma^I e_sigma^J`. The turn vector is
+/// `omega^I = D_t e_sigma^I = perp^I_J D_t phidot^J / sigmadot`, orthogonal to
+/// the tangent, with `D_t phidot^I = -3 H phidot^I - G^IJ V_J`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Kinematics<const N: usize> {
+    /// Unit tangent `e_sigma^I`.
+    pub tangent: ContravariantField<M0, f64, N>,
+    /// Covariant speed `sigmadot`.
+    pub speed: FieldVelocity,
+    /// Entropy projector `perp^IJ = G^IJ - e_sigma^I e_sigma^J`.
+    pub entropy_projector: FieldTensor2<Upper, Upper, M0, f64, N>,
+    /// Turn vector `omega^I = D_t e_sigma^I`.
+    pub turn: ContravariantField<M1, f64, N>,
+    /// Turn rate `|omega| = sqrt(G_IJ omega^I omega^J)`.
+    pub turn_rate: Hubble,
+    /// Dimensionless turn rate `|omega| / H`.
+    pub eta_perp: Quantity<M0, f64>,
+}
+
+impl<P, G, const N: usize> CovariantMultifieldSystem<P, G, N>
+where
+    P: MultifieldPotential<N>,
+    G: FieldSpaceGeometry<N>,
+{
+    /// The tangent, entropy projector, and turn vector at `state`.
+    pub fn kinematics(
+        &self,
+        state: &MultifieldState<N>,
+    ) -> Result<Kinematics<N>, KinematicBasisError> {
+        let metric = self.geometry.metric(&state.phi);
+        let inverse = self.geometry.inverse_metric(&state.phi);
+        let velocity = ContravariantField::new(state.pi);
+        let speed_squared = metric.lower(&velocity).contract(&velocity).into_value();
+        if speed_squared <= 0.0 || !speed_squared.is_finite() {
+            return Err(KinematicBasisError::ZeroSpeed);
+        }
+        let speed = speed_squared.sqrt();
+        let unit: [f64; N] = core::array::from_fn(|i| state.pi[i].into_value() / speed);
+        let tangent: ContravariantField<M0, f64, N> =
+            ContravariantField::new(unit.map(Quantity::new));
+        let projector: [[f64; N]; N] = core::array::from_fn(|i| {
+            core::array::from_fn(|j| inverse.components()[i][j].into_value() - unit[i] * unit[j])
+        });
+        let gradient = crate::CovariantField::new(self.potential.gradient(state.phi));
+        let raised_gradient = inverse.raise(&gradient).into_components();
+        let hubble = self.hubble(state).into_value();
+        let acceleration: [f64; N] = core::array::from_fn(|i| {
+            -3.0 * hubble * state.pi[i].into_value() - raised_gradient[i].into_value()
+        });
+        // perp^I_J a^J = perp^IK G_KJ a^J.
+        let lowered: [f64; N] = core::array::from_fn(|k| {
+            (0..N)
+                .map(|j| metric.components()[k][j].into_value() * acceleration[j])
+                .sum()
+        });
+        let turn: [f64; N] = core::array::from_fn(|i| {
+            (0..N).map(|k| projector[i][k] * lowered[k]).sum::<f64>() / speed
+        });
+        let turn_rate = (0..N)
+            .flat_map(|i| (0..N).map(move |j| (i, j)))
+            .map(|(i, j)| metric.components()[i][j].into_value() * turn[i] * turn[j])
+            .sum::<f64>()
+            .max(0.0)
+            .sqrt();
+        Ok(Kinematics {
+            tangent,
+            speed: FieldVelocity::new(speed),
+            entropy_projector: FieldTensor2::new(projector.map(|row| row.map(Quantity::new))),
+            turn: ContravariantField::new(turn.map(Quantity::new)),
+            turn_rate: Hubble::new(turn_rate),
+            eta_perp: Quantity::new(turn_rate / hubble),
+        })
+    }
+}
+
+/// Oriented two-field kinematics attached to a background state: the
+/// general [`Kinematics`] together with an entropy normal whose sign is
+/// continued along the trajectory, and the signed turn rate.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TwoFieldKinematics {
     /// Instantaneous adiabatic and entropy basis.
@@ -407,7 +489,7 @@ where
     G: FieldSpaceGeometry<2>,
 {
     /// Computes the oriented adiabatic/entropy basis and signed turn rate.
-    pub fn kinematics(
+    pub fn oriented_kinematics(
         &self,
         state: &MultifieldState<2>,
         previous_normal: Option<&ContravariantField<M0, f64, 2>>,
@@ -862,7 +944,7 @@ mod tests {
             ScaleFactor::new(1.0),
         );
 
-        let kinematics = system.kinematics(&state, None).unwrap();
+        let kinematics = system.oriented_kinematics(&state, None).unwrap();
         let metric = FieldMetric::<2>::euclidean();
         let overlap = metric
             .lower(&kinematics.basis.tangent)
@@ -872,5 +954,175 @@ mod tests {
         assert!(overlap.abs() < 1.0e-15);
         assert!(kinematics.turn_rate.into_value().is_finite());
         assert!(kinematics.eta_perp.into_value().is_finite());
+    }
+    /// The flat three-field potential `sum m_i^2 phi_i^2 / 2`.
+    fn three_field_system()
+    -> CovariantMultifieldSystem<QuadraticMultifieldPotential<3>, FlatFieldSpace, 3> {
+        CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([
+                Mass::new(1.0e-6),
+                Mass::new(2.3e-6),
+                Mass::new(4.1e-6),
+            ]),
+            FlatFieldSpace,
+        )
+    }
+
+    fn slow_roll_state<P, G, const N: usize>(
+        system: &CovariantMultifieldSystem<P, G, N>,
+        phi: [f64; N],
+    ) -> MultifieldState<N>
+    where
+        P: MultifieldPotential<N>,
+        G: FieldSpaceGeometry<N>,
+    {
+        let resting = MultifieldState::new(
+            phi.map(Field::new),
+            [FieldVelocity::new(0.0); N],
+            ScaleFactor::new(1.0),
+        );
+        // Tilt the slow-roll velocity off the gradient, so that the state has
+        // a generic acceleration and a nonzero turn.
+        let slow_roll = system.slow_roll_velocity(&resting);
+        let scale = slow_roll
+            .iter()
+            .map(|v| v.into_value().abs())
+            .fold(0.0, f64::max);
+        MultifieldState {
+            pi: core::array::from_fn(|i| {
+                FieldVelocity::new(slow_roll[i].into_value() + 0.3 * scale * (i as f64 - 0.7))
+            }),
+            ..resting
+        }
+    }
+
+    #[test]
+    fn n_field_kinematics_reduce_to_the_oriented_two_field_basis() {
+        let system = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0e-6), Mass::new(7.0e-6)]),
+            HyperbolicFieldSpace::new(Field::new(5.0)).unwrap(),
+        );
+        let state = slow_roll_state(&system, [12.0, 8.0]);
+        let general = system.kinematics(&state).unwrap();
+        let oriented = system.oriented_kinematics(&state, None).unwrap();
+        let close = |a: f64, b: f64| (a - b).abs() <= 1.0e-12 * (1.0 + a.abs().max(b.abs()));
+        assert!(close(
+            general.speed.into_value(),
+            oriented.basis.speed.into_value()
+        ));
+        assert!(close(
+            general.turn_rate.into_value(),
+            oriented.turn_rate.into_value().abs()
+        ));
+        for i in 0..2 {
+            assert!(close(
+                general.tangent.components()[i].into_value(),
+                oriented.basis.tangent.components()[i].into_value()
+            ));
+            // omega = (signed turn rate) e_s.
+            assert!(close(
+                general.turn.components()[i].into_value(),
+                oriented.turn_rate.into_value()
+                    * oriented.basis.normal.components()[i].into_value()
+            ));
+            for j in 0..2 {
+                // perp^IJ = e_s^I e_s^J in two dimensions.
+                let normal = oriented.basis.normal.components();
+                assert!(close(
+                    general.entropy_projector.components()[i][j].into_value(),
+                    normal[i].into_value() * normal[j].into_value()
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn the_entropy_projector_is_an_orthogonal_projector_of_rank_n_minus_one() {
+        let system = three_field_system();
+        let state = slow_roll_state(&system, [10.0, 7.0, 4.0]);
+        let kinematics = system.kinematics(&state).unwrap();
+        let p = |i: usize, j: usize| kinematics.entropy_projector.components()[i][j].into_value();
+        let e = |i: usize| kinematics.tangent.components()[i].into_value();
+        let w = |i: usize| kinematics.turn.components()[i].into_value();
+        // Flat metric: perp perp = perp, perp e = 0, trace = N - 1, omega . e = 0.
+        for i in 0..3 {
+            assert!((0..3).map(|k| p(i, k) * e(k)).sum::<f64>().abs() < 1.0e-14);
+            for j in 0..3 {
+                let square: f64 = (0..3).map(|k| p(i, k) * p(k, j)).sum();
+                assert!((square - p(i, j)).abs() < 1.0e-14);
+            }
+        }
+        assert!(((0..3).map(|i| p(i, i)).sum::<f64>() - 2.0).abs() < 1.0e-14);
+        let overlap: f64 = (0..3).map(|i| w(i) * e(i)).sum();
+        assert!(overlap.abs() < 1.0e-12 * kinematics.turn_rate.into_value());
+        assert!(kinematics.turn_rate.into_value() > 0.0);
+    }
+
+    /// A curved, non-diagonal three-field metric.
+    #[derive(Clone, Copy, Debug)]
+    struct CurvedThreeField;
+
+    impl crate::MetricJet<3> for CurvedThreeField {
+        fn metric_jet(&self, position: &[Field; 3]) -> [[crate::ThirdOrderJet<3>; 3]; 3] {
+            use crate::{ThirdOrderJet, Transcendental};
+            let [x, y, z]: [ThirdOrderJet<3>; 3] =
+                core::array::from_fn(|i| ThirdOrderJet::variable(position[i].into_value(), i));
+            let one = ThirdOrderJet::constant(1.0);
+            let a = one + x * x * 0.01;
+            let b = (y * 0.05).exp();
+            let c = one + z * z * 0.02;
+            let ab = (x * y * 0.001).tanh();
+            let ac = z * 0.01;
+            let bc = one * 0.0;
+            [[a, ab, ac], [ab, b, bc], [ac, bc, c]]
+        }
+    }
+
+    /// The numerical `D_t e_sigma^I` from a short integration both ways.
+    fn assert_turn_matches_finite_difference<P, G>(
+        system: &CovariantMultifieldSystem<P, G, 3>,
+        state: MultifieldState<3>,
+    ) where
+        P: TwiceDifferentiableMultifieldPotential<3>,
+        G: CurvedFieldSpaceGeometry<3>,
+    {
+        let kinematics = system.kinematics(&state).unwrap();
+        let step = 2.0e2;
+        let advance = |dt: f64| rk4_step(system, Time::new(0.0), &state, Time::new(dt));
+        let tangent_at = |s: &MultifieldState<3>| system.kinematics(s).unwrap().tangent;
+        let (plus, minus) = (tangent_at(&advance(step)), tangent_at(&advance(-step)));
+        let connection = system.geometry.christoffel(&state.phi);
+        for i in 0..3 {
+            let derivative = (plus.components()[i].into_value()
+                - minus.components()[i].into_value())
+                / (2.0 * step);
+            // D_t e^I = d e^I / dt + Gamma^I_JK e^J phidot^K.
+            let correction: f64 = (0..9)
+                .map(|m| {
+                    let [j, k] = [m / 3, m % 3];
+                    connection.components()[i][j][k].into_value()
+                        * kinematics.tangent.components()[j].into_value()
+                        * state.pi[k].into_value()
+                })
+                .sum();
+            let analytic = kinematics.turn.components()[i].into_value();
+            assert!(
+                (derivative + correction - analytic).abs()
+                    < 1.0e-4 * kinematics.turn_rate.into_value(),
+                "{i}: {} vs {analytic}",
+                derivative + correction
+            );
+        }
+    }
+
+    #[test]
+    fn the_turn_vector_is_the_covariant_time_derivative_of_the_tangent() {
+        let flat = three_field_system();
+        assert_turn_matches_finite_difference(&flat, slow_roll_state(&flat, [10.0, 7.0, 4.0]));
+        let curved = CovariantMultifieldSystem::in_planck_units(
+            flat.potential,
+            crate::JetGeometry(CurvedThreeField),
+        );
+        assert_turn_matches_finite_difference(&curved, slow_roll_state(&curved, [10.0, 7.0, 4.0]));
     }
 }

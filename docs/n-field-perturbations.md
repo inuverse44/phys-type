@@ -138,11 +138,11 @@ $10^{-12}$ at every step.
 
 | Step | Content |
 | --- | --- |
-| 5a | kinematics for any $N$ (decision 3); `BackgroundRecord` and `SpectrumRecord` carry $N$; deprecated two-field aliases |
+| 5a | kinematics for any $N$ (decision 3): `Kinematics<N>` with tangent, entropy projector, and turn vector; the oriented two-field basis becomes `oriented_kinematics` |
 | 5b | the mode solver and projections for any $N$ (decisions 1, 2, 4); $N=1$ analytic checks |
 | 5c | tensor modes and $r$ (decision 5) |
 | 5d | two- and three-point transport for any $N$: `BackgroundNeighborhood<N>`, the transport systems and states, `curvature_correlators` |
-| 5e | the run APIs (`survey`, `run_spectra`, `mode_spectrum`, `run_bispectrum`, `three_point_state`) and CSV writers for any $N$ |
+| 5e | the run APIs (`survey`, `run_spectra`, `mode_spectrum`, `run_bispectrum`, `three_point_state`), the record types, and the CSV writers for any $N$ |
 | 5f | Higgs inflation in `phys-type-models` (metric and Palatini) with its reproduction figure; the $N=3$ validations |
 
 ## Open questions for review

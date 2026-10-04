@@ -422,7 +422,7 @@ where
         }
         let basis = self
             .background
-            .kinematics(&background, None)
+            .oriented_kinematics(&background, None)
             .map_err(ModeInitializationError::KinematicBasis)?
             .basis;
         let normalization = (self.k * 2.0).sqrt();

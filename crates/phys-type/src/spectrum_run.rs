@@ -1326,7 +1326,7 @@ where
             }
         })?;
         let initial_kinematics = self
-            .kinematics(&initial, None)
+            .oriented_kinematics(&initial, None)
             .map_err(SpectrumRunError::KinematicBasis)?;
         let mut rows = vec![self.background_record(&initial, &initial, &initial_kinematics)];
         let mut domain_error = None;
@@ -1378,7 +1378,7 @@ where
                 if basis_error.is_some() {
                     return;
                 }
-                match self.kinematics(state, previous_normal.as_ref()) {
+                match self.oriented_kinematics(state, previous_normal.as_ref()) {
                     Ok(kinematics) => {
                         previous_normal = Some(kinematics.basis.normal);
                         if accepted.is_multiple_of(settings.background_sample_every) {
@@ -1417,7 +1417,7 @@ where
         }
 
         let final_kinematics = self
-            .kinematics(&final_state, previous_normal.as_ref())
+            .oriented_kinematics(&final_state, previous_normal.as_ref())
             .map_err(SpectrumRunError::KinematicBasis)?;
         rows.push(self.background_record(&initial, &final_state, &final_kinematics));
 
@@ -1936,7 +1936,7 @@ where
     ) -> Result<(ProjectedSpectra, TwoFieldKinematics), SpectrumRunError> {
         let cosmic = state.cosmic();
         let kinematics = self
-            .kinematics(&cosmic.background, previous_normal)
+            .oriented_kinematics(&cosmic.background, previous_normal)
             .map_err(SpectrumRunError::KinematicBasis)?;
         let metric = self.geometry.metric(&cosmic.background.phi);
         let hubble = self.hubble(&cosmic.background);
@@ -2504,14 +2504,14 @@ mod tests {
             .enumerate()
             .max_by(|(_, left), (_, right)| {
                 system
-                    .kinematics(&left.state, None)
+                    .oriented_kinematics(&left.state, None)
                     .unwrap()
                     .eta_perp
                     .into_value()
                     .abs()
                     .total_cmp(
                         &system
-                            .kinematics(&right.state, None)
+                            .oriented_kinematics(&right.state, None)
                             .unwrap()
                             .eta_perp
                             .into_value()
@@ -2690,13 +2690,13 @@ mod tests {
             .filter(|checkpoint| checkpoint.e_folds >= start && checkpoint.e_folds <= output)
             .max_by(|left, right| {
                 let left_turn = system
-                    .kinematics(&left.state, None)
+                    .oriented_kinematics(&left.state, None)
                     .unwrap()
                     .eta_perp
                     .into_value()
                     .abs();
                 let right_turn = system
-                    .kinematics(&right.state, None)
+                    .oriented_kinematics(&right.state, None)
                     .unwrap()
                     .eta_perp
                     .into_value()
