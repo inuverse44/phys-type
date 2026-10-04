@@ -5,7 +5,7 @@
 This document describes the first P3e slice: the projection of the canonical
 phase-space correlations evolved by
 [`three-point-transport.md`](three-point-transport.md) to the curvature
-perturbation $\zeta$. The implementation lives in `src/curvature.rs`.
+perturbation $\zeta$. The implementation lives in `crates/phys-type/src/curvature.rs`.
 
 Implemented:
 
@@ -225,7 +225,7 @@ corrections that $\delta N$ omits. Both comparisons are in the ignored test
 
 ## Bispectrum runs and CSV output
 
-`CovariantMultifieldSystem::run_bispectrum` (in `src/bispectrum_run.rs`)
+`CovariantMultifieldSystem::run_bispectrum` (in `crates/phys-type/src/bispectrum_run.rs`)
 surveys the background once and fixes $k_{\mathrm{pivot}}=aH$ with the
 convention of the spectrum run. Each `TriangleShape` gives $k_t/k_{\mathrm{pivot}}$
 and the Fergusson--Shellard coordinates used in Eq. (9.4) of DFMS,

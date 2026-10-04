@@ -17,7 +17,7 @@ Nothing in the solver is specialized to this background.
 
 ## Background
 
-[`PolarFieldSpace`](../src/field_space.rs) is flat field space in polar
+[`PolarFieldSpace`](../crates/phys-type/src/field_space.rs) is flat field space in polar
 coordinates, $ds^2=d\rho^2+\rho^2d\theta^2$. On it the test potential
 
 $$
@@ -180,7 +180,7 @@ independent in-in evaluation; that is the next step.
 
 The regular suite runs:
 
-- the `PolarFieldSpace` checks in `src/field_space.rs`: inverse metric,
+- the `PolarFieldSpace` checks in `crates/phys-type/src/field_space.rs`: inverse metric,
   Levi-Civita connection and its derivative against finite differences, and
   vanishing curvature built from the connection;
 - `closed_form_gamma_and_digamma_match_known_values`, for the complex
