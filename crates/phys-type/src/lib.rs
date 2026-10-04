@@ -23,6 +23,7 @@ pub mod scalar_field;
 pub mod spectra;
 pub mod spectrum_run;
 pub mod state;
+pub mod theory;
 pub mod time;
 pub mod transport;
 
@@ -47,11 +48,11 @@ pub use field_space::{
     ContravariantField, CovariantField, CovariantPotentialHessian,
     CovariantPotentialThirdDerivative, CovariantRiemannDerivative, CurvatureDerivativeGeometry,
     CurvedFieldSpaceGeometry, FieldMetric, FieldSpaceGeometry, FieldTensor2, FieldTensor3,
-    FieldTensor4, FieldTensor5, FieldVector, FlatFieldSpace, GeometryValidationError,
-    HyperbolicFieldSpace, InvalidCurvatureRadius, InverseFieldMetric, KinematicBasis2,
-    KinematicBasisError, Lower, LowerFirst, LoweredRiemannTensor, PolarFieldSpace, RaiseFirst,
-    RiemannIdentity, RiemannTensor, Tensor3Components, Tensor4Components, Tensor5Components,
-    ThirdOrderFieldSpaceGeometry, Upper, validate_riemann_symmetries,
+    FieldTensor4, FieldTensor5, FieldVector, FlatFieldSpace, GeometryDomainError,
+    GeometryValidationError, HyperbolicFieldSpace, InvalidCurvatureRadius, InverseFieldMetric,
+    KinematicBasis2, KinematicBasisError, Lower, LowerFirst, LoweredRiemannTensor, PolarFieldSpace,
+    RaiseFirst, RiemannIdentity, RiemannTensor, Tensor3Components, Tensor4Components,
+    Tensor5Components, ThirdOrderFieldSpaceGeometry, Upper, validate_riemann_symmetries,
 };
 pub use integrate::{
     AdaptiveAttempt, AdaptiveSystem, EmbeddedStep, ErrorTolerances, StepSizeLimits, System,
@@ -99,6 +100,10 @@ pub use spectrum_run::{
     SpectrumRunError, SpectrumRunSettings, SpectrumRunStage, write_metadata,
 };
 pub use state::{State, StateDelta, StateDerivative};
+pub use theory::{
+    EinsteinFrame, EinsteinGeometry, EinsteinMetric, EinsteinPotential, Formulation,
+    FrameCorrespondence, GeneralizedNonminimal, TheoryScalar, einstein_frame,
+};
 pub use time::ConformalTime;
 pub use transport::{
     AnyPhaseSpaceIndex, BackgroundNeighborhood, CanonicalCubicACoefficients,

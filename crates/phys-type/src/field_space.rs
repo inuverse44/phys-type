@@ -601,6 +601,24 @@ impl<const N: usize> ChristoffelSymbols<N> {
     }
 }
 
+/// A position where a field-space geometry, or the representation of a
+/// theory it encodes, is not valid.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GeometryDomainError {
+    /// The condition that failed.
+    pub reason: &'static str,
+    /// The offending value, such as `Omega^2` or the smallest Cholesky pivot.
+    pub value: f64,
+}
+
+impl fmt::Display for GeometryDomainError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} (value {:e})", self.reason, self.value)
+    }
+}
+
+impl std::error::Error for GeometryDomainError {}
+
 /// Supplies field-space geometry at a background position.
 pub trait FieldSpaceGeometry<const N: usize> {
     /// The covariant metric `G_IJ`.
@@ -611,6 +629,14 @@ pub trait FieldSpaceGeometry<const N: usize> {
 
     /// The Levi-Civita connection `Gamma^I_JK`.
     fn christoffel(&self, position: &[Field; N]) -> ChristoffelSymbols<N>;
+
+    /// Checks that the geometry is valid at `position`. The background
+    /// survey calls it on every accepted step. The default accepts every
+    /// position; geometries derived from a theory check their validity
+    /// conditions, such as a positive conformal factor.
+    fn check_domain(&self, _position: &[Field; N]) -> Result<(), GeometryDomainError> {
+        Ok(())
+    }
 }
 
 /// A field-space geometry that supplies analytic Riemann curvature.

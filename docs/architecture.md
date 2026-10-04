@@ -88,8 +88,8 @@ It separates three things.
   must name its frame. $\zeta$ is invariant under a field-dependent conformal
   transformation once the evolution is adiabatic; before that, and whenever
   matter couples to the Jordan metric, the definition used is stated
-  explicitly. These correspondences are written up in `docs/frames.md` with
-  references when the theory layer lands.
+  explicitly. These correspondences are written up in
+  [`frames.md`](frames.md) with references.
 
 Horndeski and DHOST theories may later need their own engine. They plug in
 at the same boundary: a theory class, an engine that accepts it, and
@@ -147,7 +147,7 @@ unchanged, which the golden data of step 1 checks bit for bit.
 | 1 | golden data | freeze the CSV output of the four examples and test that it is reproduced | — |
 | 2 | workspace | move the crate to `crates/phys-type`, no code change | CI, golden data |
 | 3a | jet geometry | `FourthOrderJet<N>`; `JetGeometry` derives the inverse metric, connection, curvature, and $\nabla R$ of any metric given with three derivatives | reproduces the polar, hyperbolic, and assisted geometries to $10^{-12}$; Bianchi identities on a generic three-field metric |
-| 3b | theory layer | `GeneralizedNonminimal<N>` and its exact map, the frame correspondence, run-time admissibility checks, `docs/frames.md` | the generic map reproduces `NonminimalAssistedFieldSpace` to round-off |
+| 3b | theory layer | `GeneralizedNonminimal<N>`, `einstein_frame`, `EinsteinFrame::correspondence`, `FieldSpaceGeometry::check_domain` checked by the background survey, [`frames.md`](frames.md) | the generic map reproduces `NonminimalAssistedFieldSpace` and its loop potential to $10^{-12}$ (metric and Palatini); single-field Higgs metric in closed form; golden data unchanged |
 | 4 | models crate | assisted as an instance of step 3; papers' formulas, example potentials, validation tests, and examples move to `crates/phys-type-models` | golden data |
 | 5+ | $N$ fields | the perturbation, transport, and observable pipeline for any $N$, starting with $N=1$ and Higgs inflation | the two-field results unchanged |
 
@@ -157,6 +157,9 @@ golden data of the fast examples with `scripts/golden.py` (see
 
 ## Open questions
 
+- A Jordan-frame curvature perturbation as an output: for several fields the
+  Jordan- and Einstein-frame $\zeta$ differ while isocurvature perturbations
+  persist ([`frames.md`](frames.md)).
 - Which frame is the default for reported e-fold numbers when a theory is
   given in the Jordan frame.
 - How the Palatini formulation enters the theory class beyond the $\kappa=0$
