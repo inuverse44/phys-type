@@ -157,7 +157,7 @@ unchanged, which the golden data of step 1 checks bit for bit.
 | 3b | theory layer | `GeneralizedNonminimal<N>`, `einstein_frame`, `EinsteinFrame::correspondence`, `FieldSpaceGeometry::check_domain` checked by the background survey, [`frames.md`](frames.md) | the generic map reproduces `NonminimalAssistedFieldSpace` and its loop potential to $10^{-12}$ (metric and Palatini); single-field Higgs metric in closed form; golden data unchanged |
 | 4a | models crate | `crates/phys-type-models`: assisted as `AssistedTheory` (an instance of step 3b), the HKKPT prescription, the constant-turn orbit, and the three model examples; the core keeps the hand-written assisted model only as a test fixture (`src/test_models/`) | fast golden data bit for bit; assisted golden refrozen after a $2\times10^{-8}$ round-off change of $f_{\mathrm{NL}}$ |
 | 4b | validation suites | the assisted and constant-turn validations move to `phys-type-models/tests`; the engine gains the public API they need (`survey`, `BackgroundTrajectory::{state_at, crossing}`, `mode_spectrum`, `three_point_state`) | the moved tests pass unchanged |
-| 5+ | $N$ fields | the perturbation, transport, and observable pipeline for any $N$, starting with $N=1$ and Higgs inflation | the two-field results unchanged |
+| 5a–5f | $N$ fields | the perturbation, transport, and observable pipeline for any $N$, with tensor modes, starting with $N=1$ and Higgs inflation; designed in [`n-field-perturbations.md`](n-field-perturbations.md) | the two-field golden data to $10^{-12}$ |
 
 Expensive validations remain ignored tests run in release mode; CI checks the
 golden data of the fast examples with `scripts/golden.py` (see
