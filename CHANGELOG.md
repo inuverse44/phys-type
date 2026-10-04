@@ -8,6 +8,12 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `Kinematics<N>` and `CovariantMultifieldSystem::kinematics` for any number
+  of fields: the unit tangent, the entropy projector
+  `perp^IJ = G^IJ - e_sigma^I e_sigma^J`, the turn vector `D_t e_sigma`, and
+  its norm. Checked against the oriented two-field basis and against a
+  finite-difference covariant derivative on flat and curved three-field
+  spaces.
 - Engine API for analyses outside the crate: `CovariantMultifieldSystem::survey`
   with `BackgroundSurvey` and a public `BackgroundTrajectory` (`state_at`,
   `crossing`), `mode_spectrum`, and `three_point_state` with
@@ -22,6 +28,8 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The oriented two-field basis is now `oriented_kinematics`; `kinematics`
+  returns the general `Kinematics<N>`.
 - The core no longer exports the assisted model or its paper's formulas:
   `NonminimalAssistedFieldSpace`, the `Nonminimal*Potential` types, and the
   `assisted_slow_roll` and `nonminimal` modules become test fixtures of the
