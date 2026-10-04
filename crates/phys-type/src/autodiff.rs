@@ -673,6 +673,288 @@ impl<const N: usize> Sqrt for ThirdOrderJet<N> {
     }
 }
 
+/// A value and its first four partial derivatives with respect to `N`
+/// variables.
+///
+/// The Einstein-frame metric of a nonminimal theory contains first
+/// derivatives of the conformal factor, and the cubic transport needs the
+/// covariant derivative of the Riemann tensor, a third derivative of the
+/// metric. The conformal factor is therefore differentiated four times.
+///
+/// Products follow the Leibniz rule as a sum over subsets of the derivative
+/// indices, and composition with a univariate function follows Faà di Bruno's
+/// formula as a sum over set partitions of the indices, so every component
+/// is computed by the same rule rather than by order-specific formulas.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FourthOrderJet<const N: usize> {
+    /// Ordinary numerical value.
+    pub value: f64,
+    /// First partial derivatives.
+    pub gradient: [f64; N],
+    /// Symmetric second partial derivatives.
+    pub hessian: [[f64; N]; N],
+    /// Fully symmetric third partial derivatives.
+    pub third: [[[f64; N]; N]; N],
+    /// Fully symmetric fourth partial derivatives.
+    pub fourth: [[[[f64; N]; N]; N]; N],
+}
+
+/// Set partitions of the positions `0..k` for `k <= 4`, each block a bit
+/// mask over the positions.
+fn set_partitions(k: usize) -> Vec<Vec<u8>> {
+    fn extend(position: usize, k: usize, blocks: &mut Vec<u8>, out: &mut Vec<Vec<u8>>) {
+        if position == k {
+            out.push(blocks.clone());
+            return;
+        }
+        for index in 0..blocks.len() {
+            blocks[index] |= 1 << position;
+            extend(position + 1, k, blocks, out);
+            blocks[index] &= !(1 << position);
+        }
+        blocks.push(1 << position);
+        extend(position + 1, k, blocks, out);
+        blocks.pop();
+    }
+    let mut out = Vec::new();
+    extend(0, k, &mut Vec::new(), &mut out);
+    out
+}
+
+impl<const N: usize> FourthOrderJet<N> {
+    /// Creates a constant with every derivative set to zero.
+    pub const fn constant(value: f64) -> Self {
+        Self {
+            value,
+            gradient: [0.0; N],
+            hessian: [[0.0; N]; N],
+            third: [[[0.0; N]; N]; N],
+            fourth: [[[[0.0; N]; N]; N]; N],
+        }
+    }
+
+    /// Creates active variable `index` with a unit gradient seed.
+    pub fn variable(value: f64, index: usize) -> Self {
+        assert!(index < N, "active variable index is out of bounds");
+        let mut result = Self::constant(value);
+        result.gradient[index] = 1.0;
+        result
+    }
+
+    /// The derivative with respect to the variables in `indices`, of order
+    /// `indices.len() <= 4`; the empty slice gives the value.
+    pub fn derivative(&self, indices: &[usize]) -> f64 {
+        match *indices {
+            [] => self.value,
+            [i] => self.gradient[i],
+            [i, j] => self.hessian[i][j],
+            [i, j, k] => self.third[i][j][k],
+            [i, j, k, l] => self.fourth[i][j][k][l],
+            _ => panic!("FourthOrderJet carries derivatives up to fourth order"),
+        }
+    }
+
+    /// The jet whose every component is `component(indices)`.
+    fn from_components(component: impl Fn(&[usize]) -> f64) -> Self {
+        Self {
+            value: component(&[]),
+            gradient: core::array::from_fn(|i| component(&[i])),
+            hessian: core::array::from_fn(|i| core::array::from_fn(|j| component(&[i, j]))),
+            third: core::array::from_fn(|i| {
+                core::array::from_fn(|j| core::array::from_fn(|k| component(&[i, j, k])))
+            }),
+            fourth: core::array::from_fn(|i| {
+                core::array::from_fn(|j| {
+                    core::array::from_fn(|k| core::array::from_fn(|l| component(&[i, j, k, l])))
+                })
+            }),
+        }
+    }
+
+    /// `indices` restricted to the positions in `mask`.
+    fn select(indices: &[usize], mask: u8) -> ([usize; 4], usize) {
+        let mut selected = [0; 4];
+        let mut count = 0;
+        for (position, &index) in indices.iter().enumerate() {
+            if mask & (1 << position) != 0 {
+                selected[count] = index;
+                count += 1;
+            }
+        }
+        (selected, count)
+    }
+
+    /// `h(self)` given `h` and its first four derivatives at `self.value`.
+    fn map_unary(self, derivatives: [f64; 5]) -> Self {
+        let partitions: [Vec<Vec<u8>>; 5] = core::array::from_fn(set_partitions);
+        Self::from_components(|indices| {
+            if indices.is_empty() {
+                return derivatives[0];
+            }
+            partitions[indices.len()]
+                .iter()
+                .map(|blocks| {
+                    derivatives[blocks.len()]
+                        * blocks
+                            .iter()
+                            .map(|&mask| {
+                                let (selected, count) = Self::select(indices, mask);
+                                self.derivative(&selected[..count])
+                            })
+                            .product::<f64>()
+                })
+                .sum()
+        })
+    }
+
+    fn reciprocal(self) -> Self {
+        let inverse = 1.0 / self.value;
+        self.map_unary([
+            inverse,
+            -inverse.powi(2),
+            2.0 * inverse.powi(3),
+            -6.0 * inverse.powi(4),
+            24.0 * inverse.powi(5),
+        ])
+    }
+
+    fn zip(self, rhs: Self, combine: impl Fn(f64, f64) -> f64) -> Self {
+        Self::from_components(|indices| combine(self.derivative(indices), rhs.derivative(indices)))
+    }
+}
+
+impl<const N: usize> Default for FourthOrderJet<N> {
+    fn default() -> Self {
+        Self::constant(0.0)
+    }
+}
+
+impl<const N: usize> From<f64> for FourthOrderJet<N> {
+    fn from(value: f64) -> Self {
+        Self::constant(value)
+    }
+}
+
+impl<const N: usize> Transcendental for FourthOrderJet<N> {
+    fn exp(self) -> Self {
+        let value = self.value.exp();
+        self.map_unary([value; 5])
+    }
+
+    fn ln(self) -> Self {
+        let inverse = 1.0 / self.value;
+        self.map_unary([
+            self.value.ln(),
+            inverse,
+            -inverse.powi(2),
+            2.0 * inverse.powi(3),
+            -6.0 * inverse.powi(4),
+        ])
+    }
+
+    fn cos(self) -> Self {
+        let (sin, cos) = self.value.sin_cos();
+        self.map_unary([cos, -sin, -cos, sin, cos])
+    }
+
+    fn tanh(self) -> Self {
+        let t = self.value.tanh();
+        let first = 1.0 - t * t;
+        // d/dx of a polynomial p(t) is p'(t) (1 - t^2).
+        let second = -2.0 * t * first;
+        let third = (-2.0 + 6.0 * t * t) * first;
+        let fourth = (16.0 * t - 24.0 * t * t * t) * first;
+        self.map_unary([t, first, second, third, fourth])
+    }
+}
+
+impl<const N: usize> Add for FourthOrderJet<N> {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        self.zip(rhs, |a, b| a + b)
+    }
+}
+
+impl<const N: usize> Sub for FourthOrderJet<N> {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.zip(rhs, |a, b| a - b)
+    }
+}
+
+impl<const N: usize> Neg for FourthOrderJet<N> {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        self * -1.0
+    }
+}
+
+impl<const N: usize> Mul for FourthOrderJet<N> {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self::from_components(|indices| {
+            let full = (1u8 << indices.len()) - 1;
+            (0..=full)
+                .map(|mask| {
+                    let (left, left_count) = Self::select(indices, mask);
+                    let (right, right_count) = Self::select(indices, full & !mask);
+                    self.derivative(&left[..left_count]) * rhs.derivative(&right[..right_count])
+                })
+                .sum()
+        })
+    }
+}
+
+#[allow(clippy::suspicious_arithmetic_impl)]
+impl<const N: usize> Div for FourthOrderJet<N> {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        self * rhs.reciprocal()
+    }
+}
+
+impl<const N: usize> Mul<f64> for FourthOrderJet<N> {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self::from_components(|indices| self.derivative(indices) * rhs)
+    }
+}
+
+impl<const N: usize> Mul<FourthOrderJet<N>> for f64 {
+    type Output = FourthOrderJet<N>;
+
+    fn mul(self, rhs: FourthOrderJet<N>) -> Self::Output {
+        rhs * self
+    }
+}
+
+impl<const N: usize> Div<f64> for FourthOrderJet<N> {
+    type Output = Self;
+
+    fn div(self, rhs: f64) -> Self::Output {
+        self * (1.0 / rhs)
+    }
+}
+
+impl<const N: usize> Sqrt for FourthOrderJet<N> {
+    fn sqrt_value(self) -> Self {
+        let root = self.value.sqrt();
+        self.map_unary([
+            root,
+            0.5 / root,
+            -0.25 / root.powi(3),
+            0.375 / root.powi(5),
+            -0.9375 / root.powi(7),
+        ])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -856,5 +1138,106 @@ mod tests {
         assert!((logarithm.third[0][0][0] - 2.0 / point.powi(3)).abs() < 1.0e-14);
         assert!((cosine.third[0][0][0] - point.sin()).abs() < 1.0e-15);
         assert!((hyperbolic_tangent.third[0][0][0] - expected_tanh_third).abs() < 1.0e-15);
+    }
+
+    fn fourth_order_sample<V>(x: V, y: V) -> V
+    where
+        V: Clone
+            + Add<Output = V>
+            + Mul<Output = V>
+            + Div<Output = V>
+            + Mul<f64, Output = V>
+            + From<f64>
+            + Transcendental
+            + Sqrt,
+    {
+        let product = x.clone() * y.clone();
+        let denominator = V::from(1.0) + x.clone() * x.clone() * 0.3;
+        (product.clone() * 0.7).exp() / denominator
+            + (V::from(2.0) + y.clone()).ln() * x.clone().cos()
+            + (y * 0.5).tanh() * (x + V::from(3.0)).sqrt_value()
+    }
+
+    #[test]
+    fn fourth_order_jet_agrees_with_the_third_order_jet() {
+        let (x0, y0) = (0.4, -0.3);
+        let fourth = fourth_order_sample(
+            FourthOrderJet::<2>::variable(x0, 0),
+            FourthOrderJet::<2>::variable(y0, 1),
+        );
+        let third = fourth_order_sample(
+            ThirdOrderJet::<2>::variable(x0, 0),
+            ThirdOrderJet::<2>::variable(y0, 1),
+        );
+        assert!((fourth.value - third.value).abs() < 1.0e-14);
+        for i in 0..2 {
+            assert!((fourth.gradient[i] - third.gradient[i]).abs() < 1.0e-13);
+            for j in 0..2 {
+                assert!((fourth.hessian[i][j] - third.hessian[i][j]).abs() < 1.0e-12);
+                for k in 0..2 {
+                    assert!((fourth.third[i][j][k] - third.third[i][j][k]).abs() < 1.0e-11);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn fourth_order_jet_matches_finite_differences_of_third_derivatives() {
+        let (x0, y0) = (0.4, -0.3);
+        let fourth = fourth_order_sample(
+            FourthOrderJet::<2>::variable(x0, 0),
+            FourthOrderJet::<2>::variable(y0, 1),
+        );
+        let step = 1.0e-4;
+        for l in 0..2 {
+            let shifted = |sign: f64| {
+                let (dx, dy) = if l == 0 {
+                    (sign * step, 0.0)
+                } else {
+                    (0.0, sign * step)
+                };
+                fourth_order_sample(
+                    ThirdOrderJet::<2>::variable(x0 + dx, 0),
+                    ThirdOrderJet::<2>::variable(y0 + dy, 1),
+                )
+            };
+            let (plus, minus) = (shifted(1.0), shifted(-1.0));
+            for i in 0..2 {
+                for j in 0..2 {
+                    for k in 0..2 {
+                        let numerical = (plus.third[i][j][k] - minus.third[i][j][k]) / (2.0 * step);
+                        let analytic = fourth.fourth[i][j][k][l];
+                        assert!(
+                            (numerical - analytic).abs() < 1.0e-6 * (1.0 + analytic.abs()),
+                            "{i}{j}{k}{l}: {numerical} vs {analytic}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn fourth_order_jet_reproduces_closed_form_fourth_derivatives() {
+        // d^4/dx^4 of exp(2x), ln x, cos x, tanh x, and sqrt x.
+        let x0 = 0.7_f64;
+        let x = FourthOrderJet::<1>::variable(x0, 0);
+        let fourth = |jet: FourthOrderJet<1>| jet.fourth[0][0][0][0];
+        let t = x0.tanh();
+        let sech2 = 1.0 - t * t;
+        let checks = [
+            (fourth((x * 2.0).exp()), 16.0 * (2.0 * x0).exp()),
+            (fourth(x.ln()), -6.0 / x0.powi(4)),
+            (fourth(x.cos()), x0.cos()),
+            (fourth(x.tanh()), sech2 * (16.0 * t - 24.0 * t.powi(3))),
+            (fourth(x.sqrt_value()), -15.0 / 16.0 * x0.powf(-3.5)),
+            (fourth(FourthOrderJet::from(1.0) / x), 24.0 / x0.powi(5)),
+        ];
+        for (index, (analytic, expected)) in checks.into_iter().enumerate() {
+            assert!(
+                (analytic - expected).abs() < 1.0e-12 * (1.0 + expected.abs()),
+                "check {index}: {analytic} vs {expected}"
+            );
+        }
     }
 }

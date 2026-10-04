@@ -8,6 +8,14 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `FourthOrderJet<N>`, forward-mode derivatives through fourth order, with
+  products and compositions written as sums over index subsets and set
+  partitions.
+- `MetricJet` and `JetGeometry`: any metric supplied with three derivatives
+  yields its inverse, connection, Riemann tensor, and covariant Riemann
+  derivative by automatic differentiation. It reproduces the polar,
+  hyperbolic, and nonminimally assisted geometries to `1e-12` and satisfies
+  the second Bianchi identity on a generic three-field metric.
 - A squeezed-bispectrum benchmark on the constant-turn orbit: the transport
   `f_NL(k, k, r k)` scales as `r^(3/2 - nu)` with `nu` set by the entropy mass
   `mu`, not by `m_eff`, as arXiv:2607.14529 states. Adds the ignored test
