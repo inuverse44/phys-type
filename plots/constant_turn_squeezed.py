@@ -87,7 +87,7 @@ def main() -> None:
         plt.Line2D([], [], color="0.3", linestyle="-", label=r"$r^{3/2-\nu}$, $\nu$ from $\mu$"),
         plt.Line2D([], [], color="0.3", linestyle=":", label=r"$r^{3/2-\nu}$, $\nu$ from $m_{\mathrm{eff}}$"),
     ]
-    scaling.legend(handles=handles, fontsize=8, loc="lower right")
+    scaling.legend(handles=handles, fontsize=8, loc="lower left")
     scaling.set_ylim(5.0e-4, 2.0)
     slope_axes.set_xlabel(r"$r=k_L/k_S$")
     slope_axes.set_ylabel(r"$d\ln|f_{\mathrm{NL}}|/d\ln r$")
