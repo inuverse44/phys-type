@@ -603,17 +603,17 @@ fn scale_two_point_block<L, R, D: Copy, const N: usize>(
 }
 
 /// Supplies the immutable P2 background trajectory to transport systems.
-pub trait TwoFieldBackgroundProvider {
+pub trait BackgroundProvider<const N: usize> {
     /// Interpolates the background at elapsed e-fold `N`.
-    fn state_at_e_folds(&self, e_folds: f64) -> MultifieldState<2>;
+    fn state_at_e_folds(&self, e_folds: f64) -> MultifieldState<N>;
 }
 
 /// Direct two-point phase-space transport on an immutable background.
 ///
 /// The state is the covariance itself; no linear mode matrix is retained or
 /// consulted after the initial covariance has been constructed.
-pub struct TwoPointTransportSystem<'a, P, G, B> {
-    background: &'a CovariantMultifieldSystem<P, G, 2>,
+pub struct TwoPointTransportSystem<'a, P, G, B, const N: usize> {
+    background: &'a CovariantMultifieldSystem<P, G, N>,
     trajectory: &'a B,
     k: Mass,
 }
@@ -647,10 +647,10 @@ impl TwoPointTransportTolerance {
     }
 }
 
-impl<'a, P, G, B> TwoPointTransportSystem<'a, P, G, B> {
+impl<'a, P, G, B, const N: usize> TwoPointTransportSystem<'a, P, G, B, N> {
     /// Builds a direct covariance system for one comoving wavenumber.
     pub const fn new(
-        background: &'a CovariantMultifieldSystem<P, G, 2>,
+        background: &'a CovariantMultifieldSystem<P, G, N>,
         trajectory: &'a B,
         k: Mass,
     ) -> Self {
@@ -662,16 +662,16 @@ impl<'a, P, G, B> TwoPointTransportSystem<'a, P, G, B> {
     }
 }
 
-impl<P, G, B> System for TwoPointTransportSystem<'_, P, G, B>
+impl<P, G, B, const N: usize> System for TwoPointTransportSystem<'_, P, G, B, N>
 where
-    P: TwiceDifferentiableMultifieldPotential<2>,
-    G: CurvedFieldSpaceGeometry<2>,
-    B: TwoFieldBackgroundProvider,
+    P: TwiceDifferentiableMultifieldPotential<N>,
+    G: CurvedFieldSpaceGeometry<N>,
+    B: BackgroundProvider<N>,
 {
     type IndependentVariable = Dimensionless;
-    type State = TwoPointPhaseSpaceCovariance<2>;
-    type Delta = TwoPointPhaseSpaceCovariance<2>;
-    type Derivative = TwoPointPhaseSpaceCovariance<2>;
+    type State = TwoPointPhaseSpaceCovariance<N>;
+    type Delta = TwoPointPhaseSpaceCovariance<N>;
+    type Derivative = TwoPointPhaseSpaceCovariance<N>;
 
     fn derivative(&self, e_folds: Dimensionless, state: &Self::State) -> Self::Derivative {
         let background = self.trajectory.state_at_e_folds(e_folds.into_value());
@@ -683,29 +683,29 @@ where
 ///
 /// At linear order the velocity `V` and canonical momentum `Pi` obey the same
 /// equations, so the marker `S` is carried through unchanged.
-fn two_point_linear_derivative<P, G, S: PhaseSpaceSlot>(
-    system: &CovariantMultifieldSystem<P, G, 2>,
-    background: &MultifieldState<2>,
+fn two_point_linear_derivative<P, G, S: PhaseSpaceSlot, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    background: &MultifieldState<N>,
     k: Mass,
-    state: &TwoPointPhaseSpaceCovariance<2, S>,
-) -> TwoPointPhaseSpaceCovariance<2, S>
+    state: &TwoPointPhaseSpaceCovariance<N, S>,
+) -> TwoPointPhaseSpaceCovariance<N, S>
 where
-    P: TwiceDifferentiableMultifieldPotential<2>,
-    G: CurvedFieldSpaceGeometry<2>,
+    P: TwiceDifferentiableMultifieldPotential<N>,
+    G: CurvedFieldSpaceGeometry<N>,
 {
     let hubble = system.hubble(background).into_value();
     let connection = system.geometry.christoffel(&background.phi);
     let mass = system.perturbation_mass_matrix(background);
     let physical_wavenumber = (k / background.a).into_value();
-    let restoring: [[f64; 2]; 2] = core::array::from_fn(|upper| {
+    let restoring: [[f64; N]; N] = core::array::from_fn(|upper| {
         core::array::from_fn(|lower| {
             mass.components()[upper][lower].value()
                 + f64::from(upper == lower) * physical_wavenumber.powi(2)
         })
     });
-    let connection_flow: [[f64; 2]; 2] = core::array::from_fn(|upper| {
+    let connection_flow: [[f64; N]; N] = core::array::from_fn(|upper| {
         core::array::from_fn(|lower| {
-            (0..2)
+            (0..N)
                 .map(|velocity| {
                     connection.components()[upper][velocity][lower].value()
                         * background.pi[velocity].value()
@@ -717,7 +717,7 @@ where
 
     let qq = TwoPointBlock::new(core::array::from_fn(|left| {
         core::array::from_fn(|right| {
-            let connection_terms: Complex64 = (0..2)
+            let connection_terms: Complex64 = (0..N)
                 .map(|contracted| {
                     connection_flow[left][contracted]
                         * state.qq.components()[contracted][right].value()
@@ -735,7 +735,7 @@ where
     }));
     let qp = TwoPointBlock::new(core::array::from_fn(|left| {
         core::array::from_fn(|right| {
-            let (restoring_term, connection_term) = (0..2).fold(
+            let (restoring_term, connection_term) = (0..N).fold(
                 (Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)),
                 |(restoring_term, connection_term), index| {
                     (
@@ -759,7 +759,7 @@ where
     }));
     let pq = TwoPointBlock::new(core::array::from_fn(|left| {
         core::array::from_fn(|right| {
-            let (restoring_term, connection_term) = (0..2).fold(
+            let (restoring_term, connection_term) = (0..N).fold(
                 (Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)),
                 |(restoring_term, connection_term), index| {
                     (
@@ -783,7 +783,7 @@ where
     }));
     let pp = TwoPointBlock::new(core::array::from_fn(|left| {
         core::array::from_fn(|right| {
-            let (restoring_term, connection_term) = (0..2).fold(
+            let (restoring_term, connection_term) = (0..N).fold(
                 (Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)),
                 |(restoring_term, connection_term), index| {
                     (
@@ -809,11 +809,11 @@ where
     TwoPointPhaseSpaceCovariance { qq, qp, pq, pp }
 }
 
-impl<P, G, B> AdaptiveSystem for TwoPointTransportSystem<'_, P, G, B>
+impl<P, G, B, const N: usize> AdaptiveSystem for TwoPointTransportSystem<'_, P, G, B, N>
 where
-    P: TwiceDifferentiableMultifieldPotential<2>,
-    G: CurvedFieldSpaceGeometry<2>,
-    B: TwoFieldBackgroundProvider,
+    P: TwiceDifferentiableMultifieldPotential<N>,
+    G: CurvedFieldSpaceGeometry<N>,
+    B: BackgroundProvider<N>,
 {
     type AbsoluteTolerance = TwoPointTransportTolerance;
 
@@ -855,10 +855,10 @@ where
     }
 }
 
-fn covariance_block_error_ratio<L, R, D: Copy>(
-    current: &TwoPointBlock<L, R, D, Complex64, 2>,
-    next: &TwoPointBlock<L, R, D, Complex64, 2>,
-    error: &TwoPointBlock<L, R, D, Complex64, 2>,
+fn covariance_block_error_ratio<L, R, D: Copy, const N: usize>(
+    current: &TwoPointBlock<L, R, D, Complex64, N>,
+    next: &TwoPointBlock<L, R, D, Complex64, N>,
+    error: &TwoPointBlock<L, R, D, Complex64, N>,
     absolute: Quantity<D, f64>,
     relative: f64,
 ) -> f64 {
@@ -897,27 +897,27 @@ fn covariance_block_error_ratio<L, R, D: Copy>(
 ///
 /// The supplied system computes `H` from the same state, preventing a mode
 /// matrix from being paired with a Hubble value from a different epoch.
-pub fn two_point_covariance_from_mode_state<P, G>(
-    system: &CovariantMultifieldSystem<P, G, 2>,
-    state: &PerturbationState<2>,
-) -> TwoPointPhaseSpaceCovariance<2>
+pub fn two_point_covariance_from_mode_state<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    state: &PerturbationState<N>,
+) -> TwoPointPhaseSpaceCovariance<N>
 where
-    P: TwiceDifferentiableMultifieldPotential<2>,
-    G: CurvedFieldSpaceGeometry<2>,
+    P: TwiceDifferentiableMultifieldPotential<N>,
+    G: CurvedFieldSpaceGeometry<N>,
 {
     let hubble = system.hubble(&state.background);
     phase_space_covariance(&state.modes, state.background.a.into_value(), hubble)
 }
 
-fn phase_space_covariance(
-    modes: &crate::Modes<2>,
+fn phase_space_covariance<const N: usize>(
+    modes: &crate::Modes<N>,
     scale_factor: f64,
     hubble: Hubble,
-) -> TwoPointPhaseSpaceCovariance<2> {
-    let q: [[ModeAmplitude; 2]; 2] = modes
+) -> TwoPointPhaseSpaceCovariance<N> {
+    let q: [[ModeAmplitude; N]; N] = modes
         .rescaled_amplitude
         .map(|row| row.map(|entry| entry / scale_factor));
-    let p: [[ModeVelocity; 2]; 2] = core::array::from_fn(|field| {
+    let p: [[ModeVelocity; N]; N] = core::array::from_fn(|field| {
         core::array::from_fn(|mode| {
             ModeVelocity::new(
                 (modes.rescaled_velocity[field][mode]
@@ -930,28 +930,28 @@ fn phase_space_covariance(
 
     let qq = TwoPointBlock::new(core::array::from_fn(|left| {
         core::array::from_fn(|right| {
-            (0..2).fold(Quantity::new(Complex64::new(0.0, 0.0)), |sum, mode| {
+            (0..N).fold(Quantity::new(Complex64::new(0.0, 0.0)), |sum, mode| {
                 sum + q[left][mode] * ModeAmplitude::new(q[right][mode].value().conj())
             })
         })
     }));
     let qp = TwoPointBlock::new(core::array::from_fn(|left| {
         core::array::from_fn(|right| {
-            (0..2).fold(Quantity::new(Complex64::new(0.0, 0.0)), |sum, mode| {
+            (0..N).fold(Quantity::new(Complex64::new(0.0, 0.0)), |sum, mode| {
                 sum + q[left][mode] * ModeVelocity::new(p[right][mode].value().conj())
             })
         })
     }));
     let pq = TwoPointBlock::new(core::array::from_fn(|left| {
         core::array::from_fn(|right| {
-            (0..2).fold(Quantity::new(Complex64::new(0.0, 0.0)), |sum, mode| {
+            (0..N).fold(Quantity::new(Complex64::new(0.0, 0.0)), |sum, mode| {
                 sum + p[left][mode] * ModeAmplitude::new(q[right][mode].value().conj())
             })
         })
     }));
     let pp = TwoPointBlock::new(core::array::from_fn(|left| {
         core::array::from_fn(|right| {
-            (0..2).fold(Quantity::new(Complex64::new(0.0, 0.0)), |sum, mode| {
+            (0..N).fold(Quantity::new(Complex64::new(0.0, 0.0)), |sum, mode| {
                 sum + p[left][mode] * ModeVelocity::new(p[right][mode].value().conj())
             })
         })
@@ -2577,9 +2577,9 @@ pub struct BackgroundNeighborhood<const N: usize> {
     pub e_fold_step: f64,
 }
 
-impl BackgroundNeighborhood<2> {
+impl<const N: usize> BackgroundNeighborhood<N> {
     /// Samples an immutable two-field trajectory around `e_folds`.
-    pub fn from_trajectory<B: TwoFieldBackgroundProvider>(
+    pub fn from_trajectory<B: BackgroundProvider<N>>(
         trajectory: &B,
         e_folds: f64,
         e_fold_step: f64,
@@ -2937,16 +2937,16 @@ fn zero_real_three_point_block<A, B, C, D: Copy, const N: usize>()
 /// Fourier legs. It intentionally omits the quadratic `u^a_bc Sigma Sigma`
 /// source; that source is the next P3d layer and cannot be confused with this
 /// homogeneous propagation in the public type name.
-pub struct ThreePointHomogeneousTransportSystem<'a, P, G, B> {
-    background: &'a CovariantMultifieldSystem<P, G, 2>,
+pub struct ThreePointHomogeneousTransportSystem<'a, P, G, B, const N: usize> {
+    background: &'a CovariantMultifieldSystem<P, G, N>,
     trajectory: &'a B,
     triangle: MomentumTriangle,
 }
 
-impl<'a, P, G, B> ThreePointHomogeneousTransportSystem<'a, P, G, B> {
+impl<'a, P, G, B, const N: usize> ThreePointHomogeneousTransportSystem<'a, P, G, B, N> {
     /// Builds a system whose state legs use the triangle's canonical order.
     pub const fn new(
-        background: &'a CovariantMultifieldSystem<P, G, 2>,
+        background: &'a CovariantMultifieldSystem<P, G, N>,
         trajectory: &'a B,
         triangle: MomentumTriangle,
     ) -> Self {
@@ -2963,16 +2963,16 @@ impl<'a, P, G, B> ThreePointHomogeneousTransportSystem<'a, P, G, B> {
     }
 }
 
-impl<P, G, B> System for ThreePointHomogeneousTransportSystem<'_, P, G, B>
+impl<P, G, B, const N: usize> System for ThreePointHomogeneousTransportSystem<'_, P, G, B, N>
 where
-    P: TwiceDifferentiableMultifieldPotential<2>,
-    G: CurvedFieldSpaceGeometry<2>,
-    B: TwoFieldBackgroundProvider,
+    P: TwiceDifferentiableMultifieldPotential<N>,
+    G: CurvedFieldSpaceGeometry<N>,
+    B: BackgroundProvider<N>,
 {
     type IndependentVariable = Dimensionless;
-    type State = ThreePointPhaseSpaceCorrelation<2>;
-    type Delta = ThreePointPhaseSpaceCorrelation<2>;
-    type Derivative = ThreePointPhaseSpaceCorrelation<2>;
+    type State = ThreePointPhaseSpaceCorrelation<N>;
+    type Delta = ThreePointPhaseSpaceCorrelation<N>;
+    type Derivative = ThreePointPhaseSpaceCorrelation<N>;
 
     fn derivative(&self, e_folds: Dimensionless, state: &Self::State) -> Self::Derivative {
         let background = self.trajectory.state_at_e_folds(e_folds.into_value());
@@ -2981,10 +2981,10 @@ where
     }
 }
 
-fn homogeneous_three_point_derivative<S: PhaseSpaceSlot>(
-    state: &ThreePointPhaseSpaceCorrelation<2, S>,
-    flows: &[LinearPhaseSpaceFlow; 3],
-) -> ThreePointPhaseSpaceCorrelation<2, S> {
+fn homogeneous_three_point_derivative<S: PhaseSpaceSlot, const N: usize>(
+    state: &ThreePointPhaseSpaceCorrelation<N, S>,
+    flows: &[LinearPhaseSpaceFlow<N>; 3],
+) -> ThreePointPhaseSpaceCorrelation<N, S> {
     ThreePointPhaseSpaceCorrelation {
         qqq: homogeneous_three_point_block(state, [PhaseSpaceSlotKind::Field; 3], flows),
         qqp: homogeneous_three_point_block(
@@ -3053,14 +3053,14 @@ fn homogeneous_three_point_derivative<S: PhaseSpaceSlot>(
 /// on the same background. Entry `r` of `covariances` belongs to canonical leg
 /// `r` of the triangle.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct CanonicalThreePointTransportState {
+pub struct CanonicalThreePointTransportState<const N: usize> {
     /// Canonical two-point covariances of legs one, two, and three.
-    pub covariances: [CanonicalTwoPointPhaseSpaceCovariance<2>; 3],
+    pub covariances: [CanonicalTwoPointPhaseSpaceCovariance<N>; 3],
     /// Connected canonical three-point function.
-    pub alpha: CanonicalThreePointPhaseSpaceCorrelation<2>,
+    pub alpha: CanonicalThreePointPhaseSpaceCorrelation<N>,
 }
 
-impl Add for CanonicalThreePointTransportState {
+impl<const N: usize> Add for CanonicalThreePointTransportState<N> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -3075,7 +3075,7 @@ impl Add for CanonicalThreePointTransportState {
     }
 }
 
-impl Mul<f64> for CanonicalThreePointTransportState {
+impl<const N: usize> Mul<f64> for CanonicalThreePointTransportState<N> {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self::Output {
@@ -3086,7 +3086,7 @@ impl Mul<f64> for CanonicalThreePointTransportState {
     }
 }
 
-impl Mul<Dimensionless> for CanonicalThreePointTransportState {
+impl<const N: usize> Mul<Dimensionless> for CanonicalThreePointTransportState<N> {
     type Output = Self;
 
     fn mul(self, rhs: Dimensionless) -> Self::Output {
@@ -3147,16 +3147,16 @@ impl CanonicalThreePointTransportTolerance {
 /// The derivative panics if the background supplies a non-positive or
 /// non-finite Hubble rate, scale factor, or reduced Planck mass, because the
 /// cubic vertices are undefined there.
-pub struct CanonicalThreePointTransportSystem<'a, P, G, B> {
-    background: &'a CovariantMultifieldSystem<P, G, 2>,
+pub struct CanonicalThreePointTransportSystem<'a, P, G, B, const N: usize> {
+    background: &'a CovariantMultifieldSystem<P, G, N>,
     trajectory: &'a B,
     triangle: MomentumTriangle,
 }
 
-impl<'a, P, G, B> CanonicalThreePointTransportSystem<'a, P, G, B> {
+impl<'a, P, G, B, const N: usize> CanonicalThreePointTransportSystem<'a, P, G, B, N> {
     /// Builds a system whose legs use the triangle's canonical order.
     pub const fn new(
-        background: &'a CovariantMultifieldSystem<P, G, 2>,
+        background: &'a CovariantMultifieldSystem<P, G, N>,
         trajectory: &'a B,
         triangle: MomentumTriangle,
     ) -> Self {
@@ -3173,16 +3173,16 @@ impl<'a, P, G, B> CanonicalThreePointTransportSystem<'a, P, G, B> {
     }
 }
 
-impl<P, G, B> System for CanonicalThreePointTransportSystem<'_, P, G, B>
+impl<P, G, B, const N: usize> System for CanonicalThreePointTransportSystem<'_, P, G, B, N>
 where
-    P: ThriceDifferentiableMultifieldPotential<2>,
-    G: ThirdOrderFieldSpaceGeometry<2> + CurvatureDerivativeGeometry<2>,
-    B: TwoFieldBackgroundProvider,
+    P: ThriceDifferentiableMultifieldPotential<N>,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N>,
+    B: BackgroundProvider<N>,
 {
     type IndependentVariable = Dimensionless;
-    type State = CanonicalThreePointTransportState;
-    type Delta = CanonicalThreePointTransportState;
-    type Derivative = CanonicalThreePointTransportState;
+    type State = CanonicalThreePointTransportState<N>;
+    type Delta = CanonicalThreePointTransportState<N>;
+    type Derivative = CanonicalThreePointTransportState<N>;
 
     fn derivative(&self, e_folds: Dimensionless, state: &Self::State) -> Self::Derivative {
         let background = self.trajectory.state_at_e_folds(e_folds.into_value());
@@ -3216,11 +3216,11 @@ where
     }
 }
 
-impl<P, G, B> AdaptiveSystem for CanonicalThreePointTransportSystem<'_, P, G, B>
+impl<P, G, B, const N: usize> AdaptiveSystem for CanonicalThreePointTransportSystem<'_, P, G, B, N>
 where
-    P: ThriceDifferentiableMultifieldPotential<2>,
-    G: ThirdOrderFieldSpaceGeometry<2> + CurvatureDerivativeGeometry<2>,
-    B: TwoFieldBackgroundProvider,
+    P: ThriceDifferentiableMultifieldPotential<N>,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N>,
+    B: BackgroundProvider<N>,
 {
     type AbsoluteTolerance = CanonicalThreePointTransportTolerance;
 
@@ -3324,14 +3324,14 @@ where
     }
 }
 
-fn three_point_block_error_ratio<A, B, C, D: Copy>(
-    current: &ThreePointBlock<A, B, C, D, Complex64, 2>,
-    next: &ThreePointBlock<A, B, C, D, Complex64, 2>,
-    error: &ThreePointBlock<A, B, C, D, Complex64, 2>,
+fn three_point_block_error_ratio<A, B, C, D: Copy, const N: usize>(
+    current: &ThreePointBlock<A, B, C, D, Complex64, N>,
+    next: &ThreePointBlock<A, B, C, D, Complex64, N>,
+    error: &ThreePointBlock<A, B, C, D, Complex64, N>,
     absolute: Quantity<D, f64>,
     relative: f64,
 ) -> f64 {
-    let components = |block: &ThreePointBlock<A, B, C, D, Complex64, 2>| {
+    let components = |block: &ThreePointBlock<A, B, C, D, Complex64, N>| {
         block
             .components
             .into_iter()
@@ -3367,15 +3367,15 @@ fn three_point_block_error_ratio<A, B, C, D: Copy>(
 /// solver, relabelled to the canonical basis at linear order, and `Alpha` is
 /// [`canonical_three_point_initial_condition`]. Every canonical leg must
 /// satisfy `k_r/(aH) >= minimum_k_over_ah`.
-pub fn canonical_three_point_transport_initial_state<P, G>(
-    system: &CovariantMultifieldSystem<P, G, 2>,
-    neighborhood: &BackgroundNeighborhood<2>,
+pub fn canonical_three_point_transport_initial_state<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    neighborhood: &BackgroundNeighborhood<N>,
     triangle: MomentumTriangle,
     minimum_k_over_ah: f64,
-) -> Result<CanonicalThreePointTransportState, ThreePointInitialConditionError>
+) -> Result<CanonicalThreePointTransportState<N>, ThreePointInitialConditionError>
 where
-    P: ThriceDifferentiableMultifieldPotential<2> + Copy,
-    G: ThirdOrderFieldSpaceGeometry<2> + CurvatureDerivativeGeometry<2> + Copy,
+    P: ThriceDifferentiableMultifieldPotential<N> + Copy,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N> + Copy,
 {
     let alpha =
         canonical_three_point_initial_condition(system, neighborhood, triangle, minimum_k_over_ah)?;
@@ -3402,15 +3402,15 @@ where
 ///
 /// The vertices are evaluated on `background`, which must be the slice on
 /// which `state` was evaluated.
-pub fn velocity_three_point_from_transport_state<P, G>(
-    system: &CovariantMultifieldSystem<P, G, 2>,
-    background: &MultifieldState<2>,
+pub fn velocity_three_point_from_transport_state<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    background: &MultifieldState<N>,
     triangle: MomentumTriangle,
-    state: &CanonicalThreePointTransportState,
-) -> Result<ThreePointPhaseSpaceCorrelation<2>, CubicCoefficientError>
+    state: &CanonicalThreePointTransportState<N>,
+) -> Result<ThreePointPhaseSpaceCorrelation<N>, CubicCoefficientError>
 where
-    P: ThriceDifferentiableMultifieldPotential<2>,
-    G: ThirdOrderFieldSpaceGeometry<2> + CurvatureDerivativeGeometry<2>,
+    P: ThriceDifferentiableMultifieldPotential<N>,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N>,
 {
     let vertices = canonical_cubic_hamiltonian_vertices(system, background, triangle)?;
     Ok(velocity_three_point_from_canonical_tree(
@@ -3425,21 +3425,21 @@ where
 }
 
 /// Linear phase-space flow of each Fourier leg in elapsed e-folds.
-fn linear_phase_space_flows<P, G>(
-    system: &CovariantMultifieldSystem<P, G, 2>,
-    background: &MultifieldState<2>,
+fn linear_phase_space_flows<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    background: &MultifieldState<N>,
     wavenumbers: [Mass; 3],
-) -> [LinearPhaseSpaceFlow; 3]
+) -> [LinearPhaseSpaceFlow<N>; 3]
 where
-    P: TwiceDifferentiableMultifieldPotential<2>,
-    G: CurvedFieldSpaceGeometry<2>,
+    P: TwiceDifferentiableMultifieldPotential<N>,
+    G: CurvedFieldSpaceGeometry<N>,
 {
     let hubble = system.hubble(background).into_value();
     let connection = system.geometry.christoffel(&background.phi);
     let mass = system.perturbation_mass_matrix(background);
-    let connection_flow: [[f64; 2]; 2] = core::array::from_fn(|upper| {
+    let connection_flow: [[f64; N]; N] = core::array::from_fn(|upper| {
         core::array::from_fn(|lower| {
-            (0..2)
+            (0..N)
                 .map(|velocity| {
                     connection.components()[upper][velocity][lower].value()
                         * background.pi[velocity].value()
@@ -3474,14 +3474,14 @@ where
 }
 
 #[derive(Clone, Copy)]
-struct LinearPhaseSpaceFlow {
-    qq: [[f64; 2]; 2],
-    qp: [[f64; 2]; 2],
-    pq: [[f64; 2]; 2],
-    pp: [[f64; 2]; 2],
+struct LinearPhaseSpaceFlow<const N: usize> {
+    qq: [[f64; N]; N],
+    qp: [[f64; N]; N],
+    pq: [[f64; N]; N],
+    pp: [[f64; N]; N],
 }
 
-impl LinearPhaseSpaceFlow {
+impl<const N: usize> LinearPhaseSpaceFlow<N> {
     fn component(
         self,
         output: PhaseSpaceSlotKind,
@@ -3498,11 +3498,11 @@ impl LinearPhaseSpaceFlow {
     }
 }
 
-fn homogeneous_three_point_block<A, B, C, D, S: PhaseSpaceSlot>(
-    state: &ThreePointPhaseSpaceCorrelation<2, S>,
+fn homogeneous_three_point_block<A, B, C, D, S: PhaseSpaceSlot, const N: usize>(
+    state: &ThreePointPhaseSpaceCorrelation<N, S>,
     output_slots: [PhaseSpaceSlotKind; 3],
-    flows: &[LinearPhaseSpaceFlow; 3],
-) -> ThreePointBlock<A, B, C, D, Complex64, 2> {
+    flows: &[LinearPhaseSpaceFlow<N>; 3],
+) -> ThreePointBlock<A, B, C, D, Complex64, N> {
     ThreePointBlock::new(core::array::from_fn(|first| {
         core::array::from_fn(|second| {
             core::array::from_fn(|third| {
@@ -3512,7 +3512,7 @@ fn homogeneous_three_point_block<A, B, C, D, S: PhaseSpaceSlot>(
                         [PhaseSpaceSlotKind::Field, PhaseSpaceSlotKind::Momentum]
                             .into_iter()
                             .flat_map(move |input_slot| {
-                                (0..2).map(move |input_index| (leg, input_slot, input_index))
+                                (0..N).map(move |input_index| (leg, input_slot, input_index))
                             })
                     })
                     .map(|(leg, input_slot, input_index)| {
@@ -3546,7 +3546,7 @@ mod tests {
     #[derive(Clone, Copy)]
     struct FixedTrajectory(MultifieldState<2>);
 
-    impl TwoFieldBackgroundProvider for FixedTrajectory {
+    impl BackgroundProvider<2> for FixedTrajectory {
         fn state_at_e_folds(&self, _e_folds: f64) -> MultifieldState<2> {
             self.0
         }
@@ -5543,6 +5543,128 @@ mod tests {
                 leg: FourierLeg::Two,
                 ..
             })
+        ));
+    }
+    /// A curved, non-diagonal three-field metric for the N-field checks.
+    #[derive(Clone, Copy, Debug)]
+    struct CurvedThreeField;
+
+    impl crate::MetricJet<3> for CurvedThreeField {
+        fn metric_jet(&self, position: &[Field; 3]) -> [[crate::ThirdOrderJet<3>; 3]; 3] {
+            use crate::{ThirdOrderJet, Transcendental};
+            let [x, y, z]: [ThirdOrderJet<3>; 3] =
+                core::array::from_fn(|i| ThirdOrderJet::variable(position[i].into_value(), i));
+            let one = ThirdOrderJet::constant(1.0);
+            let a = one + x * x * 0.01;
+            let b = (y * 0.05).exp();
+            let c = one + z * z * 0.02;
+            let ab = (x * y * 0.001).tanh();
+            let ac = z * 0.01;
+            let bc = one * 0.0;
+            [[a, ab, ac], [ab, b, bc], [ac, bc, c]]
+        }
+    }
+
+    /// The two-point transport right-hand side equals the e-fold derivative
+    /// of the covariance built from evolving modes, for three fields.
+    fn assert_transport_matches_mode_evolution<P, G>(system: CovariantMultifieldSystem<P, G, 3>)
+    where
+        P: TwiceDifferentiableMultifieldPotential<3> + Clone,
+        G: CurvedFieldSpaceGeometry<3> + Clone,
+    {
+        let resting = MultifieldState::new(
+            [Field::new(10.0), Field::new(7.0), Field::new(4.0)],
+            [FieldVelocity::new(0.0); 3],
+            ScaleFactor::new(1.0),
+        );
+        let slow_roll = system.slow_roll_velocity(&resting);
+        let background = MultifieldState {
+            pi: core::array::from_fn(|i| {
+                FieldVelocity::new(slow_roll[i].into_value() * (1.0 + 0.2 * i as f64))
+            }),
+            ..resting
+        };
+        let k = Mass::new(2.0e-5);
+        let modes = PerturbationSystem::new(system.clone(), k);
+        let state = modes.bunch_davies_state(background, 1.5).unwrap();
+        let step = 50.0;
+        let advance =
+            |dt: f64| crate::rk4_step(&modes, crate::Time::new(0.0), &state, crate::Time::new(dt));
+        let covariance =
+            |s: &PerturbationState<3>| two_point_covariance_from_mode_state(&system, s);
+        let (plus, minus) = (covariance(&advance(step)), covariance(&advance(-step)));
+        let hubble = system.hubble(&background).into_value();
+        let transport = two_point_linear_derivative(&system, &background, k, &covariance(&state));
+        let numerical = (plus + minus * -1.0) * (1.0 / (2.0 * step * hubble));
+        let difference = transport + numerical * -1.0;
+        // The blocks carry different dimensions; compare each against its own
+        // largest entry.
+        for (label, a, b) in [
+            (
+                "qq",
+                difference
+                    .qq
+                    .components()
+                    .map(|r| r.map(|e| e.value().norm())),
+                transport
+                    .qq
+                    .components()
+                    .map(|r| r.map(|e| e.value().norm())),
+            ),
+            (
+                "qp",
+                difference
+                    .qp
+                    .components()
+                    .map(|r| r.map(|e| e.value().norm())),
+                transport
+                    .qp
+                    .components()
+                    .map(|r| r.map(|e| e.value().norm())),
+            ),
+            (
+                "pq",
+                difference
+                    .pq
+                    .components()
+                    .map(|r| r.map(|e| e.value().norm())),
+                transport
+                    .pq
+                    .components()
+                    .map(|r| r.map(|e| e.value().norm())),
+            ),
+            (
+                "pp",
+                difference
+                    .pp
+                    .components()
+                    .map(|r| r.map(|e| e.value().norm())),
+                transport
+                    .pp
+                    .components()
+                    .map(|r| r.map(|e| e.value().norm())),
+            ),
+        ] {
+            let largest = b.iter().flatten().fold(0.0_f64, |m, &v| m.max(v));
+            let error = a.iter().flatten().fold(0.0_f64, |m, &v| m.max(v));
+            assert!(error < 1.0e-5 * largest, "{label}: {error} vs {largest}");
+        }
+    }
+
+    #[test]
+    fn three_field_two_point_transport_matches_mode_evolution() {
+        let potential = QuadraticMultifieldPotential::new([
+            Mass::new(1.0e-6),
+            Mass::new(2.3e-6),
+            Mass::new(4.1e-6),
+        ]);
+        assert_transport_matches_mode_evolution(CovariantMultifieldSystem::in_planck_units(
+            potential,
+            FlatFieldSpace,
+        ));
+        assert_transport_matches_mode_evolution(CovariantMultifieldSystem::in_planck_units(
+            potential,
+            crate::JetGeometry(CurvedThreeField),
         ));
     }
 }

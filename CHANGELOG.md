@@ -40,6 +40,11 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The two- and three-point transport and the curvature projection take any
+  number of fields: `TwoPointTransportSystem`, the three-point transport
+  systems, and `CanonicalThreePointTransportState` gain `const N`,
+  `TwoFieldBackgroundProvider` becomes `BackgroundProvider<N>`, and
+  `curvature_correlators` is generic over `N`.
 - Two-field names lose "TwoField" in one break: `TwoFieldModes` becomes
   `Modes<2>`, `TwoFieldPerturbationState` becomes `PerturbationState<2>`,
   `ConformalTwoFieldPerturbationSystem<P, G>` becomes
