@@ -117,6 +117,17 @@ Its reference figure is tracked as
 [`docs/figures/constant_turn_spectra.png`](docs/figures/constant_turn_spectra.png)
 with a vector [`PDF`](docs/figures/constant_turn_spectra.pdf); see
 [`docs/constant-turn-exact-solutions.md`](docs/constant-turn-exact-solutions.md).
+The squeezed bispectrum on the same orbit, against the scaling
+`f_NL ~ r^(3/2 - nu)` of arXiv:2607.14529, takes about nine minutes:
+
+```sh
+cargo run --release --example constant_turn_squeezed
+uv run plots/constant_turn_squeezed.py diagnostics
+```
+
+Its reference figure is
+[`docs/figures/constant_turn_squeezed.png`](docs/figures/constant_turn_squeezed.png)
+([`PDF`](docs/figures/constant_turn_squeezed.pdf)).
 
 The nonminimally assisted inflation examples of arXiv:2302.05866 (loop,
 power-law, and hybrid inflatons; one subclass of nonminimal inflation) take
@@ -151,6 +162,7 @@ uv run plots/final_spectra.py diagnostics/two_field_spectra.csv
 uv run plots/pivot_mode_evolution.py diagnostics
 uv run plots/constant_turn.py diagnostics
 uv run plots/assisted_inflation.py diagnostics
+uv run plots/constant_turn_squeezed.py diagnostics
 ```
 
 The plotting scripts declare their own Python dependencies, so `uv` creates an

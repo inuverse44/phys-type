@@ -58,9 +58,10 @@ are outside that scope; see [`curvature-projection.md`](curvature-projection.md)
 
 ### Next-session handoff
 
-The implementation boundary is the branch `feat/constant-turn-exact-solutions`,
-based on merge commit `907bf4f` (PR #33). The validated state is 221 unit
-tests plus 24 compile-fail cases, with fifteen expensive ignored tests that
+The implementation boundary is the branch
+`feat/constant-turn-squeezed-bispectrum`, based on merge commit `3ce6975`
+(PR #36). The validated state is 221 unit
+tests plus 24 compile-fail cases, with sixteen expensive ignored tests that
 pass in release mode (`cargo test --release -- --ignored`; they are not run by
 CI). Clippy with warnings denied, rustfmt, and rustdoc pass locally.
 
@@ -102,12 +103,18 @@ The first external model validation after P3 is complete; see
    is the counterpart of Figs. 9–10, 13–14, and 17–18 of arXiv:2302.05866,
    and exposed a swapped label in its Fig. 17 (entry 11).
 
+8. The squeezed three-point transport on the constant-turn orbit follows
+   $f_{\mathrm{NL}}\propto r^{3/2-\nu}$ with $\nu$ set by $\mu$, not $m_{\mathrm{eff}}$, as
+   arXiv:2607.14529 states (figure
+   [`figures/constant_turn_squeezed.png`](figures/constant_turn_squeezed.png)).
+
 The plan from here, one pull request per step:
 
-1. compare the three-point transport with the squeezed-limit bispectra of
-   the companion article arXiv:2607.14529, after deriving the coefficients
-   $\alpha$, $\beta$, and $\gamma$ of its cubic action for the constant-turn orbit,
-   with a figure of the squeezed shape;
+1. compare bispectrum amplitudes with arXiv:2607.14529: the decoupling-limit
+   cubic action of the orbit in the paper's variables (it includes a
+   $\sigma(\nabla\varphi)^2$ coupling outside the paper's basis), an independent
+   in-in evaluation, and the transport, in the equilateral and squeezed
+   limits; then heavy-field oscillations;
 2. then the next P3 extension below, such as general nonminimal inflation,
    reheating, or dynamically sized field spaces.
 

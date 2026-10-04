@@ -17,41 +17,16 @@
 
 use std::fs;
 use std::io::{self, Write};
-use std::ops::{Add, Mul};
 use std::path::Path;
-use std::process::Command;
 
-use phys_type::{
-    CovariantMultifieldSystem, EndOfInflation, EnergyDensity, Field, FieldVelocity,
-    MultifieldPotentialValue, MultifieldState, PolarFieldSpace, Quantity, ScaleFactor,
-    SpectrumRunSettings,
-};
+use phys_type::SpectrumRunSettings;
 
-const HUBBLE: f64 = 1.0e-5;
+#[path = "shared/constant_turn.rs"]
+mod constant_turn;
+
+use constant_turn::{HUBBLE, radius, revision};
+
 const BEFORE_EXIT: f64 = 6.0;
-
-#[derive(Clone, Copy, Debug)]
-struct ConstantTurnPotential {
-    v0: f64,
-    slope: f64,
-    mass_squared: f64,
-    rho0: f64,
-}
-
-impl<V> MultifieldPotentialValue<V, 2> for ConstantTurnPotential
-where
-    V: From<f64> + Clone + Add<V, Output = V> + Mul<V, Output = V> + Mul<f64, Output = V>,
-{
-    fn value(&self, fields: [Field<V>; 2]) -> EnergyDensity<V> {
-        let [rho, theta] = fields.map(Quantity::into_value);
-        let radial = rho + V::from(-self.rho0);
-        EnergyDensity::new(
-            V::from(self.v0)
-                + theta * (-self.slope)
-                + radial.clone() * radial * (0.5 * self.mass_squared),
-        )
-    }
-}
 
 /// One orbit: measured `lambda`, `mu^2 / H^2`, `P_zeta / Delta_0`, and `z`
 /// at the output.
@@ -64,38 +39,13 @@ struct Orbit {
 }
 
 fn orbit(lambda: f64, mu_squared: f64, radius: f64, after_exit: f64) -> Orbit {
-    let omega = 0.5 * lambda * HUBBLE;
-    let mass_squared = (mu_squared - 0.75 * lambda * lambda) * HUBBLE * HUBBLE;
-    // Radial balance m^2 (rho - rho_0) = rho Omega^2 and the angular
-    // slow-roll attractor c = 3 H rho^2 Omega.
-    let potential = ConstantTurnPotential {
-        v0: 3.0 * HUBBLE * HUBBLE,
-        slope: 3.0 * HUBBLE * radius * radius * omega,
-        mass_squared,
-        rho0: radius - radius * omega * omega / mass_squared,
-    };
-    let system = CovariantMultifieldSystem::in_planck_units(potential, PolarFieldSpace);
-    let pivot_before_end = after_exit + 1.0;
-    let total = pivot_before_end + BEFORE_EXIT + 8.0;
+    let (system, initial, settings) =
+        constant_turn::orbit(lambda, mu_squared, radius, after_exit, BEFORE_EXIT + 8.0);
     let settings = SpectrumRunSettings {
-        end_of_inflation: EndOfInflation::FieldValue {
-            field: 1,
-            value: Field::new(omega / HUBBLE * total),
-        },
         e_folds_before_exit: BEFORE_EXIT,
-        pivot_e_folds_before_end: pivot_before_end,
-        output_e_folds_before_end: 1.0,
-        k_min_over_pivot: 1.0,
-        k_max_over_pivot: 1.0,
-        k_count: 1,
-        background_sample_every: 1,
-        ..SpectrumRunSettings::default()
+        ..settings
     };
-    let initial = MultifieldState::new(
-        [Field::new(radius), Field::new(0.0)],
-        [FieldVelocity::new(0.0), FieldVelocity::new(omega)],
-        ScaleFactor::new(1.0),
-    );
+    let mass_squared = constant_turn::radial_mass_squared(lambda, mu_squared);
     let run = system
         .run_two_field_spectra(initial, &settings)
         .unwrap_or_else(|error| {
@@ -117,7 +67,7 @@ fn orbit(lambda: f64, mu_squared: f64, radius: f64, after_exit: f64) -> Orbit {
     let spectrum = run.spectra[0];
     Orbit {
         lambda: 2.0 * exit.eta_perp.abs(),
-        mu_squared: mass_squared / (h * h) + 3.0 * exit.eta_perp * exit.eta_perp,
+        mu_squared: mass_squared * (HUBBLE / h).powi(2) + 3.0 * exit.eta_perp * exit.eta_perp,
         ratio: spectrum.p_r / delta_0,
         z_end: spectrum.k_over_ah,
     }
@@ -133,32 +83,6 @@ fn calibrated_orbit(lambda: f64, mu_squared: f64, radius: f64, after_exit: f64) 
         result = orbit(lambda_in, mu_squared_in, radius, after_exit);
     }
     result
-}
-
-/// `epsilon = rho^2 lambda^2 / 8` fixes the orbit radius.
-fn radius(lambda: f64, epsilon: f64) -> f64 {
-    (8.0 * epsilon).sqrt() / lambda
-}
-
-fn revision() -> Option<String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .ok()?;
-    let revision = output
-        .status
-        .success()
-        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())?;
-    let status = Command::new("git")
-        .args(["status", "--porcelain", "--untracked-files=no"])
-        .output()
-        .ok()?;
-    let dirty = status.status.success() && !status.stdout.is_empty();
-    Some(if dirty {
-        format!("{revision}-dirty")
-    } else {
-        revision
-    })
 }
 
 fn header(file: &mut fs::File, entropy_field: &str) -> io::Result<()> {

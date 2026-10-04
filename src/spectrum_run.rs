@@ -5251,4 +5251,84 @@ mod tests {
             assert!(printed / run.ratio - 1.0 > 0.2, "lambda {lambda}");
         }
     }
+
+    /// Squeezed `f_NL` on the constant-turn orbit for isosceles triangles
+    /// `k_1 = k_2 = k_pivot`, `k_3 = r k_pivot`.
+    fn constant_turn_squeezed_f_nl(
+        lambda: f64,
+        mu_squared: f64,
+        after_exit: f64,
+        ratios: &[f64],
+    ) -> Vec<f64> {
+        let hubble = 1.0e-5;
+        let radius = (8.0e-5_f64).sqrt() / lambda;
+        let omega = 0.5 * lambda * hubble;
+        let mass_squared = (mu_squared - 0.75 * lambda * lambda) * hubble * hubble;
+        let potential = ConstantTurnPotential {
+            v0: 3.0 * hubble * hubble,
+            slope: 3.0 * hubble * radius * radius * omega,
+            mass_squared,
+            rho0: radius - radius * omega * omega / mass_squared,
+        };
+        let system = CovariantMultifieldSystem::in_planck_units(potential, crate::PolarFieldSpace);
+        let pivot_before_end = after_exit + 1.0;
+        let total = pivot_before_end + 16.0;
+        let settings = crate::BispectrumRunSettings {
+            background: SpectrumRunSettings {
+                end_of_inflation: EndOfInflation::FieldValue {
+                    field: 1,
+                    value: Field::new(omega / hubble * total),
+                },
+                pivot_e_folds_before_end: pivot_before_end,
+                output_e_folds_before_end: 1.0,
+                k_min_over_pivot: 1.0,
+                k_max_over_pivot: 1.0,
+                k_count: 1,
+                ..SpectrumRunSettings::default()
+            },
+            ..crate::BispectrumRunSettings::default()
+        };
+        let initial = MultifieldState::new(
+            [Field::new(radius), Field::new(0.0)],
+            [FieldVelocity::new(0.0), FieldVelocity::new(omega)],
+            ScaleFactor::new(1.0),
+        );
+        let shapes: Vec<crate::TriangleShape> = ratios
+            .iter()
+            .map(|&r| crate::TriangleShape {
+                k_t_over_pivot: 2.0 + r,
+                alpha: 0.0,
+                beta: (2.0 - r) / (2.0 + r),
+            })
+            .collect();
+        system
+            .run_bispectrum(initial, &settings, &shapes)
+            .unwrap()
+            .records
+            .iter()
+            .map(|record| record.f_nl)
+            .collect()
+    }
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn constant_turn_squeezed_bispectrum_scales_with_mu_not_the_effective_mass() {
+        // arXiv:2607.14529: the leading squeezed shape is r^(1/2 - nu), so the
+        // reduced f_NL scales as r^(3/2 - nu) with nu = sqrt(9/4 - mu^2/H^2),
+        // not with the effective mass m_eff^2 = mu^2 - lambda^2 H^2.
+        for (lambda, mu_squared, after_exit) in
+            [(1.0, 1.25, 20.0), (2.0, 1.25, 20.0), (2.0, 0.81, 30.0)]
+        {
+            let f_nl = constant_turn_squeezed_f_nl(lambda, mu_squared, after_exit, &[0.03, 0.01]);
+            let slope = (f_nl[0] / f_nl[1]).ln() / 3.0_f64.ln();
+            let exponent = |m2: f64| 1.5 - (2.25 - m2).sqrt();
+            let predicted = exponent(mu_squared);
+            let effective = exponent(mu_squared - lambda * lambda);
+            assert!(
+                (slope - predicted).abs() < 0.03,
+                "lambda {lambda}, mu^2 {mu_squared}: slope {slope} vs {predicted}"
+            );
+            assert!((slope - effective).abs() > 0.3, "{slope} vs {effective}");
+        }
+    }
 }
