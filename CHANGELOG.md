@@ -8,6 +8,11 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `CovariantMultifieldSystem::tensor_spectrum`: the tensor power spectrum of
+  one wavenumber, evolved from the Bunch-Davies vacuum on a surveyed
+  trajectory. It reproduces the second-order slow-roll `P_t` and the
+  consistency relation `r = 16 epsilon_1 (1 + C epsilon_2)` in single-field
+  quadratic inflation.
 - The mode solver for any number of fields: `PerturbationSystem<P, G, N>`,
   `ConformalPerturbationSystem<P, G, N>`, `Modes<N>`, `PerturbationState<N>`,
   and their tolerances, with a Bunch-Davies frame built by Gram-Schmidt from

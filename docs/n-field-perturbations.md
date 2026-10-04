@@ -140,7 +140,7 @@ $10^{-12}$ at every step.
 | --- | --- |
 | 5a | kinematics for any $N$ (decision 3): `Kinematics<N>` with tangent, entropy projector, and turn vector; the oriented two-field basis becomes `oriented_kinematics` |
 | 5b | the mode solver and projections for any $N$ (decisions 1, 2, 4): `PerturbationSystem<P, G, N>`, `ConformalPerturbationSystem<P, G, N>`, `Modes<N>`, a Bunch–Davies frame from Gram–Schmidt (the two-field normal for $N=2$, so the two-field numbers are unchanged bit for bit), and `invariant_spectra`; checked against the oriented two-field projection, rotation invariance for $N=3$, and a one-field run against two fields with a decoupled spectator. The analytic single-field checks need the run API and move to 5e |
-| 5c | tensor modes and $r$ (decision 5) |
+| 5c | tensor modes and $r$ (decision 5): `CovariantMultifieldSystem::tensor_spectrum`, evolved on the surveyed trajectory with the scalar integrator; single-field quadratic inflation reproduces $\mathcal P_t=(2H_*^2/\pi^2)[1-2(C+1)\epsilon_1]$ and $r=16\epsilon_1(1+C\epsilon_2)$ (Stewart–Lyth, $C=-2+\ln2+\gamma_E$) to $2\epsilon_1^2$; the vacuum must start well inside the horizon (two e-folds before exit leaves a 1.3% error, six leave $4\times10^{-4}$). $r$ enters the records in 5e |
 | 5d | two- and three-point transport for any $N$: `BackgroundNeighborhood<N>`, the transport systems and states, `curvature_correlators` |
 | 5e | the run APIs (`survey`, `run_spectra`, `mode_spectrum`, `run_bispectrum`, `three_point_state`), the record types, and the CSV writers for any $N$ |
 | 5f | Higgs inflation in `phys-type-models` (metric and Palatini) with its reproduction figure; the $N=3$ validations |

@@ -1021,6 +1021,10 @@ struct InterpolatedModeSystem<'a, P, G> {
     background: &'a CovariantMultifieldSystem<P, G, 2>,
     trajectory: &'a BackgroundTrajectory,
     k: Mass,
+    /// Evolve a tensor polarization instead of the scalar modes: the
+    /// equation of a massless field in flat field space, so the mass
+    /// matrix and the connection terms drop out. Only entry `[0][0]` is used.
+    tensor: bool,
 }
 
 impl<P, G> System for InterpolatedModeSystem<'_, P, G>
@@ -1039,6 +1043,8 @@ where
         let hubble = self.background.hubble(&background);
         let connection = self.background.geometry.christoffel(&background.phi);
         let mass = self.background.perturbation_mass_matrix(&background);
+        // Tensor modes: no mass matrix and no field-space connection.
+        let coupling = if self.tensor { 0.0 } else { 1.0 };
         let conformal_field_velocity = background.pi.map(|entry| entry * scale_factor);
         let scale_factor_squared = scale_factor * scale_factor;
         let expansion =
@@ -1058,7 +1064,7 @@ where
                                 * state.0.rescaled_amplitude[second][mode]
                         },
                     );
-                (state.0.rescaled_velocity[upper][mode] - connection_term) / a_h
+                (state.0.rescaled_velocity[upper][mode] - connection_term * coupling) / a_h
             })
         });
         let velocity = core::array::from_fn(|upper| {
@@ -1067,11 +1073,11 @@ where
                     ModeAcceleration::new(Complex64::new(0.0, 0.0)),
                     |sum, lower| {
                         let entry = if upper == lower {
-                            mass.components()[upper][lower] * scale_factor_squared
+                            mass.components()[upper][lower] * scale_factor_squared * coupling
                                 + wave_number_squared
                                 - expansion
                         } else {
-                            mass.components()[upper][lower] * scale_factor_squared
+                            mass.components()[upper][lower] * scale_factor_squared * coupling
                         };
                         sum + entry * state.0.rescaled_amplitude[lower][mode]
                     },
@@ -1086,7 +1092,7 @@ where
                                 * state.0.rescaled_velocity[second][mode]
                         },
                     );
-                (-restoring - connection_term) / a_h
+                (-restoring - connection_term * coupling) / a_h
             })
         });
 
@@ -1251,6 +1257,69 @@ where
         validate(settings)?;
         self.evolve_one_mode(initial, settings, trajectory, k, 1.0, e_folds_at_output)
             .map(|(record, _, _)| record)
+    }
+
+    /// The tensor power spectrum `P_t` of wavenumber `k` at
+    /// `e_folds_at_output`, summed over both polarizations.
+    ///
+    /// Each polarization obeys `v'' + (k^2 - a''/a) v = 0` for
+    /// `v = a M_pl h / 2`, independent of the fields, and starts in the
+    /// Bunch-Davies vacuum `settings.e_folds_before_exit` e-folds before
+    /// horizon exit, like the scalar modes. Then
+    /// `P_t = 8 (k^3 / 2 pi^2) |v / a|^2 / M_pl^2`, which is `2 H^2 / (pi^2 M_pl^2)`
+    /// in de Sitter. `h_ij` is unchanged by a conformal transformation, so this
+    /// is also the Jordan-frame tensor spectrum.
+    pub fn tensor_spectrum(
+        &self,
+        settings: &SpectrumRunSettings,
+        trajectory: &BackgroundTrajectory,
+        k: Mass,
+        e_folds_at_output: f64,
+    ) -> Result<f64, SpectrumRunError> {
+        validate(settings)?;
+        let start_e_folds = trajectory
+            .crossing(|state| {
+                (k / (state.a * self.hubble(state))).into_value() - start_depth(settings)
+            })
+            .ok_or(SpectrumRunError::StepLimitReached {
+                stage: SpectrumRunStage::ModeStart { k: k.into_value() },
+            })?;
+        let amplitude: ModeAmplitude<f64> = crate::Dimensionless::new(1.0) / (k * 2.0).sqrt();
+        let amplitude = ModeAmplitude::new(Complex64::new(amplitude.into_value(), 0.0));
+        let frequency =
+            crate::Quantity::<crate::M1, Complex64>::new(Complex64::new(0.0, -k.into_value()));
+        let zero_amplitude = ModeAmplitude::new(Complex64::new(0.0, 0.0));
+        let zero_velocity = ModeVelocity::new(Complex64::new(0.0, 0.0));
+        let mut rescaled_amplitude = [[zero_amplitude; 2]; 2];
+        let mut rescaled_velocity = [[zero_velocity; 2]; 2];
+        rescaled_amplitude[0][0] = amplitude;
+        rescaled_velocity[0][0] = amplitude * frequency;
+        let mode_system = InterpolatedModeSystem {
+            background: self,
+            trajectory,
+            k,
+            tensor: true,
+        };
+        let state = advance_interpolated_modes(
+            &mode_system,
+            ModesInEFolds(Modes {
+                rescaled_amplitude,
+                rescaled_velocity,
+            }),
+            start_e_folds,
+            e_folds_at_output,
+            settings,
+            SpectrumRunStage::ModeEvolution { k: k.into_value() },
+            |_, _| {},
+        )?;
+        let scale_factor = trajectory.state_at(e_folds_at_output).a.into_value();
+        let v = state.0.rescaled_amplitude[0][0].into_value() / scale_factor;
+        let planck = self.m_pl.into_value();
+        let k = k.into_value();
+        Ok(
+            8.0 * k * k * k / (2.0 * core::f64::consts::PI * core::f64::consts::PI) * v.norm_sqr()
+                / (planck * planck),
+        )
     }
 
     /// Runs the background survey, fixes the pivot, and evolves one mode
@@ -1500,6 +1569,7 @@ where
             background: self,
             trajectory,
             k,
+            tensor: false,
         };
         let mut state = ModesInEFolds(initialized.modes);
         let initial_combined = ConformalPerturbationState {
@@ -2713,6 +2783,7 @@ mod tests {
             background: &system,
             trajectory: &trajectory,
             k,
+            tensor: false,
         };
         let transport_system = TwoPointTransportSystem::new(&system, &trajectory, k);
         let mut modes = ModesInEFolds(initialized.modes);
@@ -2844,6 +2915,54 @@ mod tests {
             relative,
             allowed
         );
+    }
+
+    #[test]
+    fn the_tensor_spectrum_matches_slow_roll_and_the_consistency_relation() {
+        // On a trajectory along the first axis the model is single-field
+        // quadratic inflation. At second order in slow roll (Stewart and
+        // Lyth), P_t = (2 H_*^2 / pi^2)[1 - 2 (C + 1) epsilon_1] and
+        // r = 16 epsilon_1 [1 + C epsilon_2], with C = -2 + ln 2 + gamma_E and
+        // epsilon_2 = d ln epsilon_1 / dN, all at horizon crossing.
+        let system = system([1.0e-6, 1.5e-6]);
+        let c = -2.0 + 2.0_f64.ln() + 0.577_215_664_901_532_9;
+        for (phi, pivot_before_end) in [(12.0, 25.0), (15.0, 45.0)] {
+            let initial = slow_roll_start(&system, [phi, 0.0]);
+            let settings = SpectrumRunSettings {
+                pivot_e_folds_before_end: pivot_before_end,
+                e_folds_before_exit: 6.0,
+                ..quick_settings()
+            };
+            let survey = system.survey(initial, &settings).unwrap();
+            let output = survey.e_folds_at_end - settings.output_e_folds_before_end;
+            let crossing = survey.e_folds_at_end - settings.pivot_e_folds_before_end;
+            let pivot = survey.trajectory.state_at(crossing);
+            let k = pivot.a * system.hubble(&pivot);
+            let hubble = system.hubble(&pivot).into_value();
+            let epsilon = system.epsilon_h(&pivot);
+            let step = 0.01;
+            let epsilon_at = |n: f64| system.epsilon_h(&survey.trajectory.state_at(n));
+            let epsilon_2 = (epsilon_at(crossing + step).ln() - epsilon_at(crossing - step).ln())
+                / (2.0 * step);
+            let tensor = system
+                .tensor_spectrum(&settings, &survey.trajectory, k, output)
+                .unwrap();
+            let scalar = system
+                .mode_spectrum(initial, &settings, &survey.trajectory, k, output)
+                .unwrap()
+                .p_r;
+            let slow_roll = 2.0 * hubble * hubble / (PI * PI) * (1.0 - 2.0 * (c + 1.0) * epsilon);
+            let consistency = 16.0 * epsilon * (1.0 + c * epsilon_2);
+            let r = tensor / scalar;
+            assert!(
+                (tensor / slow_roll - 1.0).abs() < 2.0 * epsilon * epsilon,
+                "P_t {tensor} vs {slow_roll} at epsilon {epsilon}"
+            );
+            assert!(
+                (r / consistency - 1.0).abs() < 2.0 * epsilon * epsilon,
+                "r {r} vs {consistency} at epsilon {epsilon}"
+            );
+        }
     }
 
     #[test]
