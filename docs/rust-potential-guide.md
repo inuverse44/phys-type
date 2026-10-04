@@ -1,6 +1,6 @@
 # `potential.rs`で学ぶRust文法
 
-この文書は、Rust初心者が`src/potential.rs`を読めるようになることを
+この文書は、Rust初心者が`crates/phys-type/src/potential.rs`を読めるようになることを
 目的とする。
 
 題材は、単一場の二次ポテンシャル

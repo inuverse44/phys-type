@@ -30,10 +30,10 @@ At merge commit `6d6a7dc`:
 | Item | Where | Problem |
 | --- | --- | --- |
 | No action layer | — | Users hand-write the Einstein-frame metric $G_{IJ}$ and potential $V$; nothing derives them from an action. |
-| `NonminimalAssistedFieldSpace` | `src/nonminimal.rs` | One model, $f(s)=1+\xi_2s^2$ with a diagonal $(\phi,s)$ metric and a Gaussian-curvature formula valid only for that form, sits beside the generic geometries. |
-| `NonminimalLoopInflationPotential`, `…PowerLaw…`, `…Hybrid…` | `src/nonminimal.rs`, root exports | Example potentials of one paper are core exports. |
-| `assisted_slow_roll` | `src/assisted_slow_roll.rs`, a root module | One paper's slow-roll prescription is a top-level public module. |
-| Model validation tests | `src/spectrum_run.rs` test module | About a thousand lines of assisted and constant-turn validation live in a core file. |
+| `NonminimalAssistedFieldSpace` | `crates/phys-type/src/nonminimal.rs` | One model, $f(s)=1+\xi_2s^2$ with a diagonal $(\phi,s)$ metric and a Gaussian-curvature formula valid only for that form, sits beside the generic geometries. |
+| `NonminimalLoopInflationPotential`, `…PowerLaw…`, `…Hybrid…` | `crates/phys-type/src/nonminimal.rs`, root exports | Example potentials of one paper are core exports. |
+| `assisted_slow_roll` | `crates/phys-type/src/assisted_slow_roll.rs`, a root module | One paper's slow-roll prescription is a top-level public module. |
+| Model validation tests | `crates/phys-type/src/spectrum_run.rs` test module | About a thousand lines of assisted and constant-turn validation live in a core file. |
 | Two-field perturbations | `perturbation`, `transport`, `spectrum_run`, `bispectrum_run` | The background is $N$-field, but the perturbation, transport, and observable pipeline is fixed to $N=2$, so single-field Higgs inflation and three or more fields cannot use it. |
 
 The type layer (`quantity`, `dimension`, `autodiff`, `field_space`,

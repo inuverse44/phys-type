@@ -84,7 +84,7 @@ with [M] to next order in $\epsilon$, and satisfy the squeezed consistency
 relation to 0.33% at $k_3/k_1=0.05$. The printed coefficient is ruled out by
 both the conservation and the single-field limit.
 
-**Where.** `src/curvature.rs`, `curvature_gauge_coefficients`; tests
+**Where.** `crates/phys-type/src/curvature.rs`, `curvature_gauge_coefficients`; tests
 `cross_coefficients_attach_the_gradient_term_to_the_field_input`,
 `single_field_f_nl_is_conserved_and_matches_maldacena`, and
 `squeezed_single_field_bispectrum_satisfies_the_consistency_relation`.

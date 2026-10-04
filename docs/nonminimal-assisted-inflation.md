@@ -44,7 +44,7 @@ in reduced Planck units, with $\kappa=1$ (metric) or $0$ (Palatini).
 `NonminimalAssistedFieldSpace` implements this geometry, and
 `NonminimalLoopInflationPotential` implements it with
 $V_J=\Lambda^4(1+\alpha\ln\phi)$ (Eq. (4.1)). Both live in
-`src/nonminimal.rs`.
+`crates/phys-type/src/nonminimal.rs`.
 
 Neither field is canonically normalized, so the geometry supplies every
 connection and curvature term. Since the metric depends only on $s$ in two
@@ -348,7 +348,7 @@ contains no curve that the tests do not also exercise.
 
 ## Tests
 
-The regular suite runs the geometry and potential tests in `src/nonminimal.rs`.
+The regular suite runs the geometry and potential tests in `crates/phys-type/src/nonminimal.rs`.
 The ignored release-mode tests are:
 
 - `assisted_loop_spectral_index_agrees_with_delta_n_and_eq_3_1`;

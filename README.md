@@ -333,7 +333,7 @@ measurements behind both choices.
 ## Compile-fail tests
 
 Rejecting invalid expressions is part of the contract, so it is tested. The
-cases live in `tests/compile_fail/`. After an intentional change to an error
+cases live in `crates/phys-type/tests/compile_fail/`. After an intentional change to an error
 message, refresh the expectations with:
 
 ```sh

@@ -1,6 +1,6 @@
 # `quantity.rs`で学ぶRust文法
 
-この文書は、Rust初心者が`src/quantity.rs`を読めるようになることを
+この文書は、Rust初心者が`crates/phys-type/src/quantity.rs`を読めるようになることを
 目的とする。
 
 `Quantity<D, V>`は、このライブラリの中心となる型である。
@@ -430,7 +430,7 @@ Field × Mass           -> M^2
 EnergyDensity / M^2    -> M^2
 ```
 
-一方、`tests/compile_fail/`は、誤った式がコンパイル時に拒否されることを
+一方、`crates/phys-type/tests/compile_fail/`は、誤った式がコンパイル時に拒否されることを
 確認する。
 
 ```text
