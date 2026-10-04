@@ -45,7 +45,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets -- -D warnings
 cargo test --all-targets
 cargo build --release --all-targets
-cargo package --locked
+cargo package --locked -p phys-type
 ```
 
 ## Golden data
