@@ -108,15 +108,12 @@ The first external model validation after P3 is complete; see
    arXiv:2607.14529 states (figure
    [`figures/constant_turn_squeezed.png`](figures/constant_turn_squeezed.png)).
 
-The plan from here, one pull request per step:
-
-1. compare bispectrum amplitudes with arXiv:2607.14529: the decoupling-limit
-   cubic action of the orbit in the paper's variables (it includes a
-   $\sigma(\nabla\varphi)^2$ coupling outside the paper's basis), an independent
-   in-in evaluation, and the transport, in the equilateral and squeezed
-   limits; then heavy-field oscillations;
-2. then the next P3 extension below, such as general nonminimal inflation,
-   reheating, or dynamically sized field spaces.
+The plan from here follows [`architecture.md`](architecture.md): separate the
+core (types, theory layer, engine, observables) from the models in a
+workspace, add the generalized nonminimal theory layer with its frame
+correspondence, and then generalize the perturbation pipeline to $N$ fields
+starting with Higgs inflation. The bispectrum amplitude comparison with
+arXiv:2607.14529 resumes on top of that boundary.
 
 ### Reading order for the active P3 work
 
