@@ -42,14 +42,18 @@ the inner loops, and $N=1,2,3$ are separate monomorphizations. Stable Rust
 cannot form `[T; N - 1]`, so nothing may be sized by the number of entropy
 directions (see decision 3).
 
-**2. Names lose "TwoField".** `TwoFieldModes` becomes `Modes<N>`,
-`ConformalTwoFieldPerturbationSystem` becomes `ConformalPerturbationSystem<P,
-G, N>`, `run_two_field_spectra` becomes `run_spectra`, and so on. The old
-two-field names remain for one release as deprecated type aliases and
-methods for `N = 2`, so downstream code keeps compiling with a warning.
+**2. Names lose "TwoField", in one break.** `TwoFieldModes` becomes
+`Modes<N>`, `ConformalTwoFieldPerturbationSystem` becomes
+`ConformalPerturbationSystem<P, G, N>`, `run_two_field_spectra` becomes
+`run_spectra`, and so on. The crate is pre-1.0 with no outside users, so the
+renaming is a clean break released as 0.3.0, without deprecated aliases.
 
 **3. The adiabatic direction is a vector; the entropy sector is a
-projector.** For any $N$ the tangent $e_\sigma^I=\dot\phi^I/\dot\sigma$ is unique.
+projector.** (The alternative is the Frenet basis: $e_1=e_\sigma$, $e_2$ along
+the turn $D_te_1$, $e_3$ along the part of $D_te_2$ orthogonal to $e_1$ and $e_2$,
+and so on, each with its own turn rate, as in the Frenet–Serret frame of a
+space curve. It names $N-1$ entropy directions but is undefined wherever a
+turn rate vanishes, for example on straight segments.) For any $N$ the tangent $e_\sigma^I=\dot\phi^I/\dot\sigma$ is unique.
 The entropy sector is the orthogonal complement, of dimension $N-1$, and has
 no preferred basis for $N\ge3$ (a Frenet basis degenerates on straight
 segments). The kinematics therefore return
@@ -96,11 +100,11 @@ light single-field diagnostic of the MVP; single-field predictions go through
 | --- | --- |
 | $N=2$ | golden data to $10^{-12}$; every existing test, including the ignored validations in both crates |
 | $N=1$, analytic | quadratic and quartic single-field inflation: $\mathcal P_{\mathcal R}$ against the slow-roll amplitude to $O(\epsilon)$, $n_s$ and $r$ against their slow-roll values, $f_{\mathrm{NL}}$ against Maldacena's result and the squeezed consistency relation (already validated as a two-field limit) |
-| $N=1$, Higgs inflation | $\Omega^2=1+\xi\phi^2$, $V_J=\lambda\phi^4/4$ through the theory layer, metric formulation: at large $\xi$, $n_s\simeq1-2/N_*$ and $r\simeq12/N_*^2$ ([Bezrukov and Shaposhnikov, arXiv:0710.3755](https://arxiv.org/abs/0710.3755)); Palatini: $r\simeq2/(\xi N_*^2)$ ([Bauer and Demir, arXiv:0803.2664](https://arxiv.org/abs/0803.2664)); the exact numbers differ from these at $O(1/N_*)$ and the differences are recorded, not tuned away; with a reproduction figure of $n_s$ and $r$ against $\xi$ |
+| $N=1$, Higgs inflation | $\Omega^2=1+\xi\phi^2$, $V_J=\lambda\phi^4/4$ through the theory layer, metric formulation: at large $\xi$, $n_s\simeq1-2/N_*$ and $r\simeq12/N_*^2$, with $N_*$ in the frame the reference uses ([Bezrukov and Shaposhnikov, arXiv:0710.3755](https://arxiv.org/abs/0710.3755)); Palatini: $r\simeq2/(\xi N_*^2)$ ([Bauer and Demir, arXiv:0803.2664](https://arxiv.org/abs/0803.2664)); the exact numbers differ from these at $O(1/N_*)$ and the differences are recorded, not tuned away; with a reproduction figure of $n_s$ and $r$ against $\xi$ |
 | $N=1$ embedded | a single field run as $N=2$ with a decoupled heavy spectator reproduces the $N=1$ run |
-| $N=3$, separable | three uncoupled quadratic fields: $\mathcal P_{\mathcal R}$ and $f_{\mathrm{NL}}$ against the sum-separable $\delta N$ results of [Battefeld and Easther, arXiv:astro-ph/0610296](https://arxiv.org/abs/astro-ph/0610296) and a numerical $\delta N$ |
-| $N=3$, covariance | a constant rotation of the three fields and a nonlinear field redefinition (generic three-field metric from `JetGeometry`) leave the projected spectra and $f_{\mathrm{NL}}$ unchanged, and the phase-space correlators transform as tensors, extending the existing two-field covariance tests |
-| $N=3$ embedding | the assisted model plus a decoupled heavy third field reproduces the two-field assisted results |
+| $N=3$, separable | (a case with a known answer) three uncoupled quadratic fields: $\mathcal P_{\mathcal R}$ and $f_{\mathrm{NL}}$ against the sum-separable $\delta N$ results of [Battefeld and Easther, arXiv:astro-ph/0610296](https://arxiv.org/abs/astro-ph/0610296) and a numerical $\delta N$ |
+| $N=3$, covariance | (the answer must not depend on coordinates) a constant rotation of the three fields and a nonlinear field redefinition (generic three-field metric from `JetGeometry`) leave the projected spectra and $f_{\mathrm{NL}}$ unchanged, and the phase-space correlators transform as tensors, extending the existing two-field covariance tests |
+| $N=3$ embedding | (an extra decoupled field must change nothing) the assisted model plus a decoupled heavy third field reproduces the two-field assisted results |
 
 ## Migration
 
@@ -119,14 +123,22 @@ $10^{-12}$ at every step.
 ## Open questions for review
 
 1. **Reported entropy quantities for $N\ge3$.** Decision 4 reports the
-   entropy trace and the norm of the cross vector. An alternative is the
-   Frenet basis along the trajectory, which gives $N-1$ named entropy
-   spectra where the turn does not vanish.
-2. **Deprecation period.** One release with aliases, or a clean break at
-   0.3.0, since the crate is pre-1.0.
-3. **E-folds in single-field Higgs predictions.** $N_*$ is counted in the
-   Einstein frame (see [`frames.md`](frames.md)); for Higgs inflation the
-   Jordan-frame count differs by the change of $\ln\Omega$ between the pivot
-   and the end: with $\xi\phi_*^2\simeq4N_*/3\simeq80$ and $\xi\phi_e^2\simeq1.15$,
-   $\tfrac12\ln(81/2.15)\simeq1.8$ e-folds, which moves $n_s$ by about
-   $10^{-3}$. The comparison will state both.
+   entropy trace and the norm of the cross vector, which exist on every
+   trajectory. The Frenet basis of decision 3 would add $N-1$ named entropy
+   spectra where no turn rate vanishes; it can be added later as an extra
+   output.
+
+## Resolved in review
+
+- **Deprecation.** A clean break at 0.3.0 (decision 2).
+- **Frames and $n_s$ for Higgs inflation.** The physics does not depend on
+  the frame. For a single field, $\zeta$ is frame invariant, and $\Omega\to1$
+  after inflation, so $n_s(k)$ at a physical wavenumber $k$ is the same in both
+  frames. What depends on the frame is the label "the pivot left the horizon
+  $N_*$ e-folds before the end": the e-fold count between the pivot and the
+  end differs by the change of $\ln\Omega$, with $\xi\phi_*^2\simeq4N_*/3\simeq80$
+  and $\xi\phi_e^2\simeq1.15$ about $\tfrac12\ln(81/2.15)\simeq1.8$. "$N_*=60$" in the
+  Einstein frame and in the Jordan frame therefore name different physical
+  scales, whose $n_s$ differ by about $2\Delta N/N_*^2\simeq10^{-3}$. Predictions
+  are reported at a physical $k$, with $N_*$ given in both frames, and a
+  comparison with a paper first establishes which frame its $N_*$ uses.
