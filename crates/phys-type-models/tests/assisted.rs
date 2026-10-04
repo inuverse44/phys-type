@@ -71,7 +71,7 @@ where
         e_folds_before_exit: f64,
         target: f64,
         relative_tolerance: f64,
-    ) -> phys_type::CanonicalThreePointTransportState {
+    ) -> phys_type::CanonicalThreePointTransportState<2> {
         self.system
             .three_point_state(
                 &self.trajectory,

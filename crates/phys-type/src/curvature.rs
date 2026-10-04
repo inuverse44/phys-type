@@ -263,13 +263,13 @@ impl CurvatureCorrelators {
 /// `N_I Sigma` with the external field slot projected on `zeta`, in operator
 /// order: an external leg to the left of the quadratic insertion contracts as
 /// `Sigma^{a c}`, one to the right as `Sigma^{c a}`.
-fn projected_field_internal(
-    linear: &[Quantity<MMinus1, f64>; 2],
-    covariance: &CanonicalTwoPointPhaseSpaceCovariance<2>,
+fn projected_field_internal<const N: usize>(
+    linear: &[Quantity<MMinus1, f64>; N],
+    covariance: &CanonicalTwoPointPhaseSpaceCovariance<N>,
     external_is_left: bool,
     internal: usize,
 ) -> Quantity<MMinus2, Complex64> {
-    (0..2)
+    (0..N)
         .map(|i| {
             let block = covariance.qq.components();
             let component = if external_is_left {
@@ -283,13 +283,13 @@ fn projected_field_internal(
 }
 
 /// As [`projected_field_internal`], with a momentum slot on the insertion.
-fn projected_momentum_internal(
-    linear: &[Quantity<MMinus1, f64>; 2],
-    covariance: &CanonicalTwoPointPhaseSpaceCovariance<2>,
+fn projected_momentum_internal<const N: usize>(
+    linear: &[Quantity<MMinus1, f64>; N],
+    covariance: &CanonicalTwoPointPhaseSpaceCovariance<N>,
     external_is_left: bool,
     internal: usize,
 ) -> Quantity<MMinus1, Complex64> {
-    (0..2)
+    (0..N)
         .map(|i| {
             let component = if external_is_left {
                 covariance.qp.components()[i][internal]
@@ -308,33 +308,33 @@ fn projected_momentum_internal(
 /// coefficient has no momentum part, the canonical and velocity bases give
 /// the same result: `Q` is common to both and the quadratic insertion
 /// differs only at cubic order.
-pub fn curvature_correlators<P, G>(
-    system: &CovariantMultifieldSystem<P, G, 2>,
-    background: &MultifieldState<2>,
+pub fn curvature_correlators<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    background: &MultifieldState<N>,
     triangle: MomentumTriangle,
-    state: &CanonicalThreePointTransportState,
+    state: &CanonicalThreePointTransportState<N>,
     maximum_k_over_ah: f64,
 ) -> Result<CurvatureCorrelators, CurvatureProjectionError>
 where
-    P: MultifieldPotential<2>,
-    G: FieldSpaceGeometry<2>,
+    P: MultifieldPotential<N>,
+    G: FieldSpaceGeometry<N>,
 {
     let coefficients =
         curvature_gauge_coefficients(system, background, triangle, maximum_k_over_ah)?;
     let n = &coefficients.linear;
     let power = state.covariances.map(|covariance| {
-        (0..4)
+        (0..N * N)
             .map(|m| {
-                let [i, j] = [m / 2, m % 2];
+                let [i, j] = [m / N, m % N];
                 n[i] * n[j]
                     * Quantity::<MMinus1, f64>::new(covariance.qq.components()[i][j].value().re)
             })
             .fold(Quantity::new(0.0), Add::add)
     });
 
-    let intrinsic: Quantity<MMinus6, Complex64> = (0..8)
+    let intrinsic: Quantity<MMinus6, Complex64> = (0..N * N * N)
         .map(|m| {
-            let [i, j, k] = [m / 4, (m / 2) % 2, m % 2];
+            let [i, j, k] = [m / (N * N), (m / N) % N, m % N];
             n[i] * n[j] * n[k] * state.alpha.qqq.components()[i][j][k]
         })
         .fold(Quantity::new(Complex64::new(0.0, 0.0)), Add::add);
@@ -352,9 +352,9 @@ where
             let momentum = |leg: usize, index: usize| {
                 projected_momentum_internal(n, &state.covariances[leg], leg < output, index)
             };
-            (0..4)
+            (0..N * N)
                 .map(|m| {
-                    let [c, d] = [m / 2, m % 2];
+                    let [c, d] = [m / N, m % N];
                     vertex.field_field[c][d] * field(first, c) * field(second, d)
                         + vertex.field_momentum[c][d] * field(first, c) * momentum(second, d)
                         + vertex.momentum_field[c][d] * momentum(first, c) * field(second, d)

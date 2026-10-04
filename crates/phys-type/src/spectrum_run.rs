@@ -28,7 +28,7 @@ use crate::{
     CovariantMultifieldSystem, CurvedFieldSpaceGeometry, KinematicBasisError, M0, Mass,
     ModeAcceleration, ModeAmplitude, ModeInitializationError, ModeVelocity, Modes, MultifieldState,
     MultifieldStateDelta, ScaleFactor, Time, TwiceDifferentiableMultifieldPotential,
-    TwoFieldBackgroundProvider, TwoFieldKinematics,
+    TwoFieldKinematics,
 };
 
 #[cfg(test)]
@@ -937,7 +937,7 @@ impl BackgroundTrajectory {
     }
 }
 
-impl TwoFieldBackgroundProvider for BackgroundTrajectory {
+impl crate::BackgroundProvider<2> for BackgroundTrajectory {
     fn state_at_e_folds(&self, e_folds: f64) -> MultifieldState<2> {
         self.state_at(e_folds)
     }
@@ -3735,7 +3735,7 @@ mod tests {
             e_folds_before_exit: f64,
             target: f64,
             relative_tolerance: f64,
-        ) -> crate::CanonicalThreePointTransportState {
+        ) -> crate::CanonicalThreePointTransportState<2> {
             crate::bispectrum_run::evolve_three_point(
                 &self.system,
                 &self.trajectory,
@@ -4039,7 +4039,7 @@ mod tests {
         assert!(errors.iter().all(|error| *error < 1.0e-8), "{errors:?}");
 
         // zeta is a scalar: its correlators must not depend on the coordinates.
-        let project = |system_state: &crate::CanonicalThreePointTransportState,
+        let project = |system_state: &crate::CanonicalThreePointTransportState<2>,
                        background: MultifieldState<2>,
                        sheared_coordinates: bool| {
             if sheared_coordinates {

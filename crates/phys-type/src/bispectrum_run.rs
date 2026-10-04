@@ -357,7 +357,7 @@ pub(crate) fn evolve_three_point<P, G>(
     target_e_folds: f64,
     relative_tolerance: f64,
     max_steps: usize,
-) -> Result<(f64, CanonicalThreePointTransportState), ThreePointEvolutionError>
+) -> Result<(f64, CanonicalThreePointTransportState<2>), ThreePointEvolutionError>
 where
     P: ThriceDifferentiableMultifieldPotential<2> + Copy,
     G: ThirdOrderFieldSpaceGeometry<2> + CurvatureDerivativeGeometry<2> + Copy,
@@ -444,7 +444,7 @@ const BLOCK_NAMES: [&str; 8] = ["QQQ", "QQP", "QPQ", "PQQ", "QPP", "PQP", "PPQ",
 
 fn phase_space_records(
     shape: usize,
-    state: &CanonicalThreePointTransportState,
+    state: &CanonicalThreePointTransportState<2>,
     wavenumbers: [f64; 3],
 ) -> Vec<PhaseSpaceBispectrumRecord> {
     let weight = (wavenumbers[0] * wavenumbers[1] * wavenumbers[2]).powi(2);
@@ -519,7 +519,7 @@ where
         e_folds_at_output: f64,
         relative_tolerance: f64,
         max_steps: usize,
-    ) -> Result<CanonicalThreePointTransportState, ThreePointEvolutionError> {
+    ) -> Result<CanonicalThreePointTransportState<2>, ThreePointEvolutionError> {
         evolve_three_point(
             self,
             trajectory,
