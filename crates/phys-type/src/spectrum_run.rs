@@ -137,6 +137,13 @@ pub enum SpectrumRunError {
         /// The e-folding number actually reached.
         e_folds: f64,
     },
+    /// The background left the domain of the field-space geometry.
+    OutsideGeometryDomain {
+        /// The e-folding number of the first offending step.
+        e_folds: f64,
+        /// The failed condition.
+        error: crate::GeometryDomainError,
+    },
     /// `epsilon_H` reached one before the requested field-value event.
     SlowRollEndedFirst {
         /// The e-folding number at which `epsilon_H = 1`.
@@ -234,6 +241,10 @@ impl fmt::Display for SpectrumRunError {
                     "inflation did not end within {e_folds:e} e-folds"
                 )
             }
+            Self::OutsideGeometryDomain { e_folds, error } => write!(
+                formatter,
+                "the background left the geometry's domain after {e_folds:e} e-folds: {error}"
+            ),
             Self::SlowRollEndedFirst { e_folds } => write!(
                 formatter,
                 "epsilon_H reached one after {e_folds:e} e-folds, before the field-value end of inflation"
@@ -1257,10 +1268,17 @@ where
         initial: MultifieldState<2>,
         settings: &SpectrumRunSettings,
     ) -> Result<(Vec<BackgroundRecord>, BackgroundTrajectory, f64), SpectrumRunError> {
+        self.geometry.check_domain(&initial.phi).map_err(|error| {
+            SpectrumRunError::OutsideGeometryDomain {
+                e_folds: 0.0,
+                error,
+            }
+        })?;
         let initial_kinematics = self
             .kinematics(&initial, None)
             .map_err(SpectrumRunError::KinematicBasis)?;
         let mut rows = vec![self.background_record(&initial, &initial, &initial_kinematics)];
+        let mut domain_error = None;
         let mut previous_normal = Some(initial_kinematics.basis.normal);
         let mut basis_error = None;
         let mut accepted = 0_usize;
@@ -1298,6 +1316,14 @@ where
             |state, _| {
                 accepted += 1;
                 checkpoints.push(self.background_checkpoint(&initial, state));
+                if domain_error.is_none()
+                    && let Err(error) = self.geometry.check_domain(&state.phi)
+                {
+                    domain_error = Some(SpectrumRunError::OutsideGeometryDomain {
+                        e_folds: state.e_folds(&initial),
+                        error,
+                    });
+                }
                 if basis_error.is_some() {
                     return;
                 }
@@ -1313,6 +1339,9 @@ where
             },
         )?;
 
+        if let Some(error) = domain_error {
+            return Err(error);
+        }
         if let Some(error) = basis_error {
             return Err(SpectrumRunError::KinematicBasis(error));
         }
@@ -2086,6 +2115,58 @@ mod tests {
         MultifieldState {
             pi: system.slow_roll_velocity(&resting),
             ..resting
+        }
+    }
+
+    /// Flat field space that declares `phi^1 < 12` outside its domain.
+    #[derive(Clone, Copy, Debug)]
+    struct BoundedFlat;
+
+    impl crate::FieldSpaceGeometry<2> for BoundedFlat {
+        fn metric(&self, position: &[Field; 2]) -> crate::FieldMetric<2> {
+            FlatFieldSpace.metric(position)
+        }
+
+        fn inverse_metric(&self, position: &[Field; 2]) -> crate::InverseFieldMetric<2> {
+            FlatFieldSpace.inverse_metric(position)
+        }
+
+        fn christoffel(&self, position: &[Field; 2]) -> crate::ChristoffelSymbols<2> {
+            <FlatFieldSpace as crate::FieldSpaceGeometry<2>>::christoffel(&FlatFieldSpace, position)
+        }
+
+        fn check_domain(&self, position: &[Field; 2]) -> Result<(), crate::GeometryDomainError> {
+            let phi = position[0].into_value();
+            if phi < 12.0 {
+                Err(crate::GeometryDomainError {
+                    reason: "below the test boundary",
+                    value: phi,
+                })
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    impl CurvedFieldSpaceGeometry<2> for BoundedFlat {
+        fn riemann(&self, _position: &[Field; 2]) -> crate::RiemannTensor<2> {
+            crate::RiemannTensor::zero()
+        }
+    }
+
+    #[test]
+    fn the_survey_stops_where_the_geometry_leaves_its_domain() {
+        let flat = system([1.0e-6, 7.0e-6]);
+        let bounded = CovariantMultifieldSystem::in_planck_units(flat.potential, BoundedFlat);
+        let initial = slow_roll_start(&flat, [14.0, 12.0]);
+        let error = bounded
+            .run_two_field_spectra(initial, &quick_settings())
+            .unwrap_err();
+        match error {
+            SpectrumRunError::OutsideGeometryDomain { e_folds, error } => {
+                assert!(e_folds > 0.0 && error.value < 12.0, "{e_folds} {error}");
+            }
+            other => panic!("expected a domain error, got {other}"),
         }
     }
 

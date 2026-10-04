@@ -8,6 +8,16 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The theory layer: `GeneralizedNonminimal<N>` states a theory by its
+  Jordan-frame action (`Omega^2(phi) R`, `k_IJ(phi)`, `V_J(phi)`, metric or
+  Palatini), `einstein_frame` maps it exactly to the Einstein-frame potential
+  and a `JetGeometry`, and `EinsteinFrame::correspondence` returns the
+  Jordan-frame scale factor, e-folds, Hubble rate, and field velocities.
+  `docs/frames.md` records the map, the correspondence, and the frame
+  dependence of the multi-field curvature perturbation.
+- `FieldSpaceGeometry::check_domain`, checked by the background survey on
+  every accepted step; `SpectrumRunError::OutsideGeometryDomain` reports a
+  non-positive conformal factor or a metric that is not positive definite.
 - `FourthOrderJet<N>`, forward-mode derivatives through fourth order, with
   products and compositions written as sums over index subsets and set
   partitions.

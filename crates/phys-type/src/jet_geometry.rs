@@ -27,7 +27,8 @@
 use crate::{
     ChristoffelDerivatives, ChristoffelSymbols, CovariantRiemannDerivative,
     CurvatureDerivativeGeometry, CurvedFieldSpaceGeometry, Field, FieldMetric, FieldSpaceGeometry,
-    InverseFieldMetric, Jet, Quantity, RiemannTensor, ThirdOrderFieldSpaceGeometry, ThirdOrderJet,
+    GeometryDomainError, InverseFieldMetric, Jet, Quantity, RiemannTensor,
+    ThirdOrderFieldSpaceGeometry, ThirdOrderJet,
 };
 
 /// A covariant field-space metric with its first three partial derivatives.
@@ -35,6 +36,12 @@ pub trait MetricJet<const N: usize> {
     /// `G_IJ` and its derivatives with respect to the `N` field coordinates,
     /// evaluated at `position`. The matrix must be symmetric.
     fn metric_jet(&self, position: &[Field; N]) -> [[ThirdOrderJet<N>; N]; N];
+
+    /// Checks conditions under which the metric is defined at `position`,
+    /// beyond the positive definiteness that [`JetGeometry`] always checks.
+    fn check_domain(&self, _position: &[Field; N]) -> Result<(), GeometryDomainError> {
+        Ok(())
+    }
 }
 
 /// The geometry of a [`MetricJet`]: inverse metric, connection, curvature,
@@ -184,6 +191,31 @@ impl<M: MetricJet<N>, const N: usize> FieldSpaceGeometry<N> for JetGeometry<M> {
         InverseFieldMetric::new(core::array::from_fn(|i| {
             core::array::from_fn(|j| Quantity::new(inverse[i][j].value))
         }))
+    }
+
+    fn check_domain(&self, position: &[Field; N]) -> Result<(), GeometryDomainError> {
+        self.0.check_domain(position)?;
+        // Cholesky factorization: every pivot positive iff G is positive definite.
+        let metric = self.0.metric_jet(position);
+        let mut factor = [[0.0; N]; N];
+        for i in 0..N {
+            for j in 0..=i {
+                let sum: f64 = (0..j).map(|k| factor[i][k] * factor[j][k]).sum();
+                if i == j {
+                    let pivot = metric[i][i].value - sum;
+                    if !(pivot.is_finite() && pivot > 0.0) {
+                        return Err(GeometryDomainError {
+                            reason: "the field-space metric is not positive definite",
+                            value: pivot,
+                        });
+                    }
+                    factor[i][i] = pivot.sqrt();
+                } else {
+                    factor[i][j] = (metric[i][j].value - sum) / factor[j][j];
+                }
+            }
+        }
+        Ok(())
     }
 
     fn christoffel(&self, position: &[Field; N]) -> ChristoffelSymbols<N> {

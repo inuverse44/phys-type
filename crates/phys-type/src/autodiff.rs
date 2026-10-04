@@ -699,27 +699,31 @@ pub struct FourthOrderJet<const N: usize> {
     pub fourth: [[[[f64; N]; N]; N]; N],
 }
 
-/// Set partitions of the positions `0..k` for `k <= 4`, each block a bit
-/// mask over the positions.
-fn set_partitions(k: usize) -> Vec<Vec<u8>> {
-    fn extend(position: usize, k: usize, blocks: &mut Vec<u8>, out: &mut Vec<Vec<u8>>) {
-        if position == k {
-            out.push(blocks.clone());
-            return;
-        }
-        for index in 0..blocks.len() {
-            blocks[index] |= 1 << position;
-            extend(position + 1, k, blocks, out);
-            blocks[index] &= !(1 << position);
-        }
-        blocks.push(1 << position);
-        extend(position + 1, k, blocks, out);
-        blocks.pop();
-    }
-    let mut out = Vec::new();
-    extend(0, k, &mut Vec::new(), &mut out);
-    out
-}
+/// Set partitions of the positions `0..k`, for `k = 0..=4`, each block a bit
+/// mask over the positions. The counts are the Bell numbers 1, 1, 2, 5, 15.
+const SET_PARTITIONS: [&[&[u8]]; 5] = [
+    &[&[]],
+    &[&[1]],
+    &[&[3], &[1, 2]],
+    &[&[7], &[3, 4], &[5, 2], &[1, 6], &[1, 2, 4]],
+    &[
+        &[15],
+        &[7, 8],
+        &[11, 4],
+        &[3, 12],
+        &[3, 4, 8],
+        &[13, 2],
+        &[5, 10],
+        &[5, 2, 8],
+        &[9, 6],
+        &[1, 14],
+        &[1, 6, 8],
+        &[9, 2, 4],
+        &[1, 10, 4],
+        &[1, 2, 12],
+        &[1, 2, 4, 8],
+    ],
+];
 
 impl<const N: usize> FourthOrderJet<N> {
     /// Creates a constant with every derivative set to zero.
@@ -786,12 +790,11 @@ impl<const N: usize> FourthOrderJet<N> {
 
     /// `h(self)` given `h` and its first four derivatives at `self.value`.
     fn map_unary(self, derivatives: [f64; 5]) -> Self {
-        let partitions: [Vec<Vec<u8>>; 5] = core::array::from_fn(set_partitions);
         Self::from_components(|indices| {
             if indices.is_empty() {
                 return derivatives[0];
             }
-            partitions[indices.len()]
+            SET_PARTITIONS[indices.len()]
                 .iter()
                 .map(|blocks| {
                     derivatives[blocks.len()]
@@ -1239,5 +1242,25 @@ mod tests {
                 "check {index}: {analytic} vs {expected}"
             );
         }
+    }
+    #[test]
+    fn the_set_partition_table_covers_every_partition_once() {
+        for (k, partitions) in SET_PARTITIONS.iter().enumerate() {
+            let full = ((1u16 << k) - 1) as u8;
+            let mut seen = std::collections::BTreeSet::new();
+            for blocks in partitions.iter() {
+                let mut union = 0u8;
+                for &block in blocks.iter() {
+                    assert!(block != 0 || k == 0);
+                    assert_eq!(union & block, 0, "blocks overlap");
+                    union |= block;
+                }
+                assert_eq!(union, full);
+                let mut sorted = blocks.to_vec();
+                sorted.sort_unstable();
+                assert!(seen.insert(sorted), "duplicate partition");
+            }
+        }
+        assert_eq!(SET_PARTITIONS.map(<[_]>::len), [1, 1, 2, 5, 15]);
     }
 }
