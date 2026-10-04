@@ -10,7 +10,7 @@ repository = "https://github.com/inuverse44/phys-type"
 readme = "README.md"
 keywords = ["physics", "units", "cosmology", "numerics"]
 categories = ["science", "mathematics"]
-exclude = ["daily/**", "phys-type.key"]
+exclude = ["daily/**"]
 
 [dependencies]
 num-complex = "0.4.6"
