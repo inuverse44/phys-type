@@ -40,6 +40,30 @@ cargo build --release --all-targets
 cargo package --locked
 ```
 
+## Golden data
+
+`golden/` freezes the data rows of the example CSV files. A refactor must
+reproduce them; CI runs
+
+```sh
+python3 scripts/golden.py check
+```
+
+on the fast examples, comparing every value to a relative tolerance of
+`1e-9` so that last-digit differences between platform math libraries pass;
+round-off diagnostics such as `Im_P_12` are compared on the scale of their
+reference column. Before merging a change that touches the engine, also
+run the slow examples and the identical-text check locally:
+
+```sh
+python3 scripts/golden.py check --all
+python3 scripts/golden.py check --exact
+```
+
+When a change is meant to alter the numbers, refreeze with
+`python3 scripts/golden.py update --all` and explain the difference in the
+pull request.
+
 To verify the complete diagnostics and plotting workflow, install `uv` and run:
 
 ```sh

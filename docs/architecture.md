@@ -150,7 +150,8 @@ unchanged, which the golden data of step 1 checks bit for bit.
 | 5+ | $N$ fields | the perturbation, transport, and observable pipeline for any $N$, starting with $N=1$ and Higgs inflation | the two-field results unchanged |
 
 Expensive validations remain ignored tests run in release mode; CI checks the
-golden data.
+golden data of the fast examples with `scripts/golden.py` (see
+`CONTRIBUTING.md`), and the slow examples are checked locally with `--all`.
 
 ## Open questions
 
