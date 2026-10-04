@@ -52,6 +52,10 @@ STEP_SAMPLED = {
 # Round-off diagnostics -> the column whose scale bounds them.
 NOISE_COLUMNS = {"Im_P_12": "P_11"}
 
+# (file, column) -> absolute scale, for columns tuned to vanish: the massless
+# orbit drives the measured mu^2 / H^2 to zero, leaving only round-off.
+ABSOLUTE_SCALES = {("constant_turn_massless.csv", "mu2"): 1.0}
+
 # example name -> CSV files it writes; the slow ones run only with --all.
 FAST = {
     "diagnostics": [
@@ -143,7 +147,12 @@ def compare(name: str, golden: Path, fresh: Path, rtol: float, exact: bool) -> l
         for index, (row_a, row_b) in enumerate(zip(table_a, table_b)):
             a, b = row_a[column], row_b[column]
             if isinstance(a, float) and isinstance(b, float):
-                scale = abs(row_b[reference]) if reference is not None else max(abs(a), abs(b))
+                if (name, label) in ABSOLUTE_SCALES:
+                    scale = ABSOLUTE_SCALES[(name, label)]
+                elif reference is not None:
+                    scale = abs(row_b[reference])
+                else:
+                    scale = max(abs(a), abs(b))
                 if abs(a - b) > rtol * scale + floor:
                     errors.append(
                         f"{name}: column {label}, row {index}: {a!r} vs golden {b!r}"
