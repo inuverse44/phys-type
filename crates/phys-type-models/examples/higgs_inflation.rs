@@ -130,7 +130,7 @@ fn main() -> io::Result<()> {
             let jordan_e_folds = jordan(&end) - jordan(&pivot);
             writeln!(
                 file,
-                "{formulation:?},{xi:e},{n_s:.8},{r:.8e},{n_s_slow_roll:.8},{r_slow_roll:.8e},{jordan_e_folds:.6},{:.8e}",
+                "{formulation:?},{xi:e},{n_s:.12},{r:.12e},{n_s_slow_roll:.12},{r_slow_roll:.12e},{jordan_e_folds:.10},{:.12e}",
                 pivot.phi[0].into_value()
             )?;
             eprintln!(
