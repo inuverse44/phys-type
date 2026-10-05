@@ -70,7 +70,10 @@ formulations (444 points, about a minute). `plots/higgs_ns_r.py` follows the
 layout of Fig. 4 of Kodama and Takahashi,
 [arXiv:2112.05283](https://arxiv.org/abs/2112.05283): metric and Palatini in
 two columns, logarithmic and linear $r$ in two rows, $\log_{10}\xi$ as colour.
-It overlays the points on
+The logarithmic panels stop at $r=10^{-5}$, so the
+Palatini points with $\xi\gtrsim10^2$ appear only in the linear panels (at
+$r\simeq0$). The contours are drawn as lines, solid for 68% and dashed for
+95%. It overlays the points on
 the 68% and 95% contours that BICEP/Keck publish with
 [BICEP/Keck XIII, arXiv:2110.00483](https://arxiv.org/abs/2110.00483)
 (Fig. 5, data release `rns_code.tgz` at
