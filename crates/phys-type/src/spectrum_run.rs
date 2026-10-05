@@ -25,10 +25,10 @@ use crate::spectra::{
 use crate::{
     Complex64, ComplexMagnitude, ConformalBackgroundState, ConformalPerturbationState,
     ConformalPerturbationSystem, ConformalPerturbationTolerance, ContravariantField,
-    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, KinematicBasisError, M0, Mass,
-    ModeAcceleration, ModeAmplitude, ModeInitializationError, ModeVelocity, Modes, MultifieldState,
-    MultifieldStateDelta, ScaleFactor, Time, TwiceDifferentiableMultifieldPotential,
-    TwoFieldKinematics,
+    CovariantMultifieldSystem, CurvedFieldSpaceGeometry, FieldSpaceGeometry, KinematicBasisError,
+    M0, Mass, ModeAcceleration, ModeAmplitude, ModeInitializationError, ModeVelocity, Modes,
+    MultifieldPotential, MultifieldState, MultifieldStateDelta, Quantity, ScaleFactor, Time,
+    TwiceDifferentiableMultifieldPotential, TwoFieldKinematics,
 };
 
 #[cfg(test)]
@@ -303,13 +303,31 @@ pub struct Pivot {
 
 /// The result of [`CovariantMultifieldSystem::survey`].
 #[derive(Clone, Debug)]
-pub struct BackgroundSurvey {
-    /// Sampled background rows.
-    pub records: Vec<BackgroundRecord>,
+pub struct BackgroundSurvey<const N: usize = 2> {
+    /// Background samples: the initial state, every
+    /// `background_sample_every`-th accepted step, and the end.
+    pub samples: Vec<BackgroundSample<N>>,
     /// The interpolated trajectory.
-    pub trajectory: BackgroundTrajectory,
+    pub trajectory: BackgroundTrajectory<N>,
     /// Elapsed e-folds at the end of inflation.
     pub e_folds_at_end: f64,
+}
+
+/// One background sample for any number of fields, in Planck units.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BackgroundSample<const N: usize> {
+    /// Elapsed e-folds.
+    pub e_folds: f64,
+    /// Field values.
+    pub phi: [f64; N],
+    /// Cosmic-time field velocities.
+    pub pi: [f64; N],
+    /// Hubble rate.
+    pub hubble: f64,
+    /// `epsilon_H`.
+    pub epsilon_h: f64,
+    /// `|eta_perp| = |D_t e_sigma| / H`; zero for one field.
+    pub eta_perp: f64,
 }
 
 /// One background row, in Planck units.
@@ -843,11 +861,11 @@ where
 }
 
 #[derive(Clone, Copy, Debug)]
-struct BackgroundCheckpoint {
+struct BackgroundCheckpoint<const N: usize> {
     e_folds: f64,
-    state: MultifieldState<2>,
-    dphi_dn: [crate::Field; 2],
-    dpi_dn: [crate::FieldVelocity; 2],
+    state: MultifieldState<N>,
+    dphi_dn: [crate::Field; N],
+    dpi_dn: [crate::FieldVelocity; N],
 }
 
 /// A surveyed background, interpolated between accepted integration steps.
@@ -856,15 +874,15 @@ struct BackgroundCheckpoint {
 /// interpolation is the cubic Hermite scheme of
 /// `docs/background-checkpoint-interpolation.md`.
 #[derive(Clone, Debug)]
-pub struct BackgroundTrajectory {
-    initial: MultifieldState<2>,
-    checkpoints: Vec<BackgroundCheckpoint>,
+pub struct BackgroundTrajectory<const N: usize = 2> {
+    initial: MultifieldState<N>,
+    checkpoints: Vec<BackgroundCheckpoint<N>>,
 }
 
-impl BackgroundTrajectory {
+impl<const N: usize> BackgroundTrajectory<N> {
     /// The interpolated state `e_folds` after the initial state, clamped to
     /// the surveyed range.
-    pub fn state_at(&self, e_folds: f64) -> MultifieldState<2> {
+    pub fn state_at(&self, e_folds: f64) -> MultifieldState<N> {
         let last = self.checkpoints.len() - 1;
         let upper = self
             .checkpoints
@@ -901,7 +919,7 @@ impl BackgroundTrajectory {
     /// The first elapsed e-fold at which `event` falls from positive to
     /// zero or below, refined by bisection to `1e-13` e-folds and returned on
     /// the positive side; `None` if it never does.
-    pub fn crossing(&self, mut event: impl FnMut(&MultifieldState<2>) -> f64) -> Option<f64> {
+    pub fn crossing(&self, mut event: impl FnMut(&MultifieldState<N>) -> f64) -> Option<f64> {
         let mut left = self.checkpoints[0].e_folds;
         let left_value = event(&self.checkpoints[0].state);
         if left_value <= 0.0 {
@@ -937,31 +955,31 @@ impl BackgroundTrajectory {
     }
 }
 
-impl crate::BackgroundProvider<2> for BackgroundTrajectory {
-    fn state_at_e_folds(&self, e_folds: f64) -> MultifieldState<2> {
+impl<const N: usize> crate::BackgroundProvider<N> for BackgroundTrajectory<N> {
+    fn state_at_e_folds(&self, e_folds: f64) -> MultifieldState<N> {
         self.state_at(e_folds)
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct ModesInEFolds(Modes<2>);
+struct ModesInEFolds<const N: usize>(Modes<N>);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct ModeDeltaInEFolds {
-    amplitude: [[ModeAmplitude; 2]; 2],
-    velocity: [[ModeVelocity; 2]; 2],
+struct ModeDeltaInEFolds<const N: usize> {
+    amplitude: [[ModeAmplitude; N]; N],
+    velocity: [[ModeVelocity; N]; N],
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct ModeDerivativeInEFolds {
-    amplitude: [[ModeAmplitude; 2]; 2],
-    velocity: [[ModeVelocity; 2]; 2],
+struct ModeDerivativeInEFolds<const N: usize> {
+    amplitude: [[ModeAmplitude; N]; N],
+    velocity: [[ModeVelocity; N]; N],
 }
 
-impl core::ops::Add<ModeDeltaInEFolds> for ModesInEFolds {
+impl<const N: usize> core::ops::Add<ModeDeltaInEFolds<N>> for ModesInEFolds<N> {
     type Output = Self;
 
-    fn add(self, rhs: ModeDeltaInEFolds) -> Self::Output {
+    fn add(self, rhs: ModeDeltaInEFolds<N>) -> Self::Output {
         Self(Modes {
             rescaled_amplitude: core::array::from_fn(|field| {
                 core::array::from_fn(|mode| {
@@ -977,7 +995,7 @@ impl core::ops::Add<ModeDeltaInEFolds> for ModesInEFolds {
     }
 }
 
-impl core::ops::Add for ModeDerivativeInEFolds {
+impl<const N: usize> core::ops::Add for ModeDerivativeInEFolds<N> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -994,7 +1012,7 @@ impl core::ops::Add for ModeDerivativeInEFolds {
     }
 }
 
-impl core::ops::Mul<f64> for ModeDerivativeInEFolds {
+impl<const N: usize> core::ops::Mul<f64> for ModeDerivativeInEFolds<N> {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self::Output {
@@ -1005,8 +1023,8 @@ impl core::ops::Mul<f64> for ModeDerivativeInEFolds {
     }
 }
 
-impl core::ops::Mul<crate::Dimensionless> for ModeDerivativeInEFolds {
-    type Output = ModeDeltaInEFolds;
+impl<const N: usize> core::ops::Mul<crate::Dimensionless> for ModeDerivativeInEFolds<N> {
+    type Output = ModeDeltaInEFolds<N>;
 
     fn mul(self, rhs: crate::Dimensionless) -> Self::Output {
         let rhs = rhs.into_value();
@@ -1017,9 +1035,9 @@ impl core::ops::Mul<crate::Dimensionless> for ModeDerivativeInEFolds {
     }
 }
 
-struct InterpolatedModeSystem<'a, P, G> {
-    background: &'a CovariantMultifieldSystem<P, G, 2>,
-    trajectory: &'a BackgroundTrajectory,
+struct InterpolatedModeSystem<'a, P, G, const N: usize> {
+    background: &'a CovariantMultifieldSystem<P, G, N>,
+    trajectory: &'a BackgroundTrajectory<N>,
     k: Mass,
     /// Evolve a tensor polarization instead of the scalar modes: the
     /// equation of a massless field in flat field space, so the mass
@@ -1027,15 +1045,15 @@ struct InterpolatedModeSystem<'a, P, G> {
     tensor: bool,
 }
 
-impl<P, G> System for InterpolatedModeSystem<'_, P, G>
+impl<P, G, const N: usize> System for InterpolatedModeSystem<'_, P, G, N>
 where
-    P: TwiceDifferentiableMultifieldPotential<2>,
-    G: CurvedFieldSpaceGeometry<2>,
+    P: TwiceDifferentiableMultifieldPotential<N>,
+    G: CurvedFieldSpaceGeometry<N>,
 {
     type IndependentVariable = crate::Dimensionless;
-    type State = ModesInEFolds;
-    type Delta = ModeDeltaInEFolds;
-    type Derivative = ModeDerivativeInEFolds;
+    type State = ModesInEFolds<N>;
+    type Delta = ModeDeltaInEFolds<N>;
+    type Derivative = ModeDerivativeInEFolds<N>;
 
     fn derivative(&self, e_folds: crate::Dimensionless, state: &Self::State) -> Self::Derivative {
         let background = self.trajectory.state_at(e_folds.into_value());
@@ -1054,8 +1072,8 @@ where
 
         let amplitude = core::array::from_fn(|upper| {
             core::array::from_fn(|mode| {
-                let connection_term = (0..2)
-                    .flat_map(|first| (0..2).map(move |second| (first, second)))
+                let connection_term = (0..N)
+                    .flat_map(|first| (0..N).map(move |second| (first, second)))
                     .fold(
                         ModeVelocity::new(Complex64::new(0.0, 0.0)),
                         |sum, (first, second)| {
@@ -1069,7 +1087,7 @@ where
         });
         let velocity = core::array::from_fn(|upper| {
             core::array::from_fn(|mode| {
-                let restoring = (0..2).fold(
+                let restoring = (0..N).fold(
                     ModeAcceleration::new(Complex64::new(0.0, 0.0)),
                     |sum, lower| {
                         let entry = if upper == lower {
@@ -1082,8 +1100,8 @@ where
                         sum + entry * state.0.rescaled_amplitude[lower][mode]
                     },
                 );
-                let connection_term = (0..2)
-                    .flat_map(|first| (0..2).map(move |second| (first, second)))
+                let connection_term = (0..N)
+                    .flat_map(|first| (0..N).map(move |second| (first, second)))
                     .fold(
                         ModeAcceleration::new(Complex64::new(0.0, 0.0)),
                         |sum, (first, second)| {
@@ -1109,10 +1127,10 @@ struct ModeTolerancesInEFolds {
     velocity: ModeVelocity<f64>,
 }
 
-impl<P, G> AdaptiveSystem for InterpolatedModeSystem<'_, P, G>
+impl<P, G, const N: usize> AdaptiveSystem for InterpolatedModeSystem<'_, P, G, N>
 where
-    P: TwiceDifferentiableMultifieldPotential<2>,
-    G: CurvedFieldSpaceGeometry<2>,
+    P: TwiceDifferentiableMultifieldPotential<N>,
+    G: CurvedFieldSpaceGeometry<N>,
 {
     type AbsoluteTolerance = ModeTolerancesInEFolds;
 
@@ -1126,8 +1144,8 @@ where
         let amplitude_scale = mode_scale(&current.0.rescaled_amplitude, &next.0.rescaled_amplitude);
         let velocity_scale = mode_scale(&current.0.rescaled_velocity, &next.0.rescaled_velocity);
 
-        (0..2)
-            .flat_map(|field| (0..2).map(move |mode| (field, mode)))
+        (0..N)
+            .flat_map(|field| (0..N).map(move |mode| (field, mode)))
             .map(|(field, mode)| {
                 crate::perturbation::normalized_mode_error(
                     error.amplitude[field][mode],
@@ -1146,9 +1164,9 @@ where
     }
 }
 
-fn mode_scale<D: Copy>(
-    current: &[[crate::Quantity<D, Complex64>; 2]; 2],
-    next: &[[crate::Quantity<D, Complex64>; 2]; 2],
+fn mode_scale<D: Copy, const N: usize>(
+    current: &[[crate::Quantity<D, Complex64>; N]; N],
+    next: &[[crate::Quantity<D, Complex64>; N]; N],
 ) -> crate::Quantity<D, f64> {
     crate::Quantity::new(
         current
@@ -1160,19 +1178,19 @@ fn mode_scale<D: Copy>(
     )
 }
 
-fn advance_interpolated_modes<P, G, Observe>(
-    system: &InterpolatedModeSystem<'_, P, G>,
-    initial_state: ModesInEFolds,
+fn advance_interpolated_modes<P, G, Observe, const N: usize>(
+    system: &InterpolatedModeSystem<'_, P, G, N>,
+    initial_state: ModesInEFolds<N>,
     initial_e_folds: f64,
     target_e_folds: f64,
     settings: &SpectrumRunSettings,
     stage: SpectrumRunStage,
     mut on_accepted: Observe,
-) -> Result<ModesInEFolds, SpectrumRunError>
+) -> Result<ModesInEFolds<N>, SpectrumRunError>
 where
-    P: TwiceDifferentiableMultifieldPotential<2>,
-    G: CurvedFieldSpaceGeometry<2>,
-    Observe: FnMut(&ModesInEFolds, f64),
+    P: TwiceDifferentiableMultifieldPotential<N>,
+    G: CurvedFieldSpaceGeometry<N>,
+    Observe: FnMut(&ModesInEFolds<N>, f64),
 {
     let limits = StepSizeLimits {
         min: settings.min_dt,
@@ -1221,42 +1239,253 @@ where
     Err(SpectrumRunError::StepLimitReached { stage })
 }
 
-impl<P, G> CovariantMultifieldSystem<P, G, 2>
+impl<P, G, const N: usize> CovariantMultifieldSystem<P, G, N>
 where
-    P: TwiceDifferentiableMultifieldPotential<2> + Clone,
-    G: CurvedFieldSpaceGeometry<2> + Clone,
+    P: MultifieldPotential<N>,
+    G: FieldSpaceGeometry<N>,
 {
+    fn background_checkpoint(
+        &self,
+        initial: &MultifieldState<N>,
+        state: &MultifieldState<N>,
+    ) -> BackgroundCheckpoint<N> {
+        let hubble = self.hubble(state);
+        let derivative = self.derivative(Time::new(0.0), state);
+
+        BackgroundCheckpoint {
+            e_folds: state.e_folds(initial),
+            state: *state,
+            dphi_dn: derivative.dphi_dt.map(|entry| entry / hubble),
+            dpi_dn: derivative.dpi_dt.map(|entry| entry / hubble),
+        }
+    }
+
+    /// Integrates the background to the end-of-inflation event, checking the
+    /// geometry's domain on every accepted step. `on_accepted` sees every
+    /// accepted state and the number of accepted steps so far.
+    pub(crate) fn survey_trajectory(
+        &self,
+        initial: MultifieldState<N>,
+        settings: &SpectrumRunSettings,
+        mut on_accepted: impl FnMut(&MultifieldState<N>, usize),
+    ) -> Result<(BackgroundTrajectory<N>, f64, MultifieldState<N>), SpectrumRunError> {
+        self.geometry.check_domain(&initial.phi).map_err(|error| {
+            SpectrumRunError::OutsideGeometryDomain {
+                e_folds: 0.0,
+                error,
+            }
+        })?;
+        let mut domain_error = None;
+        let mut accepted = 0_usize;
+        let mut checkpoints = vec![self.background_checkpoint(&initial, &initial)];
+
+        // Inflation ends at the requested event. The survey also stops if the
+        // e-folding budget runs out, or if slow roll is violated before a
+        // field-value event; both are reported separately.
+        let field_event = match settings.end_of_inflation {
+            EndOfInflation::SlowRollViolation => None,
+            EndOfInflation::FieldValue { field, value } => {
+                let side = (initial.phi[field] - value).into_value().signum();
+                Some((field, value, side))
+            }
+        };
+        let (final_state, _) = advance_until(
+            self,
+            initial,
+            Time::new(0.0),
+            AdvanceControl {
+                settings,
+                tolerances: &background_tolerances::<N>(settings),
+                stage: SpectrumRunStage::BackgroundSurvey,
+            },
+            |state| {
+                let remaining = settings.max_e_folds - state.e_folds(&initial);
+                let inflating = 1.0 - self.epsilon_h(state);
+                let before_field_event = field_event
+                    .map_or(f64::INFINITY, |(field, value, side)| {
+                        side * (state.phi[field] - value).into_value()
+                    });
+
+                remaining.min(inflating).min(before_field_event)
+            },
+            |state, _| {
+                accepted += 1;
+                checkpoints.push(self.background_checkpoint(&initial, state));
+                if domain_error.is_none()
+                    && let Err(error) = self.geometry.check_domain(&state.phi)
+                {
+                    domain_error = Some(SpectrumRunError::OutsideGeometryDomain {
+                        e_folds: state.e_folds(&initial),
+                        error,
+                    });
+                }
+                on_accepted(state, accepted);
+            },
+        )?;
+
+        if let Some(error) = domain_error {
+            return Err(error);
+        }
+
+        let e_folds = final_state.e_folds(&initial);
+        let ended = match field_event {
+            None => self.epsilon_h(&final_state) >= 1.0 - 1.0e-9,
+            Some((field, value, side)) => {
+                let distance = side * (final_state.phi[field] - value).into_value();
+                if distance > 1.0e-9 * value.into_value().abs().max(1.0) {
+                    if self.epsilon_h(&final_state) >= 1.0 - 1.0e-9 {
+                        return Err(SpectrumRunError::SlowRollEndedFirst { e_folds });
+                    }
+                    false
+                } else {
+                    true
+                }
+            }
+        };
+        if !ended {
+            return Err(SpectrumRunError::InflationDidNotEnd { e_folds });
+        }
+
+        Ok((
+            BackgroundTrajectory {
+                initial,
+                checkpoints,
+            },
+            e_folds,
+            final_state,
+        ))
+    }
+
+    fn background_sample(
+        &self,
+        initial: &MultifieldState<N>,
+        state: &MultifieldState<N>,
+    ) -> BackgroundSample<N> {
+        BackgroundSample {
+            e_folds: state.e_folds(initial),
+            phi: state.phi.map(Quantity::into_value),
+            pi: state.pi.map(Quantity::into_value),
+            hubble: self.hubble(state).into_value(),
+            epsilon_h: self.epsilon_h(state),
+            eta_perp: if N == 1 {
+                0.0
+            } else {
+                self.kinematics(state)
+                    .map_or(f64::NAN, |kinematics| kinematics.eta_perp.into_value())
+            },
+        }
+    }
+
     /// Integrates the background from `initial` to the end-of-inflation event
-    /// of `settings`, checking the geometry's domain on every accepted step.
+    /// of `settings`, for any number of fields, checking the geometry's
+    /// domain on every accepted step.
     pub fn survey(
         &self,
-        initial: MultifieldState<2>,
+        initial: MultifieldState<N>,
         settings: &SpectrumRunSettings,
-    ) -> Result<BackgroundSurvey, SpectrumRunError> {
+    ) -> Result<BackgroundSurvey<N>, SpectrumRunError> {
         validate(settings)?;
-        let (records, trajectory, e_folds_at_end) = self.survey_background(initial, settings)?;
+        let mut samples = vec![self.background_sample(&initial, &initial)];
+        let (trajectory, e_folds_at_end, final_state) =
+            self.survey_trajectory(initial, settings, |state, accepted| {
+                if accepted.is_multiple_of(settings.background_sample_every) {
+                    samples.push(self.background_sample(&initial, state));
+                }
+            })?;
+        samples.push(self.background_sample(&initial, &final_state));
         Ok(BackgroundSurvey {
-            records,
+            samples,
             trajectory,
             e_folds_at_end,
         })
     }
+}
 
+/// The spectra of one mode on a surveyed trajectory, for any number of
+/// fields.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ModeSpectrum<const N: usize> {
+    /// Comoving wavenumber in Planck units.
+    pub k: f64,
+    /// Elapsed e-folds of the output slice.
+    pub e_folds: f64,
+    /// `k/(aH)` on the output slice.
+    pub k_over_ah: f64,
+    /// Curvature and basis-free entropy spectra.
+    pub spectra: crate::InvariantSpectra<N>,
+}
+
+impl<P, G, const N: usize> CovariantMultifieldSystem<P, G, N>
+where
+    P: TwiceDifferentiableMultifieldPotential<N> + Clone,
+    G: CurvedFieldSpaceGeometry<N> + Clone,
+{
     /// Evolves the mode of wavenumber `k` on a surveyed `trajectory` from its
     /// Bunch-Davies start, `settings.e_folds_before_exit` e-folds before
-    /// horizon exit, to `e_folds_at_output`, and projects its spectra. The
-    /// record's `k_over_pivot` is one; `k_internal_over_m_pl` gives `k`.
+    /// horizon exit, to `e_folds_at_output`, and projects it onto the
+    /// curvature and basis-free entropy spectra.
     pub fn mode_spectrum(
         &self,
-        initial: MultifieldState<2>,
         settings: &SpectrumRunSettings,
-        trajectory: &BackgroundTrajectory,
+        trajectory: &BackgroundTrajectory<N>,
         k: Mass,
         e_folds_at_output: f64,
-    ) -> Result<SpectrumRecord, SpectrumRunError> {
+    ) -> Result<ModeSpectrum<N>, SpectrumRunError> {
         validate(settings)?;
-        self.evolve_one_mode(initial, settings, trajectory, k, 1.0, e_folds_at_output)
-            .map(|(record, _, _)| record)
+        let start_e_folds = trajectory
+            .crossing(|state| {
+                (k / (state.a * self.hubble(state))).into_value() - start_depth(settings)
+            })
+            .ok_or(SpectrumRunError::StepLimitReached {
+                stage: SpectrumRunStage::ModeStart { k: k.into_value() },
+            })?;
+        let conformal_system = ConformalPerturbationSystem::new(self.clone(), k);
+        let initialized = conformal_system
+            .bunch_davies_state(trajectory.state_at(start_e_folds), start_depth(settings))
+            .map_err(|source| SpectrumRunError::ModeInitialization {
+                k: k.into_value(),
+                source,
+            })?;
+        let mode_system = InterpolatedModeSystem {
+            background: self,
+            trajectory,
+            k,
+            tensor: false,
+        };
+        let state = advance_interpolated_modes(
+            &mode_system,
+            ModesInEFolds(initialized.modes),
+            start_e_folds,
+            e_folds_at_output,
+            settings,
+            SpectrumRunStage::ModeEvolution { k: k.into_value() },
+            |_, _| {},
+        )?;
+        let background = trajectory.state_at(e_folds_at_output);
+        let k_over_ah = (k / (background.a * self.hubble(&background))).into_value();
+        if k_over_ah > 1.0 {
+            return Err(SpectrumRunError::OutputBeforeHorizonExit {
+                k: k.into_value(),
+                k_over_ah,
+            });
+        }
+        let cosmic = ConformalPerturbationState {
+            background: ConformalBackgroundState::from_cosmic(background),
+            modes: state.0,
+        }
+        .cosmic();
+        let spectra = crate::PerturbationSystem::new(self.clone(), k)
+            .invariant_spectra(&cosmic, settings.spectrum_tolerances)
+            .map_err(|source| SpectrumRunError::Spectrum {
+                k: k.into_value(),
+                source,
+            })?;
+        Ok(ModeSpectrum {
+            k: k.into_value(),
+            e_folds: e_folds_at_output,
+            k_over_ah,
+            spectra,
+        })
     }
 
     /// The tensor power spectrum `P_t` of wavenumber `k` at
@@ -1272,7 +1501,7 @@ where
     pub fn tensor_spectrum(
         &self,
         settings: &SpectrumRunSettings,
-        trajectory: &BackgroundTrajectory,
+        trajectory: &BackgroundTrajectory<N>,
         k: Mass,
         e_folds_at_output: f64,
     ) -> Result<f64, SpectrumRunError> {
@@ -1290,8 +1519,8 @@ where
             crate::Quantity::<crate::M1, Complex64>::new(Complex64::new(0.0, -k.into_value()));
         let zero_amplitude = ModeAmplitude::new(Complex64::new(0.0, 0.0));
         let zero_velocity = ModeVelocity::new(Complex64::new(0.0, 0.0));
-        let mut rescaled_amplitude = [[zero_amplitude; 2]; 2];
-        let mut rescaled_velocity = [[zero_velocity; 2]; 2];
+        let mut rescaled_amplitude = [[zero_amplitude; N]; N];
+        let mut rescaled_velocity = [[zero_velocity; N]; N];
         rescaled_amplitude[0][0] = amplitude;
         rescaled_velocity[0][0] = amplitude * frequency;
         let mode_system = InterpolatedModeSystem {
@@ -1321,7 +1550,13 @@ where
                 / (planck * planck),
         )
     }
+}
 
+impl<P, G> CovariantMultifieldSystem<P, G, 2>
+where
+    P: TwiceDifferentiableMultifieldPotential<2> + Clone,
+    G: CurvedFieldSpaceGeometry<2> + Clone,
+{
     /// Runs the background survey, fixes the pivot, and evolves one mode
     /// matrix per requested wavenumber.
     pub fn run_two_field_spectra(
@@ -1397,52 +1632,10 @@ where
             .oriented_kinematics(&initial, None)
             .map_err(SpectrumRunError::KinematicBasis)?;
         let mut rows = vec![self.background_record(&initial, &initial, &initial_kinematics)];
-        let mut domain_error = None;
         let mut previous_normal = Some(initial_kinematics.basis.normal);
         let mut basis_error = None;
-        let mut accepted = 0_usize;
-        let mut checkpoints = vec![self.background_checkpoint(&initial, &initial)];
-
-        // Inflation ends at the requested event. The survey also stops if the
-        // e-folding budget runs out, or if slow roll is violated before a
-        // field-value event; both are reported separately.
-        let field_event = match settings.end_of_inflation {
-            EndOfInflation::SlowRollViolation => None,
-            EndOfInflation::FieldValue { field, value } => {
-                let side = (initial.phi[field] - value).into_value().signum();
-                Some((field, value, side))
-            }
-        };
-        let (final_state, _) = advance_until(
-            self,
-            initial,
-            Time::new(0.0),
-            AdvanceControl {
-                settings,
-                tolerances: &background_tolerances(settings),
-                stage: SpectrumRunStage::BackgroundSurvey,
-            },
-            |state| {
-                let remaining = settings.max_e_folds - state.e_folds(&initial);
-                let inflating = 1.0 - self.epsilon_h(state);
-                let before_field_event = field_event
-                    .map_or(f64::INFINITY, |(field, value, side)| {
-                        side * (state.phi[field] - value).into_value()
-                    });
-
-                remaining.min(inflating).min(before_field_event)
-            },
-            |state, _| {
-                accepted += 1;
-                checkpoints.push(self.background_checkpoint(&initial, state));
-                if domain_error.is_none()
-                    && let Err(error) = self.geometry.check_domain(&state.phi)
-                {
-                    domain_error = Some(SpectrumRunError::OutsideGeometryDomain {
-                        e_folds: state.e_folds(&initial),
-                        error,
-                    });
-                }
+        let (trajectory, e_folds, final_state) =
+            self.survey_trajectory(initial, settings, |state, accepted| {
                 if basis_error.is_some() {
                     return;
                 }
@@ -1455,64 +1648,16 @@ where
                     }
                     Err(error) => basis_error = Some(error),
                 }
-            },
-        )?;
-
-        if let Some(error) = domain_error {
-            return Err(error);
-        }
+            })?;
         if let Some(error) = basis_error {
             return Err(SpectrumRunError::KinematicBasis(error));
         }
-
-        let e_folds = final_state.e_folds(&initial);
-        let ended = match field_event {
-            None => self.epsilon_h(&final_state) >= 1.0 - 1.0e-9,
-            Some((field, value, side)) => {
-                let distance = side * (final_state.phi[field] - value).into_value();
-                if distance > 1.0e-9 * value.into_value().abs().max(1.0) {
-                    if self.epsilon_h(&final_state) >= 1.0 - 1.0e-9 {
-                        return Err(SpectrumRunError::SlowRollEndedFirst { e_folds });
-                    }
-                    false
-                } else {
-                    true
-                }
-            }
-        };
-        if !ended {
-            return Err(SpectrumRunError::InflationDidNotEnd { e_folds });
-        }
-
         let final_kinematics = self
             .oriented_kinematics(&final_state, previous_normal.as_ref())
             .map_err(SpectrumRunError::KinematicBasis)?;
         rows.push(self.background_record(&initial, &final_state, &final_kinematics));
 
-        Ok((
-            rows,
-            BackgroundTrajectory {
-                initial,
-                checkpoints,
-            },
-            e_folds,
-        ))
-    }
-
-    fn background_checkpoint(
-        &self,
-        initial: &MultifieldState<2>,
-        state: &MultifieldState<2>,
-    ) -> BackgroundCheckpoint {
-        let hubble = self.hubble(state);
-        let derivative = self.derivative(Time::new(0.0), state);
-
-        BackgroundCheckpoint {
-            e_folds: state.e_folds(initial),
-            state: *state,
-            dphi_dn: derivative.dphi_dt.map(|entry| entry / hubble),
-            dpi_dn: derivative.dpi_dt.map(|entry| entry / hubble),
-        }
+        Ok((rows, trajectory, e_folds))
     }
 
     fn background_record(
@@ -2033,14 +2178,17 @@ fn component_pair(vector: &ContravariantField<M0, f64, 2>) -> [f64; 2] {
 }
 
 /// The background-only tolerances implied by a run's settings.
-fn background_tolerances(
+/// Background tolerances for `N` fields. The settings carry per-field
+/// tolerances for two fields; other `N` use the first field's for every field.
+fn background_tolerances<const N: usize>(
     settings: &SpectrumRunSettings,
-) -> ErrorTolerances<MultifieldStateDelta<2>> {
+) -> ErrorTolerances<MultifieldStateDelta<N>> {
     let absolute = settings.tolerances.absolute.background;
+    let index = |i: usize| if N == 2 { i } else { 0 };
     ErrorTolerances::new(
         MultifieldStateDelta {
-            phi: absolute.phi,
-            pi: absolute.pi,
+            phi: core::array::from_fn(|i| absolute.phi[index(i)]),
+            pi: core::array::from_fn(|i| absolute.pi[index(i)]),
             // The survey still uses the legacy cosmic-time background.  Its
             // scale factor is dimensionless like ln(a); the relative term
             // controls it away from zero, while this shared floor only guards
@@ -2948,9 +3096,11 @@ mod tests {
                 .tensor_spectrum(&settings, &survey.trajectory, k, output)
                 .unwrap();
             let scalar = system
-                .mode_spectrum(initial, &settings, &survey.trajectory, k, output)
+                .mode_spectrum(&settings, &survey.trajectory, k, output)
                 .unwrap()
-                .p_r;
+                .spectra
+                .curvature
+                .into_value();
             let slow_roll = 2.0 * hubble * hubble / (PI * PI) * (1.0 - 2.0 * (c + 1.0) * epsilon);
             let consistency = 16.0 * epsilon * (1.0 + c * epsilon_2);
             let r = tensor / scalar;
@@ -4442,6 +4592,143 @@ mod tests {
         assert!(
             (transported - delta_n).abs() < 5.0e-3 * delta_n.abs(),
             "transport {transported} against delta N {delta_n}"
+        );
+    }
+    /// `P_R`, `P_t`, and equilateral `f_NL` of one triangle at the pivot,
+    /// for any number of fields.
+    fn n_field_observables<P, G, const N: usize>(
+        system: &CovariantMultifieldSystem<P, G, N>,
+        initial: MultifieldState<N>,
+        settings: &SpectrumRunSettings,
+    ) -> (f64, f64, f64)
+    where
+        P: crate::ThriceDifferentiableMultifieldPotential<N> + Copy,
+        G: crate::ThirdOrderFieldSpaceGeometry<N> + crate::CurvatureDerivativeGeometry<N> + Copy,
+    {
+        let survey = system.survey(initial, settings).unwrap();
+        let output = survey.e_folds_at_end - settings.output_e_folds_before_end;
+        let pivot = survey
+            .trajectory
+            .state_at(survey.e_folds_at_end - settings.pivot_e_folds_before_end);
+        let k = pivot.a * system.hubble(&pivot);
+        let scalar = system
+            .mode_spectrum(settings, &survey.trajectory, k, output)
+            .unwrap()
+            .spectra
+            .curvature
+            .into_value();
+        let tensor = system
+            .tensor_spectrum(settings, &survey.trajectory, k, output)
+            .unwrap();
+        let bispectrum = system
+            .run_bispectrum(
+                initial,
+                &crate::BispectrumRunSettings {
+                    background: *settings,
+                    ..crate::BispectrumRunSettings::default()
+                },
+                &[crate::TriangleShape::equilateral(3.0)],
+            )
+            .unwrap();
+        (scalar, tensor, bispectrum.records[0].f_nl)
+    }
+
+    fn resting_slow_roll<P, G, const N: usize>(
+        system: &CovariantMultifieldSystem<P, G, N>,
+        phi: [f64; N],
+    ) -> MultifieldState<N>
+    where
+        P: crate::MultifieldPotential<N>,
+        G: crate::FieldSpaceGeometry<N>,
+    {
+        let resting = MultifieldState::new(
+            phi.map(Field::new),
+            [FieldVelocity::new(0.0); N],
+            ScaleFactor::new(1.0),
+        );
+        MultifieldState {
+            pi: system.slow_roll_velocity(&resting),
+            ..resting
+        }
+    }
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn one_field_runs_match_two_fields_with_a_decoupled_spectator() {
+        let settings = SpectrumRunSettings {
+            pivot_e_folds_before_end: 25.0,
+            e_folds_before_exit: 4.0,
+            ..quick_settings()
+        };
+        let single = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([Mass::new(1.0e-6)]),
+            FlatFieldSpace,
+        );
+        let pair = system([1.0e-6, 3.0e-5]);
+        let one = n_field_observables(&single, resting_slow_roll(&single, [12.0]), &settings);
+        let two = n_field_observables(&pair, resting_slow_roll(&pair, [12.0, 0.0]), &settings);
+        assert!(
+            (one.0 / two.0 - 1.0).abs() < 1.0e-9,
+            "P_R {} vs {}",
+            one.0,
+            two.0
+        );
+        assert!(
+            (one.1 / two.1 - 1.0).abs() < 1.0e-9,
+            "P_t {} vs {}",
+            one.1,
+            two.1
+        );
+        assert!(
+            (one.2 / two.2 - 1.0).abs() < 1.0e-6,
+            "f_NL {} vs {}",
+            one.2,
+            two.2
+        );
+    }
+
+    #[test]
+    #[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+    fn three_field_runs_match_two_fields_with_a_decoupled_spectator() {
+        let settings = SpectrumRunSettings {
+            pivot_e_folds_before_end: 25.0,
+            e_folds_before_exit: 4.0,
+            ..quick_settings()
+        };
+        let pair = system([1.0e-6, 7.0e-6]);
+        let triple = CovariantMultifieldSystem::in_planck_units(
+            QuadraticMultifieldPotential::new([
+                Mass::new(1.0e-6),
+                Mass::new(7.0e-6),
+                Mass::new(3.0e-4),
+            ]),
+            FlatFieldSpace,
+        );
+        let two = n_field_observables(&pair, resting_slow_roll(&pair, [14.0, 12.0]), &settings);
+        let three = n_field_observables(
+            &triple,
+            resting_slow_roll(&triple, [14.0, 12.0, 0.0]),
+            &settings,
+        );
+        // The spectator changes the adaptive steps, so the agreement is at the
+        // integration tolerance rather than bit for bit.
+        assert!(
+            (two.0 / three.0 - 1.0).abs() < 1.0e-8,
+            "P_R {} vs {}",
+            two.0,
+            three.0
+        );
+        assert!(
+            (two.1 / three.1 - 1.0).abs() < 1.0e-8,
+            "P_t {} vs {}",
+            two.1,
+            three.1
+        );
+        assert!(
+            (two.2 / three.2 - 1.0).abs() < 1.0e-6,
+            "f_NL {} vs {}",
+            two.2,
+            three.2
         );
     }
 }

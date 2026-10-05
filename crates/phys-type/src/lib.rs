@@ -90,9 +90,9 @@ pub use spectra::{
     hermiticity_residual, invariant_spectra, mode_covariance, project,
 };
 pub use spectrum_run::{
-    BackgroundRecord, BackgroundSurvey, BackgroundTrajectory, EndOfInflation, ModeEvolutionRecord,
-    Pivot, SpectrumRecord, SpectrumRun, SpectrumRunError, SpectrumRunSettings, SpectrumRunStage,
-    write_metadata,
+    BackgroundRecord, BackgroundSample, BackgroundSurvey, BackgroundTrajectory, EndOfInflation,
+    ModeEvolutionRecord, ModeSpectrum, Pivot, SpectrumRecord, SpectrumRun, SpectrumRunError,
+    SpectrumRunSettings, SpectrumRunStage, write_metadata,
 };
 pub use state::{State, StateDelta, StateDerivative};
 pub use theory::{
