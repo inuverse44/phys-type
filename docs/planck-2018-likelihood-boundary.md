@@ -60,6 +60,18 @@ The typed source of this block is `PLANCK_2018_TT_TE_EE_LOW_E`.  Lensing is a
 separate `LikelihoodComponent`, so it cannot appear in the baseline by an
 undocumented convention.
 
+## Published contours as an overlay
+
+`plots/higgs_ns_r.py` draws the 68% and 95% $n_s$–$r_{0.002}$ contours from
+the BICEP/Keck 2018 data release
+([arXiv:2110.00483](https://arxiv.org/abs/2110.00483), `rns_code.tgz`), for the
+combinations "Planck TT,TE,EE+lowE+lensing" and "+BK18+BAO".
+`scripts/fetch_bk18.py` fetches the release and pins its SHA-256; the grids
+are not redistributed. The overlay places predicted points against published
+posteriors that were derived for $\Lambda$CDM+$r$. It does not evaluate any
+likelihood, so the boundary above still applies: falling inside a contour is
+a benchmark comparison, not a fit.
+
 ## Future inference boundary
 
 A genuine fit requires at least these additional, separately validated

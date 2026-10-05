@@ -2,3 +2,4 @@
 /diagnostics
 __pycache__/
 *.py[cod]
+/data

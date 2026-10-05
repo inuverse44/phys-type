@@ -61,6 +61,62 @@ At $\xi=10^4$:
   frame it was counted in; for Palatini Higgs inflation the choice moves $n_s$
   by about $2\Delta N/N^2\simeq4\times10^{-3}$.
 
+## The $n_s$–$r$ plane
+
+`examples/higgs_ns_r.rs` runs the same exact evolution
+(`examples/shared/higgs.rs`) on a grid of $\log_{10}\xi=-5,-4.75,\dots,4$ and
+$N_*=50,52,\dots,60$ Einstein-frame e-folds before the end, in both
+formulations (444 points, about a minute). `plots/higgs_ns_r.py` follows the
+layout of Fig. 4 of Kodama and Takahashi,
+[arXiv:2112.05283](https://arxiv.org/abs/2112.05283): metric and Palatini in
+two columns, logarithmic and linear $r$ in two rows, $\log_{10}\xi$ as colour.
+It overlays the points on
+the 68% and 95% contours that BICEP/Keck publish with
+[BICEP/Keck XIII, arXiv:2110.00483](https://arxiv.org/abs/2110.00483)
+(Fig. 5, data release `rns_code.tgz` at
+<http://bicepkeck.org/>), for "Planck TT,TE,EE+lowE+lensing" and
+"+BK18+BAO". `scripts/fetch_bk18.py` downloads that release into
+`data/bk18_rns/` and checks its SHA-256; the contours are not redistributed in
+this repository.
+
+![n_s-r plane](figures/higgs_ns_r.png)
+
+| $N_*$ | metric, $\xi=10^4$ | Palatini, $\xi=10^4$ |
+| --- | --- | --- |
+| 50 | $n_s=0.96150$, $r=4.25\times10^{-3}$ | $n_s=0.95971$, $r=8.2\times10^{-8}$ |
+| 60 | $n_s=0.96775$, $r=3.01\times10^{-3}$ | $n_s=0.96643$, $r=5.7\times10^{-8}$ |
+
+The smallest $\log_{10}\xi$ on the grid that lies inside each region
+(every larger $\xi$ on the grid stays inside; identical for the two
+formulations at this resolution):
+
+| region | $N_*=50$ | $N_*=60$ |
+| --- | --- | --- |
+| Planck 95% | $-1.75$ | $-2.25$ |
+| Planck 68% | $-1.25$ | $-2.0$ |
+| +BK18+BAO 95% | $-1.25$ | $-1.75$ |
+| +BK18+BAO 68% | none | $-1.5$ |
+
+- At $\xi=10^{-5}$ both formulations are quartic inflation
+  ($r\simeq0.26$–0.31), well outside both regions. They separate only once
+  $\xi\gtrsim10^{-2}$, where $\xi\phi_*^2\sim1$.
+- The two formulations separate only in $r$: at large $\xi$ the metric $r$
+  saturates at $\simeq12/N^2$, while the Palatini $r\propto1/\xi$ falls below any
+  foreseeable sensitivity; $n_s$ differs by $\lesssim2\times10^{-3}$.
+- The region table comes from interpolating the published densities at each
+  point. It is a reading of the overlay, not a likelihood.
+- **This is an overlay, not a fit.** The contours are the published
+  $\Lambda$CDM+$r$ posteriors and are not recomputed for this model; see
+  [`planck-2018-likelihood-boundary.md`](planck-2018-likelihood-boundary.md).
+- **Pivot.** The contours use $r_{0.002}$ ($k=0.002\,\mathrm{Mpc}^{-1}$); the
+  Higgs points give $r$ at the mode that crosses the horizon $N_*$ e-folds
+  before the end. Mapping $N_*$ onto a physical $k$ needs the reheating
+  history, which is not modelled. That uncertainty is the reason for showing
+  both 50 and 60. Within it, the difference between $r_{0.002}$ and $r_{0.05}$
+  (under 1% for these models) is negligible.
+- **Frame.** $N_*$ is counted in the Einstein frame; the Jordan-frame counts
+  for the same interval are in the `jordan_e_folds` column (see above).
+
 ## Tests
 
 `crates/phys-type-models/tests/higgs.rs` (ignored, release mode): the exact
