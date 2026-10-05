@@ -30,6 +30,9 @@ CONSTANT_TURN_PLOT = ("constant_turn.py", "constant_turn_spectra")
 ASSISTED_PLOT = ("assisted_inflation.py", "assisted_inflation")
 SQUEEZED_PLOT = ("constant_turn_squeezed.py", "constant_turn_squeezed")
 HIGGS_PLOT = ("higgs_inflation.py", "higgs_inflation")
+# The n_s-r figure overlays the BICEP/Keck 2018 contours, which are fetched
+# into data/bk18_rns rather than redistributed.
+NS_R_PLOT = ("higgs_ns_r.py", "higgs_ns_r")
 
 
 def run(command: list[str], cwd: Path) -> None:
@@ -103,7 +106,12 @@ def main() -> None:
         run([sys.executable, str(scripts / script), str(output)], repository)
         verify(output, stem)
 
-    print(f"verified {(len(PLOTS) + 7) * 2} plot files in {output}")
+    run([sys.executable, str(repository / "scripts" / "fetch_bk18.py")], repository)
+    script, stem = NS_R_PLOT
+    run([sys.executable, str(scripts / script), str(output)], repository)
+    verify(output, stem)
+
+    print(f"verified {(len(PLOTS) + 8) * 2} plot files in {output}")
 
 
 if __name__ == "__main__":

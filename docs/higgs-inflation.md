@@ -61,6 +61,44 @@ At $\xi=10^4$:
   frame it was counted in; for Palatini Higgs inflation the choice moves $n_s$
   by about $2\Delta N/N^2\simeq4\times10^{-3}$.
 
+## The $n_s$–$r$ plane
+
+`examples/higgs_inflation.rs` evaluates both formulations at $N_*=50$ and 60
+Einstein-frame e-folds before the end. `plots/higgs_ns_r.py` overlays them on
+the 68% and 95% contours that BICEP/Keck publish with
+[BICEP/Keck XIII, arXiv:2110.00483](https://arxiv.org/abs/2110.00483)
+(Fig. 5, data release `rns_code.tgz` at
+<http://bicepkeck.org/>), for "Planck TT,TE,EE+lowE+lensing" and
+"+BK18+BAO". `scripts/fetch_bk18.py` downloads that release into
+`data/bk18_rns/` and checks its SHA-256; the contours are not redistributed in
+this repository.
+
+![n_s-r plane](figures/higgs_ns_r.png)
+
+| $N_*$ | metric, $\xi=10^4$ | Palatini, $\xi=10^4$ | BK18+BAO region, $\xi\ge10^{-1}$ |
+| --- | --- | --- | --- |
+| 50 | $n_s=0.96150$, $r=4.25\times10^{-3}$ | $n_s=0.95971$, $r=8.2\times10^{-8}$ | 95% |
+| 60 | $n_s=0.96775$, $r=3.01\times10^{-3}$ | $n_s=0.96643$, $r=5.7\times10^{-8}$ | 68% |
+
+- For $\xi\le10^{-2}$ both formulations approach quartic inflation and lie
+  outside the 95% region (at $\xi=10^{-3}$, $r\simeq0.18$–0.22).
+- The two formulations separate only in $r$: at large $\xi$ the metric $r$
+  saturates at $\simeq12/N^2$, while the Palatini $r\propto1/\xi$ falls below any
+  foreseeable sensitivity; $n_s$ differs by $\lesssim2\times10^{-3}$.
+- The region column comes from interpolating the published BK18+BAO density
+  at each point.
+- **This is an overlay, not a fit.** The contours are the published
+  $\Lambda$CDM+$r$ posteriors and are not recomputed for this model; see
+  [`planck-2018-likelihood-boundary.md`](planck-2018-likelihood-boundary.md).
+- **Pivot.** The contours use $r_{0.002}$ ($k=0.002\,\mathrm{Mpc}^{-1}$); the
+  Higgs points give $r$ at the mode that crosses the horizon $N_*$ e-folds
+  before the end. Mapping $N_*$ onto a physical $k$ needs the reheating
+  history, which is not modelled. That uncertainty is the reason for showing
+  both 50 and 60. Within it, the difference between $r_{0.002}$ and $r_{0.05}$
+  (under 1% for these models) is negligible.
+- **Frame.** $N_*$ is counted in the Einstein frame; the Jordan-frame counts
+  for the same interval are in the `jordan_e_folds` column (see above).
+
 ## Tests
 
 `crates/phys-type-models/tests/higgs.rs` (ignored, release mode): the exact

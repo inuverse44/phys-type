@@ -13,6 +13,11 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `examples/higgs_inflation.rs`, `plots/higgs_inflation.py`, and the tracked
   figure `docs/figures/higgs_inflation.png`. The exact `n_s` and `r` follow
   slow roll to second-order accuracy and reach the large-`xi` limits.
+- The Higgs example evaluates `N_* = 50` and 60 (new `pivot_e_folds` column).
+  `plots/higgs_ns_r.py` overlays both on the Planck 2018 and BICEP/Keck 2018
+  `n_s`-`r` contours (arXiv:2110.00483), fetched and checksum-verified by
+  `scripts/fetch_bk18.py` into the untracked `data/`; tracked figure
+  `docs/figures/higgs_ns_r.png`.
 - `CovariantMultifieldSystem::tensor_spectrum`: the tensor power spectrum of
   one wavenumber, evolved from the Bunch-Davies vacuum on a surveyed
   trajectory. It reproduces the second-order slow-roll `P_t` and the

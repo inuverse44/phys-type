@@ -28,7 +28,7 @@ import numpy as np
 
 from _common import load_csv, load_metadata, require_finite, save_figure
 
-COLUMNS = {"formulation", "xi", "n_s", "r", "n_s_slow_roll", "r_slow_roll", "jordan_e_folds"}
+COLUMNS = {"pivot_e_folds", "formulation", "xi", "n_s", "r", "n_s_slow_roll", "r_slow_roll", "jordan_e_folds"}
 STYLES = {"Metric": ("tab:blue", "o"), "Palatini": ("tab:orange", "s")}
 E_FOLDS = 60.0
 
@@ -42,6 +42,7 @@ def main() -> None:
     path = args.directory / "higgs_inflation.csv"
     data = load_csv(path, COLUMNS)
     require_finite(data, COLUMNS - {"formulation"})
+    data = data[np.isclose(data["pivot_e_folds"], E_FOLDS)]
     revision = load_metadata(path).get("revision")
 
     plt.style.use("seaborn-v0_8-whitegrid")

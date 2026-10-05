@@ -154,7 +154,18 @@ uv run plots/higgs_inflation.py diagnostics
 Its reference figure is
 [`docs/figures/higgs_inflation.png`](docs/figures/higgs_inflation.png)
 ([`PDF`](docs/figures/higgs_inflation.pdf)); see
-[`docs/higgs-inflation.md`](docs/higgs-inflation.md).
+[`docs/higgs-inflation.md`](docs/higgs-inflation.md). The same predictions at
+$N_*=50$ and 60 are overlaid on the Planck 2018 and BICEP/Keck 2018 $n_s$–$r$
+contours, which are fetched from the BICEP/Keck data release rather than
+tracked:
+
+```sh
+python3 scripts/fetch_bk18.py
+uv run plots/higgs_ns_r.py diagnostics
+```
+
+See [`docs/figures/higgs_ns_r.png`](docs/figures/higgs_ns_r.png)
+([`PDF`](docs/figures/higgs_ns_r.pdf)).
 
 Generate every diagnostic CSV and publication-quality PNG/PDF figure with one
 command:
@@ -177,6 +188,7 @@ uv run plots/constant_turn.py diagnostics
 uv run plots/assisted_inflation.py diagnostics
 uv run plots/constant_turn_squeezed.py diagnostics
 uv run plots/higgs_inflation.py diagnostics
+uv run plots/higgs_ns_r.py diagnostics
 ```
 
 The plotting scripts declare their own Python dependencies, so `uv` creates an
