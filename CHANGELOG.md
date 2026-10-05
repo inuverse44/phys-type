@@ -8,6 +8,11 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `phys_type_models::higgs::HiggsTheory`, single-field Higgs inflation in the
+  metric and Palatini formulations, with first-order slow-roll predictions;
+  `examples/higgs_inflation.rs`, `plots/higgs_inflation.py`, and the tracked
+  figure `docs/figures/higgs_inflation.png`. The exact `n_s` and `r` follow
+  slow roll to second-order accuracy and reach the large-`xi` limits.
 - `CovariantMultifieldSystem::tensor_spectrum`: the tensor power spectrum of
   one wavenumber, evolved from the Bunch-Davies vacuum on a surveyed
   trajectory. It reproduces the second-order slow-roll `P_t` and the

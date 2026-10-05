@@ -143,6 +143,19 @@ Its reference figure is tracked as
 with a vector [`PDF`](docs/figures/assisted_inflation.pdf); see
 [`docs/nonminimal-assisted-inflation.md`](docs/nonminimal-assisted-inflation.md).
 
+Single-field Higgs inflation, metric and Palatini, through the theory layer
+(a few seconds):
+
+```sh
+cargo run --release --example higgs_inflation
+uv run plots/higgs_inflation.py diagnostics
+```
+
+Its reference figure is
+[`docs/figures/higgs_inflation.png`](docs/figures/higgs_inflation.png)
+([`PDF`](docs/figures/higgs_inflation.pdf)); see
+[`docs/higgs-inflation.md`](docs/higgs-inflation.md).
+
 Generate every diagnostic CSV and publication-quality PNG/PDF figure with one
 command:
 
@@ -163,6 +176,7 @@ uv run plots/pivot_mode_evolution.py diagnostics
 uv run plots/constant_turn.py diagnostics
 uv run plots/assisted_inflation.py diagnostics
 uv run plots/constant_turn_squeezed.py diagnostics
+uv run plots/higgs_inflation.py diagnostics
 ```
 
 The plotting scripts declare their own Python dependencies, so `uv` creates an

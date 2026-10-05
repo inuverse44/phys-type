@@ -1,6 +1,6 @@
 # Step 5: perturbations for any number of fields
 
-Status: design, reviewed; implementation proceeds in steps 5a–5f. It is step 5 of
+Status: implemented in steps 5a–5f, except the sum-separable $N=3$ $\delta N$ comparison. It is step 5 of
 [`architecture.md`](architecture.md).
 
 ## Goal
@@ -143,7 +143,7 @@ $10^{-12}$ at every step.
 | 5c | tensor modes and $r$ (decision 5): `CovariantMultifieldSystem::tensor_spectrum`, evolved on the surveyed trajectory with the scalar integrator; single-field quadratic inflation reproduces $\mathcal P_t=(2H_*^2/\pi^2)[1-2(C+1)\epsilon_1]$ and $r=16\epsilon_1(1+C\epsilon_2)$ (Stewart–Lyth, $C=-2+\ln2+\gamma_E$) to $2\epsilon_1^2$; the vacuum must start well inside the horizon (two e-folds before exit leaves a 1.3% error, six leave $4\times10^{-4}$). $r$ enters the records in 5e |
 | 5d | two- and three-point transport for any $N$: `BackgroundProvider<N>`, `BackgroundNeighborhood<N>`, the transport systems and `CanonicalThreePointTransportState<N>`, `curvature_correlators`; two-field numbers unchanged bit for bit; the three-field two-point transport matches the evolution of three-field modes on flat and curved spaces. The three-point checks for $N\ne2$ need a surveyed trajectory and move to 5e |
 | 5e | the run APIs for any $N$: `survey` (with `BackgroundSample<N>`), `BackgroundTrajectory<N>` (defaulting to two fields), `mode_spectrum` (returning `ModeSpectrum<N>` with `InvariantSpectra<N>`), `tensor_spectrum`, `three_point_state`, and `run_bispectrum`. `run_two_field_spectra` stays the two-field run with its oriented records and CSV files (the golden data). A one-field run equals a two-field run with a decoupled spectator ($\mathcal P_{\mathcal R}$, $\mathcal P_t$ to $10^{-9}$, $f_{\mathrm{NL}}$ to $10^{-6}$), and a three-field run equals the two-field run it embeds ($10^{-8}$, $10^{-6}$) |
-| 5f | Higgs inflation in `phys-type-models` (metric and Palatini) with its reproduction figure; the $N=3$ validations |
+| 5f | Higgs inflation in `phys-type-models` (metric and Palatini) with its figure, [`higgs-inflation.md`](higgs-inflation.md). The $N=3$ checks (rotation invariance, embedding of a two-field run) landed with 5b and 5e; the sum-separable $\delta N$ comparison remains |
 
 ## Open questions for review
 
