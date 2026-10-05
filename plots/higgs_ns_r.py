@@ -16,7 +16,8 @@ predictions are exact one-field evolutions for log10 xi from -5 to 4 (colour)
 and pivots 50 to 60 Einstein-frame e-folds before the end; thin lines join
 N_* = 50 and N_* = 60 along xi. The layout follows Fig. 4 of Kodama and
 Takahashi, arXiv:2112.05283: metric (left) and Palatini (right), with
-logarithmic (top) and linear (bottom) r. The published axis is
+logarithmic (top, down to r = 1e-5) and linear (bottom) r. The contours
+are lines, solid for 68% and dashed for 95%. The published axis is
 r_0.002; the predictions are r at the pivot, and the tensor tilt of these
 models changes r by less than a percent between the two scales. On the
 logarithmic panel the contours below the first positive grid row of the
@@ -38,8 +39,8 @@ from _common import load_csv, load_metadata, require_finite, save_figure
 
 COLUMNS = {"pivot_e_folds", "formulation", "log10_xi", "n_s", "r"}
 CONTOURS = (
-    ("P18", "Planck TT,TE,EE+lowE+lensing", ("#9ACB9A", "g"), 1.0),
-    ("BK18", "+BK18+BAO", ("#8CD3F5", "#006FED"), 0.8),
+    ("P18", "Planck TT,TE,EE+lowE+lensing", "g"),
+    ("BK18", "+BK18+BAO", "#006FED"),
 )
 FORMULATIONS = ("Metric", "Palatini")
 LINES = {50.0: ":", 60.0: "-"}
@@ -48,7 +49,7 @@ LOG_XI_LIMITS = (-5.0, 4.0)
 
 def contours(axes, data: Path, positive_only: bool) -> list:
     handles = []
-    for prefix, label, colors, alpha in CONTOURS:
+    for prefix, label, color in CONTOURS:
         xy = np.loadtxt(data / f"{prefix}density_xy.txt")
         density = np.loadtxt(data / f"{prefix}density_P.txt")
         levels = np.loadtxt(data / f"{prefix}density_levels.txt")
@@ -62,9 +63,11 @@ def contours(axes, data: Path, positive_only: bool) -> list:
             extension = np.geomspace(1.0e-9, y[keep][0], 40, endpoint=False)
             y = np.concatenate([extension, y[keep]])
             density = np.vstack([np.repeat(density[:1, :], extension.size, axis=0), density[keep, :]])
-        axes.contourf(x, y, density, levels, colors=colors, alpha=alpha)
-        axes.contour(x, y, density, levels[:1], colors=colors[1], alpha=alpha)
-        handles.append(plt.Rectangle((0, 0), 1, 1, color=colors[0], label=label))
+        # The levels file lists the 95% and then the 68% density level.
+        axes.contour(
+            x, y, density, levels[:2], colors=color, linestyles=["--", "-"], linewidths=1.2, zorder=1,
+        )
+        handles.append(plt.Line2D([], [], color=color, label=label))
     return handles
 
 
@@ -105,7 +108,7 @@ def main() -> None:
                 vmin=LOG_XI_LIMITS[0], vmax=LOG_XI_LIMITS[1], s=9, linewidths=0, zorder=3,
             )
         logarithmic.set_yscale("log")
-        logarithmic.set_ylim(1.0e-8, 1.0)
+        logarithmic.set_ylim(1.0e-5, 1.0)
         logarithmic.set_ylabel(r"$r$")
         logarithmic.set_title(f"{formulation} formulation")
         linear.set_ylim(0.0, 0.4)
@@ -113,6 +116,8 @@ def main() -> None:
         linear.set_xlabel(r"$n_s$")
         linear.set_xlim(0.935, 1.0)
     model_handles = [
+        plt.Line2D([], [], color="k", linestyle="-", linewidth=1.2, label="68%"),
+        plt.Line2D([], [], color="k", linestyle="--", linewidth=1.2, label="95%"),
         plt.Line2D([], [], color="0.25", linestyle="-", linewidth=0.8, label=r"$N_*=60$"),
         plt.Line2D([], [], color="0.25", linestyle=":", linewidth=0.8, label=r"$N_*=50$"),
     ]
