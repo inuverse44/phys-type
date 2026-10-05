@@ -52,9 +52,15 @@ STEP_SAMPLED = {
 # Round-off diagnostics -> the column whose scale bounds them.
 NOISE_COLUMNS = {"Im_P_12": "P_11"}
 
-# (file, column) -> absolute scale, for columns tuned to vanish: the massless
-# orbit drives the measured mu^2 / H^2 to zero, leaving only round-off.
-ABSOLUTE_SCALES = {("constant_turn_massless.csv", "mu2"): 1.0}
+# (file, column) -> absolute scale. The massless orbit drives the measured
+# mu^2 / H^2 to zero, leaving only round-off. A spectral index is a
+# logarithmic derivative over k e^{+-0.02}, which amplifies the integration
+# tolerance of the spectra by 1/0.04, so platforms differ at 1e-8; it is
+# compared to an absolute 1e-7.
+ABSOLUTE_SCALES = {
+    ("constant_turn_massless.csv", "mu2"): 1.0,
+    ("higgs_inflation.csv", "n_s"): 100.0,
+}
 
 # example name -> CSV files it writes; the slow ones run only with --all.
 FAST = {
