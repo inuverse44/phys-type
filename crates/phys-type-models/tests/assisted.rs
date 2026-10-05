@@ -215,15 +215,11 @@ impl<I: AssistedInflaton> CalibratedAssisted<I> {
         let k = self.k_pivot();
         let spectrum = |kk: f64| {
             self.system
-                .mode_spectrum(
-                    self.initial,
-                    &self.settings,
-                    &self.trajectory,
-                    Mass::new(kk),
-                    slice,
-                )
+                .mode_spectrum(&self.settings, &self.trajectory, Mass::new(kk), slice)
                 .unwrap()
-                .p_r
+                .spectra
+                .curvature
+                .into_value()
         };
         let step = 0.02_f64;
         (spectrum(k * step.exp()).ln() - spectrum(k * (-step).exp()).ln()) / (2.0 * step)

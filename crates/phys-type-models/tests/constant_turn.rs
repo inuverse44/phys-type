@@ -116,7 +116,6 @@ fn constant_turn_orbit(
     let k = (exit.a * system.hubble(&exit)).into_value();
     let record = system
         .mode_spectrum(
-            initial,
             &settings,
             &trajectory,
             Mass::new(k),
@@ -130,7 +129,7 @@ fn constant_turn_orbit(
         .into_value();
     let delta_0 = h * h / (8.0 * PI * PI * system.epsilon_h(&exit));
     ConstantTurnRun {
-        ratio: record.p_r / delta_0,
+        ratio: record.spectra.curvature.into_value() / delta_0,
         lambda: 2.0 * eta_perp.abs(),
         mu_squared: mass_squared / (h * h) + 3.0 * eta_perp * eta_perp,
         k_over_ah: record.k_over_ah,

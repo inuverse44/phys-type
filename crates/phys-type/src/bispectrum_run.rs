@@ -349,18 +349,18 @@ pub fn write_bispectrum_metadata<W: Write>(
 
 /// Evolves the canonical transport state of one triangle from its start slice
 /// to `target_e_folds` on a surveyed trajectory.
-pub(crate) fn evolve_three_point<P, G>(
-    system: &CovariantMultifieldSystem<P, G, 2>,
-    trajectory: &BackgroundTrajectory,
+pub(crate) fn evolve_three_point<P, G, const N: usize>(
+    system: &CovariantMultifieldSystem<P, G, N>,
+    trajectory: &BackgroundTrajectory<N>,
     triangle: MomentumTriangle,
     e_folds_before_exit: f64,
     target_e_folds: f64,
     relative_tolerance: f64,
     max_steps: usize,
-) -> Result<(f64, CanonicalThreePointTransportState<2>), ThreePointEvolutionError>
+) -> Result<(f64, CanonicalThreePointTransportState<N>), ThreePointEvolutionError>
 where
-    P: ThriceDifferentiableMultifieldPotential<2> + Copy,
-    G: ThirdOrderFieldSpaceGeometry<2> + CurvatureDerivativeGeometry<2> + Copy,
+    P: ThriceDifferentiableMultifieldPotential<N> + Copy,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N> + Copy,
 {
     let depth = e_folds_before_exit.exp();
     let shortest = Mass::new(triangle.canonical_wavenumbers()[2]);
@@ -442,14 +442,14 @@ impl std::error::Error for ThreePointEvolutionError {}
 
 const BLOCK_NAMES: [&str; 8] = ["QQQ", "QQP", "QPQ", "PQQ", "QPP", "PQP", "PPQ", "PPP"];
 
-fn phase_space_records(
+fn phase_space_records<const N: usize>(
     shape: usize,
-    state: &CanonicalThreePointTransportState<2>,
+    state: &CanonicalThreePointTransportState<N>,
     wavenumbers: [f64; 3],
 ) -> Vec<PhaseSpaceBispectrumRecord> {
     let weight = (wavenumbers[0] * wavenumbers[1] * wavenumbers[2]).powi(2);
     let alpha = &state.alpha;
-    let blocks: [[[[num_complex::Complex64; 2]; 2]; 2]; 8] = [
+    let blocks: [[[[num_complex::Complex64; N]; N]; N]; 8] = [
         alpha
             .qqq
             .components()
@@ -487,8 +487,8 @@ fn phase_space_records(
         .iter()
         .zip(BLOCK_NAMES)
         .flat_map(|(block, name)| {
-            (0..8).map(move |n| {
-                let indices = [n / 4, (n / 2) % 2, n % 2];
+            (0..N * N * N).map(move |n| {
+                let indices = [n / (N * N), (n / N) % N, n % N];
                 let value = block[indices[0]][indices[1]][indices[2]] * weight;
                 PhaseSpaceBispectrumRecord {
                     shape,
@@ -502,10 +502,10 @@ fn phase_space_records(
         .collect()
 }
 
-impl<P, G> CovariantMultifieldSystem<P, G, 2>
+impl<P, G, const N: usize> CovariantMultifieldSystem<P, G, N>
 where
-    P: ThriceDifferentiableMultifieldPotential<2> + Copy,
-    G: ThirdOrderFieldSpaceGeometry<2> + CurvatureDerivativeGeometry<2> + Copy,
+    P: ThriceDifferentiableMultifieldPotential<N> + Copy,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N> + Copy,
 {
     /// The canonical two- and three-point state of `triangle` at
     /// `e_folds_at_output`, evolved on a surveyed `trajectory` from the
@@ -513,13 +513,13 @@ where
     /// `k/(aH) = exp(e_folds_before_exit)`.
     pub fn three_point_state(
         &self,
-        trajectory: &BackgroundTrajectory,
+        trajectory: &BackgroundTrajectory<N>,
         triangle: MomentumTriangle,
         e_folds_before_exit: f64,
         e_folds_at_output: f64,
         relative_tolerance: f64,
         max_steps: usize,
-    ) -> Result<CanonicalThreePointTransportState<2>, ThreePointEvolutionError> {
+    ) -> Result<CanonicalThreePointTransportState<N>, ThreePointEvolutionError> {
         evolve_three_point(
             self,
             trajectory,
@@ -537,7 +537,7 @@ where
     /// slice.
     pub fn run_bispectrum(
         &self,
-        initial: MultifieldState<2>,
+        initial: MultifieldState<N>,
         settings: &BispectrumRunSettings,
         shapes: &[TriangleShape],
     ) -> Result<BispectrumRun, BispectrumRunError> {
@@ -552,8 +552,8 @@ where
                 "relative_tolerance must lie in (0, 1)",
             ));
         }
-        let (_, trajectory, e_folds_at_end) = self
-            .survey_background(initial, &settings.background)
+        let (trajectory, e_folds_at_end, _) = self
+            .survey_trajectory(initial, &settings.background, |_, _| {})
             .map_err(BispectrumRunError::Spectrum)?;
         let e_folds_at_pivot = e_folds_at_end - settings.background.pivot_e_folds_before_end;
         let e_folds_at_output = e_folds_at_end - settings.background.output_e_folds_before_end;

@@ -40,6 +40,13 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The run APIs take any number of fields: `survey` returns a
+  `BackgroundSurvey<N>` with `BackgroundSample<N>` rows and a
+  `BackgroundTrajectory<N>` (both default to two fields), `mode_spectrum`
+  returns a `ModeSpectrum<N>` with basis-free `InvariantSpectra<N>` (its
+  `initial` argument is gone), and `tensor_spectrum`, `three_point_state`,
+  and `run_bispectrum` are generic over `N`. `run_two_field_spectra` keeps
+  the oriented two-field records and CSV files.
 - The two- and three-point transport and the curvature projection take any
   number of fields: `TwoPointTransportSystem`, the three-point transport
   systems, and `CanonicalThreePointTransportState` gain `const N`,
