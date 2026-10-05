@@ -154,12 +154,13 @@ uv run plots/higgs_inflation.py diagnostics
 Its reference figure is
 [`docs/figures/higgs_inflation.png`](docs/figures/higgs_inflation.png)
 ([`PDF`](docs/figures/higgs_inflation.pdf)); see
-[`docs/higgs-inflation.md`](docs/higgs-inflation.md). The same predictions at
-$N_*=50$ and 60 are overlaid on the Planck 2018 and BICEP/Keck 2018 $n_s$–$r$
+[`docs/higgs-inflation.md`](docs/higgs-inflation.md). The same predictions are overlaid on the Planck 2018 and BICEP/Keck 2018 $n_s$–$r$
 contours, which are fetched from the BICEP/Keck data release rather than
-tracked:
+tracked, on a grid of $\log_{10}\xi$ from $-5$ to 4 and $N_*$ from 50 to 60
+(about a minute):
 
 ```sh
+cargo run --release --example higgs_ns_r
 python3 scripts/fetch_bk18.py
 uv run plots/higgs_ns_r.py diagnostics
 ```

@@ -60,6 +60,7 @@ NOISE_COLUMNS = {"Im_P_12": "P_11"}
 ABSOLUTE_SCALES = {
     ("constant_turn_massless.csv", "mu2"): 1.0,
     ("higgs_inflation.csv", "n_s"): 100.0,
+    ("higgs_ns_r.csv", "n_s"): 100.0,
 }
 
 # example name -> CSV files it writes; the slow ones run only with --all.
@@ -85,6 +86,7 @@ FAST = {
 SLOW = {
     "assisted_inflation": ["assisted_predictions.csv", "assisted_trajectories.csv"],
     "constant_turn_squeezed": ["constant_turn_squeezed.csv"],
+    "higgs_ns_r": ["higgs_ns_r.csv"],
 }
 
 
@@ -179,10 +181,15 @@ def main() -> int:
     parser.add_argument(
         "--portable", action="store_true", help="skip files sampled at integration steps"
     )
+    parser.add_argument(
+        "--only", action="append", choices=sorted({**FAST, **SLOW}), help="run only this example"
+    )
     parser.add_argument("--rtol", type=float, default=1.0e-9)
     args = parser.parse_args()
 
     examples = {**FAST, **(SLOW if args.all else {})}
+    if args.only:
+        examples = {name: files for name, files in {**FAST, **SLOW}.items() if name in args.only}
     with tempfile.TemporaryDirectory() as scratch:
         output = Path(scratch)
         run_examples(examples, output)

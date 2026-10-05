@@ -73,7 +73,8 @@ python3 scripts/golden.py check --exact
 
 When a change is meant to alter the numbers, refreeze with
 `python3 scripts/golden.py update --all` and explain the difference in the
-pull request.
+pull request. `--only EXAMPLE` (repeatable) restricts `check` or `update` to
+the named examples, for example a new one, without running the slow set.
 
 To verify the complete diagnostics and plotting workflow, install `uv` and run:
 

@@ -66,7 +66,7 @@ def main() -> None:
 
     # The assisted-inflation grid runs the three-point transport for 72
     # couplings and takes about five minutes; the squeezed constant-turn
-    # triangles take about nine.
+    # triangles take about nine, and the Higgs n_s-r grid about one.
     for example in (
         "diagnostics",
         "two_field_spectra",
@@ -74,6 +74,7 @@ def main() -> None:
         "assisted_inflation",
         "constant_turn_squeezed",
         "higgs_inflation",
+        "higgs_ns_r",
     ):
         run(
             ["cargo", "run", "--release", "--example", example, "--", str(output)],

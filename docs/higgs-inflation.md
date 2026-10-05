@@ -63,8 +63,14 @@ At $\xi=10^4$:
 
 ## The $n_s$–$r$ plane
 
-`examples/higgs_inflation.rs` evaluates both formulations at $N_*=50$ and 60
-Einstein-frame e-folds before the end. `plots/higgs_ns_r.py` overlays them on
+`examples/higgs_ns_r.rs` runs the same exact evolution
+(`examples/shared/higgs.rs`) on a grid of $\log_{10}\xi=-5,-4.75,\dots,4$ and
+$N_*=50,52,\dots,60$ Einstein-frame e-folds before the end, in both
+formulations (444 points, about a minute). `plots/higgs_ns_r.py` follows the
+layout of Fig. 4 of Kodama and Takahashi,
+[arXiv:2112.05283](https://arxiv.org/abs/2112.05283): metric and Palatini in
+two columns, logarithmic and linear $r$ in two rows, $\log_{10}\xi$ as colour.
+It overlays the points on
 the 68% and 95% contours that BICEP/Keck publish with
 [BICEP/Keck XIII, arXiv:2110.00483](https://arxiv.org/abs/2110.00483)
 (Fig. 5, data release `rns_code.tgz` at
@@ -75,18 +81,30 @@ this repository.
 
 ![n_s-r plane](figures/higgs_ns_r.png)
 
-| $N_*$ | metric, $\xi=10^4$ | Palatini, $\xi=10^4$ | BK18+BAO region, $\xi\ge10^{-1}$ |
-| --- | --- | --- | --- |
-| 50 | $n_s=0.96150$, $r=4.25\times10^{-3}$ | $n_s=0.95971$, $r=8.2\times10^{-8}$ | 95% |
-| 60 | $n_s=0.96775$, $r=3.01\times10^{-3}$ | $n_s=0.96643$, $r=5.7\times10^{-8}$ | 68% |
+| $N_*$ | metric, $\xi=10^4$ | Palatini, $\xi=10^4$ |
+| --- | --- | --- |
+| 50 | $n_s=0.96150$, $r=4.25\times10^{-3}$ | $n_s=0.95971$, $r=8.2\times10^{-8}$ |
+| 60 | $n_s=0.96775$, $r=3.01\times10^{-3}$ | $n_s=0.96643$, $r=5.7\times10^{-8}$ |
 
-- For $\xi\le10^{-2}$ both formulations approach quartic inflation and lie
-  outside the 95% region (at $\xi=10^{-3}$, $r\simeq0.18$–0.22).
+The smallest $\log_{10}\xi$ on the grid that lies inside each region
+(every larger $\xi$ on the grid stays inside; identical for the two
+formulations at this resolution):
+
+| region | $N_*=50$ | $N_*=60$ |
+| --- | --- | --- |
+| Planck 95% | $-1.75$ | $-2.25$ |
+| Planck 68% | $-1.25$ | $-2.0$ |
+| +BK18+BAO 95% | $-1.25$ | $-1.75$ |
+| +BK18+BAO 68% | none | $-1.5$ |
+
+- At $\xi=10^{-5}$ both formulations are quartic inflation
+  ($r\simeq0.26$–0.31), well outside both regions. They separate only once
+  $\xi\gtrsim10^{-2}$, where $\xi\phi_*^2\sim1$.
 - The two formulations separate only in $r$: at large $\xi$ the metric $r$
   saturates at $\simeq12/N^2$, while the Palatini $r\propto1/\xi$ falls below any
   foreseeable sensitivity; $n_s$ differs by $\lesssim2\times10^{-3}$.
-- The region column comes from interpolating the published BK18+BAO density
-  at each point.
+- The region table comes from interpolating the published densities at each
+  point. It is a reading of the overlay, not a likelihood.
 - **This is an overlay, not a fit.** The contours are the published
   $\Lambda$CDM+$r$ posteriors and are not recomputed for this model; see
   [`planck-2018-likelihood-boundary.md`](planck-2018-likelihood-boundary.md).
