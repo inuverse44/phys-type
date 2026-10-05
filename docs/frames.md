@@ -80,7 +80,8 @@ wavenumber is frame invariant ($\zeta$ is, and $\Omega\to1$ after inflation); on
 the label changes. For Higgs inflation the pivot-to-end interval differs by
 about 1.8 e-folds, so "$N_*=60$" in the two frames points to scales whose $n_s$
 differ by about $10^{-3}$. Results are therefore reported at a physical $k$,
-with $N_*$ in both frames. For the assisted
+with $N_*$ in both frames. For Palatini Higgs inflation at $\xi=10^4$ the
+difference reaches about 7 e-folds ([`higgs-inflation.md`](higgs-inflation.md)). For the assisted
 examples of arXiv:2302.05866, $\ln\Omega$ changes between the pivot and the end
 by $\tfrac12\ln[(1+\xi_2s_e^2)/(1+\xi_2s_*^2)]$, below $10^{-3}$ e-folds for
 $s_*=10^{-3}$ but about 0.04 e-folds for loop inflation with $\alpha=0.1$ and

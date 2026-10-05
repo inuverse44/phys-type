@@ -29,6 +29,7 @@ PIVOT_EVOLUTION_PLOT = ("pivot_mode_evolution.py", "two_field_pivot_evolution")
 CONSTANT_TURN_PLOT = ("constant_turn.py", "constant_turn_spectra")
 ASSISTED_PLOT = ("assisted_inflation.py", "assisted_inflation")
 SQUEEZED_PLOT = ("constant_turn_squeezed.py", "constant_turn_squeezed")
+HIGGS_PLOT = ("higgs_inflation.py", "higgs_inflation")
 
 
 def run(command: list[str], cwd: Path) -> None:
@@ -69,6 +70,7 @@ def main() -> None:
         "constant_turn_spectra",
         "assisted_inflation",
         "constant_turn_squeezed",
+        "higgs_inflation",
     ):
         run(
             ["cargo", "run", "--release", "--example", example, "--", str(output)],
@@ -97,11 +99,11 @@ def main() -> None:
     )
     verify(output, stem)
 
-    for script, stem in (CONSTANT_TURN_PLOT, ASSISTED_PLOT, SQUEEZED_PLOT):
+    for script, stem in (CONSTANT_TURN_PLOT, ASSISTED_PLOT, SQUEEZED_PLOT, HIGGS_PLOT):
         run([sys.executable, str(scripts / script), str(output)], repository)
         verify(output, stem)
 
-    print(f"verified {(len(PLOTS) + 6) * 2} plot files in {output}")
+    print(f"verified {(len(PLOTS) + 7) * 2} plot files in {output}")
 
 
 if __name__ == "__main__":

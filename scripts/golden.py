@@ -74,6 +74,7 @@ FAST = {
         "constant_turn_massive.csv",
         "constant_turn_massless.csv",
     ],
+    "higgs_inflation": ["higgs_inflation.csv"],
 }
 SLOW = {
     "assisted_inflation": ["assisted_predictions.csv", "assisted_trajectories.csv"],
