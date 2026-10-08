@@ -1,6 +1,6 @@
 # Step 5: perturbations for any number of fields
 
-Status: implemented in steps 5a–5f, except the sum-separable $N=3$ $\delta N$ comparison. It is step 5 of
+Status: implemented in steps 5a–5f, with every validation target below. It is step 5 of
 [`architecture.md`](architecture.md).
 
 ## Goal
@@ -143,7 +143,73 @@ $10^{-12}$ at every step.
 | 5c | tensor modes and $r$ (decision 5): `CovariantMultifieldSystem::tensor_spectrum`, evolved on the surveyed trajectory with the scalar integrator; single-field quadratic inflation reproduces $\mathcal P_t=(2H_*^2/\pi^2)[1-2(C+1)\epsilon_1]$ and $r=16\epsilon_1(1+C\epsilon_2)$ (Stewart–Lyth, $C=-2+\ln2+\gamma_E$) to $2\epsilon_1^2$; the vacuum must start well inside the horizon (two e-folds before exit leaves a 1.3% error, six leave $4\times10^{-4}$). $r$ enters the records in 5e |
 | 5d | two- and three-point transport for any $N$: `BackgroundProvider<N>`, `BackgroundNeighborhood<N>`, the transport systems and `CanonicalThreePointTransportState<N>`, `curvature_correlators`; two-field numbers unchanged bit for bit; the three-field two-point transport matches the evolution of three-field modes on flat and curved spaces. The three-point checks for $N\ne2$ need a surveyed trajectory and move to 5e |
 | 5e | the run APIs for any $N$: `survey` (with `BackgroundSample<N>`), `BackgroundTrajectory<N>` (defaulting to two fields), `mode_spectrum` (returning `ModeSpectrum<N>` with `InvariantSpectra<N>`), `tensor_spectrum`, `three_point_state`, and `run_bispectrum`. `run_two_field_spectra` stays the two-field run with its oriented records and CSV files (the golden data). A one-field run equals a two-field run with a decoupled spectator ($\mathcal P_{\mathcal R}$, $\mathcal P_t$ to $10^{-9}$, $f_{\mathrm{NL}}$ to $10^{-6}$), and a three-field run equals the two-field run it embeds ($10^{-8}$, $10^{-6}$) |
-| 5f | Higgs inflation in `phys-type-models` (metric and Palatini) with its figure, [`higgs-inflation.md`](higgs-inflation.md). The $N=3$ checks (rotation invariance, embedding of a two-field run) landed with 5b and 5e; the sum-separable $\delta N$ comparison remains |
+| 5f | Higgs inflation in `phys-type-models` (metric and Palatini) with its figure, [`higgs-inflation.md`](higgs-inflation.md). The $N=3$ checks (rotation invariance, embedding of a two-field run) landed with 5b and 5e, and the sum-separable $\delta N$ comparison follows below |
+
+## Three separable fields
+
+`crates/phys-type-models/tests/separable.rs` evolves
+$V=\sum_i\tfrac12m_i^2(\phi^i)^2$ with $m_i^2/m_1^2=(1,2,3)$ on a flat field
+space. It starts from equal energies, $\phi^i=(m_1/m_i)\phi^1$ (Eq. (51) of
+[Battefeld and Easther, arXiv:astro-ph/0610296](https://arxiv.org/abs/astro-ph/0610296)),
+about 65 e-folds before the end. The pivot leaves the horizon 55 e-folds
+before the end, and the triangle is equilateral. The heavier fields decay
+first, so the isocurvature modes feed $\zeta$ after horizon crossing: between
+40 and 5 e-folds before the end, $\mathcal P_{\mathcal R}$ grows by 19% and
+$f_{\mathrm{NL}}$ falls from 0.0263 to 0.0226.
+
+**Slow roll.** Eq. (35) of the reference, with Eq. (3) for the intrinsic
+part, is evaluated from the exact fields at horizon crossing and on the
+output slice. In the Planck sign it reads
+$f_{\mathrm{NL}}=\tfrac56[\tfrac{r}{16}(1+f)+N_iN_jN_{ij}/(N_kN_k)^2]$ with
+$f=5/6$ for the equilateral triangle. As in [HKKPT] (entry 7 of
+[`literature-discrepancies.md`](literature-discrepancies.md)), the reference
+writes $-\tfrac65f_{\mathrm{NL}}$ on the left. The factor 2 in front of
+Eq. (35) multiplies the whole numerator, including the $A$-matrix term, as
+its two-field form, Eq. (40), shows. A unit test checks the transcription
+against finite differences of the slow-roll e-fold number, Eqs. (50) and
+(52), to $10^{-6}$.
+
+| Slice (e-folds before end) | $\mathcal P_{\mathcal R}$ transport / slow roll | $f_{\mathrm{NL}}$ transport | $f_{\mathrm{NL}}$ slow roll |
+| --- | --- | --- | --- |
+| 40 | $6.655/6.558\times10^{-11}$ | 0.02630 | 0.02565 |
+| 20 | $7.255/7.155\times10^{-11}$ | 0.02482 | 0.02422 |
+| 5 | $7.904/7.802\times10^{-11}$ | 0.02261 | 0.02202 |
+
+The levels differ by 1.3–1.5% and 2.3–2.6%, which is first order in
+$\epsilon_*\simeq0.01$ at horizon crossing. The growth of
+$\mathcal P_{\mathcal R}$ agrees to 0.2%, and the change of $f_{\mathrm{NL}}$
+agrees to 2%. The test asserts 2% and 4% on the levels and 0.5% and 5% on
+the changes.
+
+**Phase-space $\delta N$.** The derivatives of the e-fold number from a
+superhorizon slice to the uniform-density slice 20 e-folds before the end are
+contracted with the transported covariance and field three-point function on
+that slice, as in the assisted validation. The field three-point term is
+60% of $f_{\mathrm{NL}}$ here, so this tests the transported $\alpha$ as
+well as the covariance. With the slice 5 and 7 e-folds after the pivot exit,
+$f_{\mathrm{NL}}$ and $\mathcal P_{\mathcal R}$ agree with the transport to
+$2\times10^{-5}$ and $4\times10^{-7}$, respectively. The residual falls as
+$(k/aH)^2$, which is what gradient terms do.
+
+That agreement needs the separate-universe lapse. The transport perturbs the
+coordinate-time velocity $\dot\phi^I$ on a flat slice. A separate universe
+starts from the proper-time velocity $\dot\phi^I/N_l$. On a flat slice the
+local scale factor is the background one, so $N_l=H/H_{\mathrm{loc}}$, and the
+energy constraint $3H^2/N_l^2=V+|\dot\phi|^2/(2N_l^2)$ fixes it nonlinearly.
+Starting the perturbed universes from $\dot\phi^I$ instead puts
+$\mathcal P_{\mathcal R}$ and $f_{\mathrm{NL}}$ both 0.8% off. The linear
+lapse $\alpha=\dot\phi_JQ^J/2H$ removes that from $\mathcal P_{\mathcal R}$
+but leaves 0.3% in $f_{\mathrm{NL}}$. The assisted phase-space $\delta N$ in
+`tests/assisted.rs` starts from $\dot\phi^I$ and agrees to its asserted
+$2\times10^{-3}$. Adding the lapse there, with the field-space metric in
+$|\dot\phi|^2$, is a follow-up.
+
+The transport itself depends on the start depth, as
+[`three-point-transport.md`](three-point-transport.md) records. From 5, 6, 7,
+and 8 e-folds before exit, $f_{\mathrm{NL}}$ on the output slice is 0.024822,
+0.024739, 0.024687, and 0.024685. The $\delta N$ comparison uses the same depth
+on both sides, so this error cancels there. In the slow-roll comparison it is
+part of the 2.5%.
 
 ## Open questions for review
 

@@ -58,12 +58,15 @@ are outside that scope; see [`curvature-projection.md`](curvature-projection.md)
 
 ### Next-session handoff
 
-The implementation boundary is `main` after step 4b of
-[`architecture.md`](architecture.md). The validated state is 230 core unit
-tests and 5 model tests plus 24 compile-fail cases, with sixteen expensive
-ignored tests (7 core, 9 models) that
-pass in release mode (`cargo test --workspace --release -- --ignored`; they are not run by
-CI). Clippy with warnings denied, rustfmt, and rustdoc pass locally.
+The implementation boundary is `main` after step 5f of
+[`architecture.md`](architecture.md): the workspace is split into the core
+`phys-type` and `phys-type-models`, the generalized nonminimal theory layer is
+in place, and the perturbation pipeline runs for any number of fields. The
+validated state is 238 core unit tests and 8 model tests plus 25
+compile-fail cases, with 22 expensive ignored tests (9 core, 13 models) that
+pass in release mode (`cargo test --workspace --release -- --ignored`; they are
+not run by CI). Clippy with warnings denied, rustfmt, and
+rustdoc pass locally.
 
 The first external model validation after P3 is complete; see
 [`nonminimal-assisted-inflation.md`](nonminimal-assisted-inflation.md):
@@ -108,12 +111,28 @@ The first external model validation after P3 is complete; see
    arXiv:2607.14529 states (figure
    [`figures/constant_turn_squeezed.png`](figures/constant_turn_squeezed.png)).
 
-The plan from here follows [`architecture.md`](architecture.md): separate the
-core (types, theory layer, engine, observables) from the models in a
-workspace, add the generalized nonminimal theory layer with its frame
-correspondence, and then generalize the perturbation pipeline to $N$ fields
-starting with Higgs inflation. The bispectrum amplitude comparison with
-arXiv:2607.14529 resumes on top of that boundary.
+9. The perturbation pipeline runs for any $N$ (steps 5a--5e of
+   [`n-field-perturbations.md`](n-field-perturbations.md)), with tensor modes
+   and $r$. A one-field run equals a two-field run with a decoupled spectator,
+   and a three-field run equals the two-field run it embeds.
+
+10. Higgs inflation in the metric and Palatini formulations is reproduced
+    through the theory layer (step 5f), with $n_s$ and $r$ against $\xi$ and an
+    overlay on the Planck 2018 and BICEP/Keck 2018 contours; see
+    [`higgs-inflation.md`](higgs-inflation.md). The overlay is not a fit.
+
+11. Three uncoupled quadratic fields complete the $N=3$ validation. The
+    transport matches the sum-separable slow-roll $\delta N$ of Battefeld and
+    Easther to first order in slow roll, including the superhorizon growth of
+    $\mathcal P_{\mathcal R}$ by isocurvature conversion. It matches
+    phase-space $\delta N$ to $2\times10^{-5}$ once the perturbed universes start
+    from the proper-time velocity. The assisted phase-space $\delta N$ still
+    starts from the coordinate-time velocity; adding the lapse there is a
+    follow-up. See
+    [`n-field-perturbations.md`](n-field-perturbations.md#three-separable-fields).
+
+The next work is the bispectrum amplitude comparison with arXiv:2607.14529 on
+the constant-turn orbit, which item 8 left at the scaling with $\mu$.
 
 ### Reading order for the active P3 work
 

@@ -8,6 +8,11 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `phys-type-models/tests/separable.rs`: three uncoupled quadratic fields
+  against the sum-separable slow-roll `delta N` of Battefeld and Easther
+  (arXiv:astro-ph/0610296, Eqs. (3) and (35)) and against phase-space
+  `delta N` with the separate-universe lapse. This completes the `N = 3`
+  validation of step 5.
 - `phys_type_models::higgs::HiggsTheory`, single-field Higgs inflation in the
   metric and Palatini formulations, with first-order slow-roll predictions;
   `examples/higgs_inflation.rs`, `plots/higgs_inflation.py`, and the tracked
