@@ -198,10 +198,10 @@ curvature built from the connection. The validation against the papers is in
 
 ## Next steps
 
-1. Amplitudes: derive the decoupling-limit cubic action of the orbit in the
-   paper's variables, evaluate it with an independent in-in code built on the
-   numerical mode functions of Eqs. (24)–(25), and compare with the transport
-   in the equilateral and squeezed limits.
+1. Amplitudes: designed in
+   [`constant-turn-bispectrum-amplitudes.md`](constant-turn-bispectrum-amplitudes.md),
+   which derives the cubic action of the orbit, including the gradient
+   coupling, and plans an independent in-in reference.
 2. Heavy entropy fields, $\mu>3H/2$: the squeezed shape oscillates as
    $r^{1/2}\sin(\rho\ln(1/r)+\phi)$ with $\rho=\sqrt{\mu^2/H^2-9/4}$; resolving a
    period needs $r\lesssim10^{-3}$.

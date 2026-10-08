@@ -132,7 +132,10 @@ The first external model validation after P3 is complete; see
     [`n-field-perturbations.md`](n-field-perturbations.md#three-separable-fields).
 
 The next work is the bispectrum amplitude comparison with arXiv:2607.14529 on
-the constant-turn orbit, which item 8 left at the scaling with $\mu$.
+the constant-turn orbit, which item 8 left at the scaling with $\mu$. Its
+design, with the cubic action of the orbit and an independent in-in
+reference, is
+[`constant-turn-bispectrum-amplitudes.md`](constant-turn-bispectrum-amplitudes.md).
 
 ### Reading order for the active P3 work
 
