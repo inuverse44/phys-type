@@ -62,8 +62,8 @@ The implementation boundary is `main` after step 5f of
 [`architecture.md`](architecture.md): the workspace is split into the core
 `phys-type` and `phys-type-models`, the generalized nonminimal theory layer is
 in place, and the perturbation pipeline runs for any number of fields. The
-validated state is 238 core unit tests and 8 model tests plus 25
-compile-fail cases, with 22 expensive ignored tests (9 core, 13 models) that
+validated state is 238 core unit tests and 17 model tests plus 25
+compile-fail cases, with 26 expensive ignored tests (9 core, 17 models) that
 pass in release mode (`cargo test --workspace --release -- --ignored`; they are
 not run by CI). Clippy with warnings denied, rustfmt, and
 rustdoc pass locally.
@@ -136,6 +136,9 @@ the constant-turn orbit, which item 8 left at the scaling with $\mu$. Its
 design, with the cubic action of the orbit and an independent in-in
 reference, is
 [`constant-turn-bispectrum-amplitudes.md`](constant-turn-bispectrum-amplitudes.md).
+The in-in reference (A1) is implemented and validated against the exact
+power spectrum, a closed-form $\dot\phi^3$ bispectrum, and the basis identities
+of the paper; the comparison with the transport (A2) is next.
 
 ### Reading order for the active P3 work
 
