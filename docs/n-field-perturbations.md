@@ -200,9 +200,9 @@ Starting the perturbed universes from $\dot\phi^I$ instead puts
 $\mathcal P_{\mathcal R}$ and $f_{\mathrm{NL}}$ both 0.8% off. The linear
 lapse $\alpha=\dot\phi_JQ^J/2H$ removes that from $\mathcal P_{\mathcal R}$
 but leaves 0.3% in $f_{\mathrm{NL}}$. The assisted phase-space $\delta N$ in
-`tests/assisted.rs` starts from $\dot\phi^I$ and agrees to its asserted
-$2\times10^{-3}$. Adding the lapse there, with the field-space metric in
-$|\dot\phi|^2$, is a follow-up.
+`tests/assisted.rs` uses the same lapse, written through `hubble` so that the
+field-space metric enters $|\dot\phi|^2$, together with the second-order
+$\delta\phi^I=Q^I-\tfrac12\Gamma^I{}_{JK}Q^JQ^K$ of a curved field space.
 
 The transport itself depends on the start depth, as
 [`three-point-transport.md`](three-point-transport.md) records. From 5, 6, 7,

@@ -504,8 +504,49 @@ impl<I: AssistedInflaton> CalibratedAssisted<I> {
             velocity_scale * x0[2].abs(),
             velocity_scale * x0[3].abs(),
         ];
+        // The derivatives are taken in the coordinates (delta phi, delta
+        // phidot) to which the linear `map` below relates the transported
+        // (Q, V). Two nonlinear corrections turn such a point into the
+        // initial state of a separate universe. The covariant Q is the
+        // tangent of a geodesic, so delta phi = Q - Gamma Q Q / 2 at second
+        // order. And the velocity is the proper-time one, phidot / N_l, with
+        // the lapse N_l = H / H_loc fixed by the energy constraint
+        // 3 H^2 = N_l^2 V + |phidot|^2 / 2 on the flat slice. Without them,
+        // f_NL is off by up to 0.1% where it is large and by 1.4% for the
+        // small values of the s_* = 0.1 branches.
+        let connection =
+            phys_type::FieldSpaceGeometry::christoffel(&self.system.geometry, &base.phi);
+        let hubble = self.system.hubble(&base).into_value();
         let at = |shift: [f64; 4]| {
-            self.e_folds_from_phase_space(core::array::from_fn(|a| x0[a] + shift[a]))
+            let mut point: [f64; 4] = core::array::from_fn(|a| x0[a] + shift[a]);
+            for (i, field) in point.iter_mut().take(2).enumerate() {
+                *field -= 0.5
+                    * (0..4)
+                        .map(|m| {
+                            let [j, kk] = [m / 2, m % 2];
+                            connection.components()[i][j][kk].value() * shift[j] * shift[kk]
+                        })
+                        .sum::<f64>();
+            }
+            let state = |velocity: [f64; 2]| {
+                MultifieldState::new(
+                    [Field::new(point[0]), Field::new(point[1])],
+                    velocity.map(FieldVelocity::new),
+                    ScaleFactor::new(1.0),
+                )
+            };
+            let potential = 3.0 * self.system.hubble(&state([0.0; 2])).into_value().powi(2);
+            let kinetic = 3.0
+                * self
+                    .system
+                    .hubble(&state([point[2], point[3]]))
+                    .into_value()
+                    .powi(2)
+                - potential;
+            let lapse = ((3.0 * hubble * hubble - kinetic) / potential).sqrt();
+            point[2] /= lapse;
+            point[3] /= lapse;
+            self.e_folds_from_phase_space(point)
         };
         let unit = |a: usize, sign: f64| -> [f64; 4] {
             core::array::from_fn(|b| if a == b { sign * h[a] } else { 0.0 })
@@ -541,10 +582,9 @@ impl<I: AssistedInflaton> CalibratedAssisted<I> {
         )
         .unwrap();
         // Coordinate perturbations at linear order: delta phi = Q and
-        // delta phidot = V - Gamma phidot Q; second-order Gamma terms are
-        // negligible here (Gamma ~ xi_2 s).
-        let connection =
-            phys_type::FieldSpaceGeometry::christoffel(&self.system.geometry, &base.phi);
+        // delta phidot = V - Gamma phidot Q. The second-order delta phi is in
+        // `at` above; the second-order delta phidot depends on the nonlinear
+        // definition of V and is left out (its effect here is below 1e-5).
         let mut map = [[0.0; 4]; 4];
         for (a, row) in map.iter_mut().enumerate() {
             row[a] = 1.0;
@@ -621,7 +661,7 @@ fn assisted_loop_transport_matches_phase_space_delta_n() {
         for offset in [3.0, 5.0] {
             let (total, gaussian, _) = model.phase_space_delta_n(k, shape, pivot + offset, 1.0e-2);
             assert!(
-                (total - transport).abs() < 2.0e-3 * transport.abs(),
+                (total - transport).abs() < 3.0e-4 * transport.abs(),
                 "{shape:?} at pivot + {offset}: delta N {total} vs transport {transport}"
             );
             // The field three-point term is small on these slices.
@@ -684,7 +724,7 @@ fn assisted_loop_branches_transport_matches_phase_space_delta_n() {
         let (delta_n, _, _) =
             model.phase_space_delta_n(k, [1.0, 1.0, 1.0], model.end - 57.0, 1.0e-2);
         assert!(
-            (delta_n - transport).abs() < (3.0e-3 * transport.abs()).max(1.0e-4),
+            (delta_n - transport).abs() < (3.0e-4 * transport.abs()).max(2.0e-5),
             "{alpha} {s_star}: delta N {delta_n} vs transport {transport}"
         );
     }
@@ -789,7 +829,7 @@ fn check_class_two_f_nl<I: AssistedInflaton>(
     let transport = project_benchmark(&early_bench, 5.0, early.output()).reduced_f_nl();
     let (delta_n, _, _) = early.phase_space_delta_n(k, [1.0, 1.0, 1.0], early.end - 57.0, 1.0e-2);
     assert!(
-        (delta_n - transport).abs() < (3.0e-3 * transport.abs()).max(1.0e-4),
+        (delta_n - transport).abs() < (3.0e-4 * transport.abs()).max(2.0e-5),
         "{label} {s_star}: delta N {delta_n} vs transport {transport}"
     );
     (transport_end, crossing)

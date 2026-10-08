@@ -225,7 +225,7 @@ $\xi_2=0.022$ and $s_*=10^{-3}$, the assistant direction is tachyonic
 $\delta N$ then agree with each other ($-0.216$ and $-0.199$ in the Planck sign)
 but underestimate $|f_{\mathrm{NL}}|$ by about 20%. A phase-space $\delta N$ from a
 later slice, which uses the evolved covariance, reproduces the tree-level
-transport value $-0.2514$ to 0.05%. The conclusion of the reference that
+transport value $-0.2514$ to $1.3\times10^{-4}$. The conclusion of the reference that
 $|f_{\mathrm{NL}}|\ll1$ is unaffected. The Class II examples with $s_*=10^{-3}$
 show the same effect with a deficit of about 8%: for the power-law model with
 $\lambda=0.01$ and $\xi_2=0.011$, the crossing-time $\delta N$ gives $-1.51$ and the
