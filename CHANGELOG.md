@@ -13,6 +13,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (arXiv:astro-ph/0610296, Eqs. (3) and (35)) and against phase-space
   `delta N` with the separate-universe lapse. This completes the `N = 3`
   validation of step 5.
+- The assisted phase-space `delta N` starts each perturbed universe from the
+  proper-time velocity and forms `delta phi = Q - Gamma Q Q / 2`; it now
+  matches the transport to `1.3e-4` (was `2e-3`), and its tests assert
+  `3e-4`.
 - `phys_type_models::higgs::HiggsTheory`, single-field Higgs inflation in the
   metric and Palatini formulations, with first-order slow-roll predictions;
   `examples/higgs_inflation.rs`, `plots/higgs_inflation.py`, and the tracked

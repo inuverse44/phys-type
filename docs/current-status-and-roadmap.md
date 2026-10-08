@@ -126,9 +126,9 @@ The first external model validation after P3 is complete; see
     Easther to first order in slow roll, including the superhorizon growth of
     $\mathcal P_{\mathcal R}$ by isocurvature conversion. It matches
     phase-space $\delta N$ to $2\times10^{-5}$ once the perturbed universes start
-    from the proper-time velocity. The assisted phase-space $\delta N$ still
-    starts from the coordinate-time velocity; adding the lapse there is a
-    follow-up. See
+    from the proper-time velocity. With that lapse and the second-order
+    $\delta\phi=Q-\tfrac12\Gamma QQ$, the assisted phase-space $\delta N$ now
+    matches the transport to $1.3\times10^{-4}$ (it was $2\times10^{-3}$). See
     [`n-field-perturbations.md`](n-field-perturbations.md#three-separable-fields).
 
 The next work is the bispectrum amplitude comparison with arXiv:2607.14529 on

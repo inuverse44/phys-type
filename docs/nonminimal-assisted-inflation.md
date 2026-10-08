@@ -159,18 +159,23 @@ output uniform-density surface in all four background variables
 $(\phi,s,\dot\phi,\dot s)$. It then contracts with the Gaussian covariance
 evolved to $N_c$, and adds the field three-point term
 $N_aN_bN_c\alpha^{abc}(N_c)$, both taken from the transport in the velocity
-basis. Coordinate perturbations are formed at linear order,
-$\delta\dot\phi^I=V^I-\Gamma^I{}_{JK}\dot\phi^JQ^K$; second-order connection
-terms are negligible because $\Gamma\sim\xi_2s$.
+basis. Coordinate perturbations are $\delta\phi^I=Q^I-\tfrac12\Gamma^I{}_{JK}Q^JQ^K$
+(the covariant $Q$ is the tangent of a geodesic) and, at linear order,
+$\delta\dot\phi^I=V^I-\Gamma^I{}_{JK}\dot\phi^JQ^K$. Each perturbed universe
+starts from the proper-time velocity $\dot\phi^I/N_l$, with the lapse
+$N_l=H/H_{\mathrm{loc}}$ fixed by the energy constraint on the flat slice
+([`n-field-perturbations.md`](n-field-perturbations.md#three-separable-fields)).
+Before these two corrections the agreement below was 0.05% here and up to
+1.4% for the small $f_{\mathrm{NL}}$ of the $s_*=0.1$ branches.
 
 | Slice $N_c$ | pivot + 1 | + 2 | + 3 | + 5 | + 10 | transport |
 | --- | --- | --- | --- | --- | --- | --- |
-| equilateral, total | $-0.25014$ | $-0.25116$ | $-0.25127$ | $-0.25128$ | $-0.25127$ | $-0.25141$ |
-| equilateral, Gaussian part | $-0.25038$ | $-0.25131$ | $-0.25131$ | $-0.25105$ | $-0.25028$ | |
-| $k_3/k_1=0.1$, total | | | $-0.35668$ | $-0.35667$ | | $-0.35686$ |
+| equilateral, total | $-0.25030$ | $-0.25129$ | $-0.25138$ | $-0.25143$ | $-0.25142$ | $-0.25141$ |
+| equilateral, Gaussian part | $-0.25054$ | $-0.25145$ | $-0.25142$ | $-0.25121$ | $-0.25044$ | |
+| $k_3/k_1=0.1$, total | | | $-0.35683$ | $-0.35689$ | | $-0.35686$ |
 
-From two e-folds after exit, the total is independent of the slice and equal
-to the transport to 0.05%, for both shapes. The field three-point term is
+From three e-folds after exit, the total is independent of the slice and
+equal to the transport to $1.3\times10^{-4}$, for both shapes. The field three-point term is
 below 1%. It is also independent of the velocity step. This is a
 separate-universe confirmation of the tree-level transport in curved field
 space. The shape dependence comes entirely from the different superhorizon
@@ -220,9 +225,10 @@ reference's $s_e$ is larger. The $s_*=0.1$ branches give
 $|f_{\mathrm{NL}}|\lesssim10^{-2}$, as the reference states.
 
 On a slice $10^{-2}$ e-folds before the end, the phase-space $\delta N$
-reproduces the transport in every branch. The differences are 0.05%, 0.4%,
-0.16%, and $4\times10^{-5}$ in absolute terms for the $f_{\mathrm{NL}}\approx0.0025$
-case. That slice is used because a perturbed trajectory may end inflation
+reproduces the transport in every branch. The relative differences are
+$6\times10^{-5}$ and $9\times10^{-5}$ for $s_*=10^{-3}$; for $s_*=0.1$, where
+$f_{\mathrm{NL}}\approx0.007$ and 0.0025, the absolute differences are
+$1.1\times10^{-5}$ and $3\times10^{-7}$. That slice is used because a perturbed trajectory may end inflation
 before the target surface of $10^{-3}$ e-folds. $f_{\mathrm{NL}}$ still evolves in
 the last e-folds, for example from $-0.861$ to $-0.713$ in the first branch.
 
@@ -281,9 +287,9 @@ The end-of-inflation $f_{\mathrm{NL}}$ (Planck sign) at four of these couplings:
 For $s_*=10^{-3}$ the crossing-time $\delta N$ again falls short, by about 8%,
 for the reason of the loop case. The hybrid $\mu=10$ branch has
 $|f_{\mathrm{NL}}|\approx13$; the reference's prescription gives a similar value. On a slice $10^{-2}$ e-folds
-before the end, the phase-space $\delta N$ reproduces the transport to 0.1%
-in all four cases (for example $-1.6331$ against $-1.6332$ and $-13.334$ against
-$-13.348$).
+before the end, the phase-space $\delta N$ reproduces the transport to
+$6\times10^{-5}$ in all four cases (for example $-1.63313$ against $-1.63317$ and
+$-13.3473$ against $-13.3477$).
 
 The phase-space $\delta N$ uses the step $h_s=\min(10^{-2}s,10^{-5})$ in $s$.
 A purely relative step fails for $s_*=10^{-3}$: $10^{-2}s$ is too coarse for
