@@ -8,6 +8,18 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `phys_type_models::in_in`, a numerical in-in reference for the
+  constant-mixing two-field theory of arXiv:2607.14529, independent of the
+  engine: modes from the paper's Eqs. (24)-(25) with a Bunch-Davies vacuum
+  from the asymptotic series of the coupled equations, tree-level bispectra
+  of `sigma phidot^2`, `sigma (nabla phi)^2`, `sigma^2 phidot`, `sigma^3`,
+  their covariant forms, and `phidot^3`, a smooth window for `i0+`, and
+  exact superhorizon commutators. `orbit_terms` gives the decoupling-limit
+  cubic action of the constant-turn orbit. Validated against the exact power
+  spectrum, the closed-form `phidot^3` bispectrum, and the paper's basis
+  identities (`tests/in_in.rs`).
+- `phys_type_models::hmps`, the closed-form power spectra of
+  arXiv:2606.18248, moved from the constant-turn tests.
 - `phys-type-models/tests/separable.rs`: three uncoupled quadratic fields
   against the sum-separable slow-roll `delta N` of Battefeld and Easther
   (arXiv:astro-ph/0610296, Eqs. (3) and (35)) and against phase-space

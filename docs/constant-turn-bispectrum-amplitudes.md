@@ -1,6 +1,7 @@
 # Bispectrum amplitudes on the constant-turn orbit
 
-Status: design. This is the next step after the squeezed-limit exponent of
+Status: A1 (the in-in reference) implemented; A2 and A3 designed. This is
+the next step after the squeezed-limit exponent of
 [`constant-turn-exact-solutions.md`](constant-turn-exact-solutions.md#squeezed-bispectrum).
 
 ## Goal
@@ -86,47 +87,89 @@ cannot be compared with the transport directly.
 
 ## Independent in-in code
 
-The in-in code must share nothing with the transport except the model
-parameters $(\lambda,\mu/H)$.
+`phys_type_models::in_in` shares nothing with the transport except the model
+parameters $(\lambda,\mu/H)$. Units are $H=1$, and a cubic coefficient is
+given times $c=\sqrt{2\epsilon}\,m_{\mathrm{Pl}}$, so that the reduced
+$f_{\mathrm{NL}}$ does not depend on $c$. For the orbit the coefficients of
+$\sigma\dot\phi^2$, $\sigma(\nabla\phi)^2/a^2$, and $\sigma^2\dot\phi$ are $\lambda/2$,
+$-\lambda/2$, and $-\lambda^2/4$; for [HMPS2] Eq. (3) they are $\tilde\alpha/2$,
+$\tilde\beta/2$, and $\tilde\gamma/6$.
 
-- **Modes.** Solve [HMPS2] Eqs. (24)–(25) in $z=-k\tau$ for the two
-  Bunch–Davies doublets, started at $z_0=e^{6}$ or deeper, as plain complex
-  ODEs. The mode solver of the core is not used. The power spectrum from
-  these modes must reproduce [HMPS2] Eq. (147), which the core already
-  matches (the tables of the earlier document); this cross-checks the two
-  independent mode codes.
-- **Vertices.** Each operator gives the tree-level contraction of the form of
-  [HMPS2] Eq. (198): $-2\,\mathrm{Im}\int d\tau\,a^{n}\prod_i K(k_i;\tau_f,\tau)$,
-  with the dressed bulk-to-boundary propagators [HMPS2] Eqs. (170)–(171)
-  built from the numerical modes. The gradient operator replaces
-  $D_\tau\phi(k_1)D_\tau\phi(k_2)$ by $-(\mathbf k_1\cdot\mathbf k_2)\phi(k_1)\phi(k_2)$.
-- **Time integral.** The integrand oscillates as $e^{-iK\tau}$ inside the
-  horizon. The $i0^+$ prescription is implemented as a damping factor
-  $e^{\kappa K\tau}$, with the result extrapolated in $\kappa\to0$. Each
-  integral must converge in $\kappa$, the start time, and the ODE tolerance
-  separately, as the transport's start depth was.
-- **Output.** $B_\zeta$ per operator, and the reduced $f_{\mathrm{NL}}$ in the
-  normalization of the repository. [HMPS2] Eq. (197) has the same
-  normalization at the equilateral point, because its $\Delta_\zeta$ is the power
-  spectrum, Eq. (145).
-
-The code belongs in `phys-type-models` as a reference calculation, like
-`hkkpt`, and not in the core.
+- **Modes.** [HMPS2] Eqs. (24)–(25) are integrated in $z$ for unit wavenumber
+  by fourth-order Runge–Kutta on a uniform grid in $s=z-1$ above $z=1$ and
+  $s=\ln z$ below it (step 0.01), and interpolated by cubic Hermite
+  polynomials. Scale invariance gives every other wavenumber, so one table
+  serves all three legs, and the long leg of a squeezed triangle starts as
+  deep as the short ones.
+- **Vacuum.** The doublets start from the two positive-frequency solutions
+  of the coupled equations,
+  $\phi,\sigma=z^{1+a}e^{iz}\sum_np_n,q_nz^{-n}$ with $a=\pm i\lambda/2$, whose
+  coefficients follow from a two-by-two recursion (eight terms). The
+  uncoupled modes $u_0$ and $u_\mu$ are not enough: with
+  $\phi'=0$ in the entropy doublet, the curvature momentum
+  $\Pi_\phi\propto D_z\phi=\lambda\sigma/z$ does not vanish, which is an $O(1)$
+  error in $\dot\phi=\lambda\sigma+\dots$. It moved the power spectrum by only
+  $10^{-3}$ but the orbit's $f_{\mathrm{NL}}$ by a factor of 3000. With the
+  series, the power spectrum no longer depends on the start, $z_0=e^6$ or
+  $e^{7.5}$.
+- **Vertices.** With $\langle Q(\tau_f)\rangle=2\int dt\,\mathrm{Im}\langle Q(\tau_f)H_I(t)\rangle$
+  and $H_I=-\int d^3x\,a^3\mathcal L_3$,
+  $B=-2\sum g\,\mathrm{Im}\int d\tau\,a^4\sum_{\mathrm{perm}}\prod_iG_i$, where
+  $G_i=\sum_b\phi_b(k_i,\tau_f)X_b^*(k_i,\tau)$ is the Wightman function of
+  [HMPS2] Eq. (152) for the vertex field $X$ on leg $i$. The gradient operator
+  contributes $-(\mathbf k_a\cdot\mathbf k_b)\tau^2$ for the legs of its two
+  $\phi$ fields.
+- **Time integral.** Eight-point Gauss–Legendre panels no wider than $1/K$
+  and $0.05|\tau|$, from where the shortest leg has $z_0$ to the final slice.
+  The $i0^+$ prescription is a smooth window that switches the integrand off
+  between $K|\tau|=z_0K/(2k_{\max})$ and $z_0K/k_{\max}$, with every derivative
+  continuous, so its error falls faster than any power of the window length.
+  It leaves the horizon-crossing region untouched. A damping
+  factor $e^{\kappa K\tau}$, as first designed, biases it at $O(\kappa)$, and
+  Richardson extrapolation leaves $O(\kappa^3)$, about 1% for practical
+  $\kappa$.
+- **Superhorizon commutators.** Outside the horizon $\mathrm{Im}\,G$ is a
+  commutator, smaller than $\mathrm{Re}\,G$ by about $z^3$; formed from products of
+  modes it cancels to roundoff by $z\sim e^{-12}$, and for a light $\sigma$ the
+  result then grew without bound with the final slice. Below $z=0.1$ it is
+  therefore computed as $r(z)S(z)$: $S$ is the equal-time commutator matrix of
+  $(\phi,\phi',\sigma,\sigma')$, exact from $[\phi,\Pi_\phi]=[\sigma,\Pi_\sigma]=i$, and
+  $r(z)$ is the response of $\phi(z_f)$ to the state at $z$, the adjoint
+  equation $dr/dz=-rA(z)$ integrated from $r(z_f)=e_\phi$. Inside the horizon the
+  modes are kept: the squeezed limit relies on an exact cancellation between
+  times of the short legs' $\mathrm{Im}\,G$, which holds only when its real and
+  imaginary parts share their integration errors. Using the response there
+  put the squeezed $\dot\phi^3$ 7% off.
+- **Output.** The reduced $f_{\mathrm{NL}}=\tfrac56B/(P_1P_2+P_1P_3+P_2P_3)$,
+  the convention of `CurvatureCorrelators::reduced_f_nl`. [HMPS2] Eq. (197)
+  has the same normalization at the equilateral point, because its
+  $\Delta_\zeta$ is the power spectrum, Eq. (145).
 
 ## Validation of the in-in code
 
-1. **Massless limit.** For $\lambda=0$ the $\sigma$ modes are the massive
-   Hankel modes; an operator with one external $\sigma$ then gives no
-   $\zeta\zeta\zeta$, which tests the propagator bookkeeping.
-2. **Weak mixing.** For $\lambda\ll1$ the $\tilde\alpha$ bispectrum is the
-   one-transfer quasi-single-field result of
-   [Chen and Wang, arXiv:0909.0496](https://arxiv.org/abs/0909.0496), first
-   order in $\lambda$, which [HMPS2] states it recovers.
-3. **The paper's closed forms.** The squeezed coefficients $C_\pm(\lambda,\nu)$
-   of [HMPS2] Sec. X and the equilateral $f^{(\alpha)}_{\mathrm{NL}}/\alpha$ of its
-   Fig. 1 are evaluated and compared with the $\alpha$, $\beta$, and $\gamma$
-   operators. Any difference is recorded in
-   [`literature-discrepancies.md`](literature-discrepancies.md).
+`crates/phys-type-models/tests/in_in.rs`, with unit tests of the vacuum
+series, the commutator matrix, and the response in the module:
+
+| Check | Result |
+| --- | --- |
+| power spectrum against [HMPS2] Eq. (147), $(\lambda,\mu^2)$ from the earlier tables | within $2\times10^{-6}$ (heavy: $10^{-9}$); a light $\sigma$ needs the final slice at $z=e^{-30}$ |
+| $g\dot\phi^3$ at $\lambda=0$ against $B=3g/(k_1k_2k_3K^3)$, equilateral, folded, $r=0.1$, $r=0.01$ | within $7\times10^{-7}$ |
+| operators with an external $\sigma$ at $\lambda=0$ | exactly zero |
+| [HMPS2] Eq. (3) against its covariant form, Eq. (8), with the reshuffled couplings | $10^{-9}$ |
+| the orbit against $(\tilde\alpha,\tilde\beta,\tilde\gamma)=(\lambda,-\lambda^2/2,0)$ plus the gradient operator | $10^{-9}$; the gradient operator is more than 10% of the total |
+| weak mixing: $f^{(\tilde\alpha)}_{\mathrm{NL}}/\lambda$ at $\lambda=10^{-3},2\times10^{-3},4\times10^{-3}$ | constant to $5\times10^{-5}$, with an $O(\lambda^2)$ correction |
+| orbit $f_{\mathrm{NL}}$ for $(1,1.25)$, $(2,2)$, $(2,0.81)$, equilateral and $r=0.01$, under $z_0\to e^{7.5}$, half the step, half the panels, an earlier window, and the response from $z=0.03$ | within $10^{-6}$ (observed $5\times10^{-8}$) |
+
+The weak-mixing check tests the order in $\lambda$ but not the value. Its value
+is part of A3, because [HMPS2] states that its closed forms reduce to the
+quasi-single-field result of
+[Chen and Wang, arXiv:0909.0496](https://arxiv.org/abs/0909.0496).
+
+The final slice is physical, not numerical: for a light $\sigma$ the
+bispectrum keeps evolving outside the horizon until $\sigma$ has decayed. For
+$\mu^2=0.81$ ($\nu=1.2$) the equilateral $f_{\mathrm{NL}}$ changes by 1.5% between
+$z=e^{-16}$ and $e^{-20}$. The comparison with the transport therefore uses the
+same slice in both codes.
 
 ## Comparison with the transport
 
@@ -135,7 +178,7 @@ $(\lambda,\mu^2/H^2)\in\{(1,1.25),(2,1.25),(1,2),(2,2),(2,0.81)\}$ and
 $\epsilon=10^{-5}$:
 
 - equilateral $f_{\mathrm{NL}}$ from the transport against the in-in sum of
-  the four operators;
+  the three operators;
 - squeezed $f_{\mathrm{NL}}(r)$ for $1\ge r\ge0.01$ against the same sum,
   including the amplitude of $r^{3/2-\nu}$;
 - the share of the gradient operator, reported separately.
@@ -152,16 +195,12 @@ closes.
 | Step | Content |
 | --- | --- |
 | A0 | this design |
-| A1 | numerical in-in reference in `phys-type-models` with the mode and power-spectrum checks and validations 1–2 |
+| A1 | numerical in-in reference in `phys-type-models` and its validation (done) |
 | A2 | the comparison with the transport, as an ignored test and a figure |
-| A3 | the comparison with the closed forms of [HMPS2] (validation 3) |
+| A3 | the comparison with the closed forms of [HMPS2]: the squeezed $C_\pm(\lambda,\nu)$ of its Sec. X, the equilateral $f^{(\alpha)}_{\mathrm{NL}}/\alpha$ of its Fig. 1, and the quasi-single-field limit; differences go to [`literature-discrepancies.md`](literature-discrepancies.md) |
 
 ## Open questions
 
-- How to integrate the vertices at $r=0.01$, where the long mode exits about
-  five e-folds after the short ones and the integrand spans both scales; the
-  modes and the integral may need to be advanced together with an adaptive
-  step.
 - How far into the heavy regime, $\mu>3H/2$, the comparison should go. The
   squeezed oscillation needs $r\lesssim10^{-3}$, which is expensive for
   both codes.
