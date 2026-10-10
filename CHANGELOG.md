@@ -8,6 +8,12 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `scripts/hmps2_squeezed.py` evaluates the squeezed closed forms and the
+  exact bispectrum representations of arXiv:2607.14529.
+  `tests/in_in_vs_paper.rs` checks them against the in-in reference: the
+  exact representations agree to `1e-8`, and the squeezed closed forms agree
+  once their prefactor carries the factor 10/9 that the paper omits
+  (`docs/literature-discrepancies.md` entry 12).
 - `phys-type-models/tests/constant_turn_amplitudes.rs`: the transport
   bispectrum on the constant-turn orbit against the in-in reference of its
   decoupling-limit cubic action, equilateral and squeezed, to `5e-5` in

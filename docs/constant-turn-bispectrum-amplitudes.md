@@ -1,7 +1,7 @@
 # Bispectrum amplitudes on the constant-turn orbit
 
-Status: A1 (the in-in reference) and A2 (the comparison with the transport)
-done; A3 designed. This is
+Status: done. A1 (the in-in reference), A2 (the comparison with the
+transport), and A3 (the comparison with the closed forms of [HMPS2]). This is
 the next step after the squeezed-limit exponent of
 [`constant-turn-exact-solutions.md`](constant-turn-exact-solutions.md#squeezed-bispectrum).
 
@@ -237,6 +237,49 @@ figure
 shows the in-in values as crosses over the transport points, with the
 relative difference in its bottom panel.
 
+## Comparison with the closed forms of [HMPS2]
+
+[`scripts/hmps2_squeezed.py`](../scripts/hmps2_squeezed.py) evaluates the
+paper's formulas for the covariant operators of its Eq. (8) one at a time.
+`crates/phys-type-models/tests/in_in_vs_paper.rs` compares them with the in-in
+reference.
+
+- **Exact representations.** The bispectra (199), (207), and (212) with the
+  integral representations (203), (209), and (214), before any squeezed
+  approximation. The time integral is $\int d\tau\,\tau^2e^{-i\Omega\tau}=-2i/\Omega^3$
+  in the late-time limit, and $2/\Omega^3=\int ds\,s^2e^{-s\Omega}$ factorizes the
+  three $t$ integrals. They agree with the in-in reference to $10^{-8}$ for
+  $\alpha$, $\beta$, and $\gamma$ at $r=1$ and $r=0.1$, signs and prefactors included.
+  The equilateral amplitudes of Figs. 1–3 are values of these
+  representations, so they are confirmed with them, though the figures
+  themselves were not digitized.
+- **Squeezed closed forms.** The leading coefficient of
+  $r^2B=A_+r^{1/2-\nu}+A_-r^{1/2+\nu}+\dots$ from Eqs. (240), (248), and (255),
+  against a fit of the in-in $r^2B$ over $10^{-6}\le r\le10^{-2}$ with the powers
+  $r^{1/2\pm\nu}$, $r$, and $r^2$. In fifteen cases ($\alpha$: $0.05\le\lambda\le3$,
+  $0.4\le\nu\le1.2$; $\beta$: $\nu=0.4$, 0.8; $\gamma$: $\nu=0.3$, 0.4) they agree to
+  $6\times10^{-6}$, or $2.5\times10^{-4}$ for $\nu=1.2$, once the printed shapes are
+  multiplied by $10/9$
+  ([`literature-discrepancies.md`](literature-discrepancies.md), entry 12).
+  $A_-$ is resolved by the fit only where $r^{1/2+\nu}$ is far from the analytic
+  $r$; for $\nu=0.4$ it agrees to 1%.
+- **Weak mixing.** The case $\lambda=0.05$ is among the fifteen. With the
+  linear scaling of A1, this confirms the paper's statement that its result
+  reduces to the one-transfer quasi-single-field limit. The quasi-single-field
+  paper itself was not evaluated.
+
+Two numerical points matter for the script. The integrals $J$ of a curvature
+leg, $\int dt\,t^{-1+a}\dots$ with imaginary $a$, are defined by analytic
+continuation. With $t=e^u$, the script subtracts $g(0)/(1+t)$ and adds back
+$g(0)\pi/\sin\pi a$, which leaves a smooth integrand whose trapezoid sum
+converges exponentially. Subtracting $g(0)$ on $t<1$ only instead left a jump,
+and $c_-$ moved by 40% with the step. An entropy leg, $t^{a}$, converges at $t=0$
+and must not be subtracted: the $1/(1+t)$ tail does not decay when
+$\mathrm{Re}(1+a)=1$, and doing so had put $\beta$ and $\gamma$ off by up to a
+factor of ten. The integrals converge at large $t$ only for $\nu<1$ ($\beta$) and
+$\nu<1/2$ ($\gamma$); continuation in $\nu$ is not implemented, so those are the
+ranges tested.
+
 ## Migration
 
 | Step | Content |
@@ -244,7 +287,7 @@ relative difference in its bottom panel.
 | A0 | this design |
 | A1 | numerical in-in reference in `phys-type-models` and its validation (done) |
 | A2 | the comparison with the transport, as an ignored test and a figure (done) |
-| A3 | the comparison with the closed forms of [HMPS2]: the squeezed $C_\pm(\lambda,\nu)$ of its Sec. X, the equilateral $f^{(\alpha)}_{\mathrm{NL}}/\alpha$ of its Fig. 1, and the quasi-single-field limit; differences go to [`literature-discrepancies.md`](literature-discrepancies.md) |
+| A3 | the comparison with the closed forms of [HMPS2] (done; one prefactor discrepancy, entry 12 of [`literature-discrepancies.md`](literature-discrepancies.md)) |
 
 ## Open questions
 

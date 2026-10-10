@@ -63,7 +63,7 @@ The implementation boundary is `main` after step 5f of
 `phys-type` and `phys-type-models`, the generalized nonminimal theory layer is
 in place, and the perturbation pipeline runs for any number of fields. The
 validated state is 238 core unit tests and 17 model tests plus 25
-compile-fail cases, with 27 expensive ignored tests (9 core, 18 models) that
+compile-fail cases, with 29 expensive ignored tests (9 core, 20 models) that
 pass in release mode (`cargo test --workspace --release -- --ignored`; they are
 not run by CI). Clippy with warnings denied, rustfmt, and
 rustdoc pass locally.
@@ -141,7 +141,10 @@ closed-form $\dot\phi^3$ bispectrum, and the basis identities of the paper.
 The transport matches it (A2) in sign and amplitude at strong mixing,
 equilateral and squeezed, to about $10^{-5}$ in $f_{\mathrm{NL}}$; the gradient
 coupling of the orbit, outside the paper's operator basis, is often the
-larger part. The comparison with the paper's closed forms (A3) is next.
+larger part. The in-in reference also reproduces the paper's exact bispectrum
+representations to $10^{-8}$ and its squeezed closed forms (A3) once their
+prefactor is multiplied by $10/9$
+([`literature-discrepancies.md`](literature-discrepancies.md) entry 12).
 
 ### Reading order for the active P3 work
 
