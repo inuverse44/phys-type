@@ -28,9 +28,10 @@ differ from the typeset numbering.
   [arXiv:2302.05866v2](https://arxiv.org/abs/2302.05866).
 - **[HMPS]** J. Huenupi, C. Muñoz, G. A. Palma, and S. Sypsas, *Pushing the
   Primordial Frontier: Exact Linear Solutions in Multifield Inflation*,
-  [arXiv:2606.18248v2](https://arxiv.org/abs/2606.18248); companion article
-  *Pushing the Primordial Frontier: Cosmological Collider Signatures at
-  Strong Mixing*, [arXiv:2607.14529](https://arxiv.org/abs/2607.14529).
+  [arXiv:2606.18248v2](https://arxiv.org/abs/2606.18248).
+- **[HMPS2]** the companion article, *Pushing the Primordial Frontier:
+  Cosmological Collider Signatures at Strong Mixing*,
+  [arXiv:2607.14529v2](https://arxiv.org/abs/2607.14529).
 - **[M]** J. Maldacena, *Non-Gaussian features of primordial fluctuations in
   single field inflationary models*, JHEP 05 (2003) 013,
   [arXiv:astro-ph/0210603](https://arxiv.org/abs/astro-ph/0210603).
@@ -270,6 +271,37 @@ $\mu=7.5$ and 15 end at $\phi_e$, and the right panel is consistent. The $\mu=30
 trajectory itself was not computed here. See
 [`nonminimal-assisted-inflation.md`](nonminimal-assisted-inflation.md), Figures.
 
+### 12. Prefactor of the squeezed bispectra, [HMPS2] Eqs. (240), (248), and (255)
+
+The squeezed shapes $S_\alpha$, $S_\beta$, and $S_\gamma$ of [HMPS2] Sec. X are $9/10$
+of what the paper's own definitions give. Inserting its Eqs. (104)–(105),
+(235), and (239) into the bispectrum (199) of the $\alpha$ interaction gives
+
+$$
+B_\alpha(k_S,k_S,rk_S)=-\frac{\alpha H^4}{128\sqrt2\,\epsilon^2m_{\mathrm{Pl}}^4\,rk_S^6}
+\big[c_{\alpha,+}r^{-\nu-1/2}+c_{\alpha,-}r^{\nu-1/2}\big],
+$$
+
+and the normalization (197), $B=\tfrac{9}{10}(2\pi)^4\Delta_\zeta^2(k_1k_2k_3)^{-2}f_{\mathrm{NL}}S$,
+then gives the prefactor $-\tfrac{10}{9}\cdot2\alpha(2\epsilon)^{-2}(H/m_{\mathrm{Pl}})^4/(2^{10}\sqrt2\pi^4\Delta_\zeta^2)$
+in place of the printed one without $\tfrac{10}{9}$. That is, the printed shapes
+omit the inverse of the $9/10$ in Eq. (197). The same holds for $\beta$ and
+$\gamma$.
+
+The evidence is numerical. The independent in-in reference
+(`phys_type_models::in_in`, [`constant-turn-bispectrum-amplitudes.md`](constant-turn-bispectrum-amplitudes.md))
+reproduces the paper's exact integral representations, Eqs. (199)/(203),
+(207)/(209), and (212)/(214), to $10^{-8}$ at $r=1$ and 0.1. Its leading squeezed
+coefficient matches the closed forms, evaluated by
+[`scripts/hmps2_squeezed.py`](../scripts/hmps2_squeezed.py), with the factor $10/9$,
+in all fifteen tested cases of the three interactions, $0.05\le\lambda\le3$ and
+$0.3\le\nu\le1.2$: to $6\times10^{-6}$, or $2.5\times10^{-4}$ for $\nu=1.2$, whose $\sigma$
+still decays as $z^{0.3}$ after the final slice. Without the factor every
+case is 10% low.
+The coefficients $c_\pm$ themselves, with their $C^{(w)}_\pm$, $F^{(w)}_0$, $N^{(w)}$, and
+the double integrals $J$, are correct. The equations were read from the
+typeset PDF of v2.
+
 ## Agreements checked
 
 Recording these makes clear which published results have been independently
@@ -300,6 +332,13 @@ reproduced here:
 - [HMPS] Eqs. (43)–(45), the massive constant-turn spectra, against the mode
   solver on a circular orbit to $3.5\times10^{-4}$ for $0.5\le\lambda\le2$ and
   $1.25\le\mu^2/H^2\le9$.
+- [HMPS2] Eq. (147), the exact power spectrum, against the independent in-in
+  modes to $2\times10^{-6}$; Eqs. (3) and (8), the reshuffled couplings; and
+  the exact bispectrum representations (199)/(203), (207)/(209), and
+  (212)/(214) against the in-in reference to $10^{-8}$.
+- [HMPS2] Sec. X, the squeezed exponents $r^{1/2\pm\nu}$ for all three
+  interactions and, with entry 12, the leading coefficients $c_{\alpha,\beta,\gamma,+}$
+  (and $c_-$ where the fit resolves it).
 - [HKKPT] Eq. (3.1) for the Class II power-law and hybrid examples, given the
   numerical end surface and $s_e$, against the mode solver to
   $1.5\times10^{-3}$.
