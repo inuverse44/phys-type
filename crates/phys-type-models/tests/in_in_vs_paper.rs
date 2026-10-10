@@ -54,11 +54,12 @@ fn fit(x: &[f64], y: &[f64], powers: &[f64]) -> Vec<f64> {
             .max_by(|&p, &q| a[p][column].abs().total_cmp(&a[q][column].abs()))
             .unwrap();
         a.swap(column, pivot);
-        for row in 0..n {
+        let pivot_row = a[column].clone();
+        for (row, entries) in a.iter_mut().enumerate() {
             if row != column {
-                let factor = a[row][column] / a[column][column];
-                for k in column..=n {
-                    a[row][k] -= factor * a[column][k];
+                let factor = entries[column] / pivot_row[column];
+                for (entry, pivot_entry) in entries.iter_mut().zip(&pivot_row).skip(column) {
+                    *entry -= factor * pivot_entry;
                 }
             }
         }
@@ -116,7 +117,9 @@ fn in_in_matches_the_exact_integral_representations() {
     // Eqs. (199)/(203), (207)/(209), and (212)/(214) of arXiv:2607.14529 at
     // finite r, before any squeezed approximation, evaluated by
     // `uv run scripts/hmps2_squeezed.py --interaction NAME --lambda L --nu NU --exact 1 0.1`.
-    let exact: [(&str, [f64; 3], f64, f64, f64, f64); 5] = [
+    // (interaction, couplings, lambda, nu, B at r = 1, B at r = 0.1)
+    type Case = (&'static str, [f64; 3], f64, f64, f64, f64);
+    let exact: [Case; 5] = [
         (
             "gamma",
             [0.0, 0.0, 1.0],
