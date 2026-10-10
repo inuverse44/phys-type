@@ -142,7 +142,9 @@ The cubic action of the polar orbit is not of the paper's form: in the
 decoupling limit it contains $\sigma(\dot\varphi^2-(\nabla\varphi)^2/a^2)/R$ and
 $\Omega\sigma^2\dot\varphi/R$, so the gradient coupling $\sigma(\nabla\varphi)^2$ lies
 outside the basis (8) of the paper. The exponent does not depend on the
-interaction, so it can be compared directly; the amplitudes $c_\pm$ cannot yet.
+interaction, so it can be compared directly. The amplitudes are compared
+with an independent in-in calculation of the orbit's own cubic action in
+[`constant-turn-bispectrum-amplitudes.md`](constant-turn-bispectrum-amplitudes.md).
 
 ![Squeezed bispectrum on the constant-turn orbit](figures/constant_turn_squeezed.png)
 
@@ -172,9 +174,11 @@ leading exponent approaches that of the analytic terms, and the slope
 converges only slowly (for $\lambda=2$, $\nu=3/4$ it is 0.28 and 0.61 over
 $r=0.03$–$0.01$ and $0.01$–$0.003$), so those cases are not used.
 
-Comparing the amplitudes requires the decoupling-limit cubic action of the
-orbit in the paper's variables, including the gradient coupling, and an
-independent in-in evaluation; that is the next step.
+The crosses and the bottom panel show the in-in reference of the orbit's
+decoupling-limit cubic action, including the gradient coupling, on the same
+slice. The transport agrees with it to $10^{-4}$–$10^{-3}$ relative, about
+$10^{-5}$ in absolute terms; see
+[`constant-turn-bispectrum-amplitudes.md`](constant-turn-bispectrum-amplitudes.md#comparison-with-the-transport).
 
 ## Tests
 
@@ -198,10 +202,10 @@ curvature built from the connection. The validation against the papers is in
 
 ## Next steps
 
-1. Amplitudes: designed in
-   [`constant-turn-bispectrum-amplitudes.md`](constant-turn-bispectrum-amplitudes.md),
-   which derives the cubic action of the orbit, including the gradient
-   coupling, and plans an independent in-in reference.
+1. Amplitudes: the transport matches the in-in reference
+   ([`constant-turn-bispectrum-amplitudes.md`](constant-turn-bispectrum-amplitudes.md));
+   the comparison of the in-in reference with the paper's closed forms
+   (step A3) remains.
 2. Heavy entropy fields, $\mu>3H/2$: the squeezed shape oscillates as
    $r^{1/2}\sin(\rho\ln(1/r)+\phi)$ with $\rho=\sqrt{\mu^2/H^2-9/4}$; resolving a
    period needs $r\lesssim10^{-3}$.
