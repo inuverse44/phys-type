@@ -13,7 +13,10 @@ k3 = r k1, the leading nonanalytic squeezed shape is S ~ r^(1/2 - nu), so the
 reduced f_NL ~ r^(3/2 - nu). The paper's claim is that nu is set by the entropy
 mass mu, nu = sqrt(9/4 - mu^2/H^2), not by the effective mass
 m_eff^2 = mu^2 - lambda^2 H^2. Both power laws are drawn through the
-squeezed-most point; the lower panel shows the local logarithmic slope.
+squeezed-most point; the middle panel shows the local logarithmic slope.
+Crosses are the independent in-in reference of the orbit's decoupling-limit
+cubic action on the same slice, and the bottom panel shows the relative
+difference of the transport from it.
 """
 
 import argparse
@@ -28,7 +31,7 @@ import numpy as np
 
 from _common import load_csv, load_metadata, require_finite, save_figure
 
-COLUMNS = {"lambda_target", "mu2_target", "lambda", "mu2", "r", "f_nl"}
+COLUMNS = {"lambda_target", "mu2_target", "lambda", "mu2", "r", "f_nl", "f_nl_in_in"}
 COLORS = ("tab:blue", "tab:orange", "tab:green")
 
 
@@ -56,9 +59,9 @@ def main() -> None:
     metadata = load_metadata(path)
 
     plt.style.use("seaborn-v0_8-whitegrid")
-    figure, (scaling, slope_axes) = plt.subplots(
-        2, 1, figsize=(7.6, 8.2), sharex=True,
-        gridspec_kw={"height_ratios": [3, 2]}, constrained_layout=True,
+    figure, (scaling, slope_axes, difference) = plt.subplots(
+        3, 1, figsize=(7.6, 10.0), sharex=True,
+        gridspec_kw={"height_ratios": [3, 2, 1.5]}, constrained_layout=True,
     )
     cases = sorted({(float(l), float(m)) for l, m in zip(data["lambda_target"], data["mu2_target"])})
     for color, (lam, mu2) in zip(COLORS, cases):
@@ -71,6 +74,12 @@ def main() -> None:
         scaling.loglog(
             r, f, "o", color=color, markerfacecolor="white", markersize=6,
             label=rf"$\lambda={lam:g}$, $\mu^2/H^2={mu2:g}$ ($\nu={nu:.2g}$)",
+        )
+        reference = rows["f_nl_in_in"]
+        scaling.loglog(r, np.abs(reference), "x", color=color, markersize=7)
+        difference.semilogx(
+            r, rows["f_nl"] / reference - 1.0, "o-", color=color,
+            markerfacecolor="white", markersize=5,
         )
         grid = np.geomspace(r[0] * 0.8, 1.2, 50)
         scaling.loglog(grid, f[0] * (grid / r[0]) ** predicted, "-", color=color, linewidth=1.5)
@@ -86,17 +95,21 @@ def main() -> None:
     handles += [
         plt.Line2D([], [], color="0.3", linestyle="-", label=r"$r^{3/2-\nu}$, $\nu$ from $\mu$"),
         plt.Line2D([], [], color="0.3", linestyle=":", label=r"$r^{3/2-\nu}$, $\nu$ from $m_{\mathrm{eff}}$"),
+        plt.Line2D([], [], color="0.3", linestyle="", marker="x", label="in-in reference"),
     ]
     scaling.legend(handles=handles, fontsize=8, loc="lower left")
     scaling.set_ylim(5.0e-4, 2.0)
-    slope_axes.set_xlabel(r"$r=k_L/k_S$")
     slope_axes.set_ylabel(r"$d\ln|f_{\mathrm{NL}}|/d\ln r$")
     slope_axes.set_ylim(-1.0, 1.2)
+    difference.axhline(0.0, color="0.3", linewidth=0.8)
+    difference.set_xlabel(r"$r=k_L/k_S$")
+    difference.set_ylabel("transport / in-in $-$ 1")
+    difference.ticklabel_format(axis="y", style="sci", scilimits=(-3, -3))
 
     epsilon = power_of_ten(float(metadata.get("epsilon", "nan")))
     title = (
         "Squeezed bispectrum on a constant-turn orbit (arXiv:2607.14529)\n"
-        rf"tree-level transport, $\epsilon={epsilon}$"
+        rf"tree-level transport with the in-in reference, $\epsilon={epsilon}$"
     )
     revision = metadata.get("revision")
     if revision is not None:

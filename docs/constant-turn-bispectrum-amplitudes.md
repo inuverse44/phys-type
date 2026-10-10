@@ -1,6 +1,7 @@
 # Bispectrum amplitudes on the constant-turn orbit
 
-Status: A1 (the in-in reference) implemented; A2 and A3 designed. This is
+Status: A1 (the in-in reference) and A2 (the comparison with the transport)
+done; A3 designed. This is
 the next step after the squeezed-limit exponent of
 [`constant-turn-exact-solutions.md`](constant-turn-exact-solutions.md#squeezed-bispectrum).
 
@@ -173,22 +174,68 @@ same slice in both codes.
 
 ## Comparison with the transport
 
-For the orbit cases of the earlier document,
-$(\lambda,\mu^2/H^2)\in\{(1,1.25),(2,1.25),(1,2),(2,2),(2,0.81)\}$ and
-$\epsilon=10^{-5}$:
+The transport runs the full theory on the orbit of
+`phys_type_models::constant_turn` with the pivot read `after_exit` e-folds after
+its exit (20, 20, 12, 12, and 30 e-folds for the cases below). The in-in
+reference uses the $\lambda$ and $\mu^2$ measured at the pivot exit and the same
+slice, $z=e^{-\text{after\_exit}}$ for the short legs. Triangles are isosceles,
+$k_1=k_2=k_S$, $k_3=rk_S$; $\epsilon=10^{-5}$, transport from five e-folds before
+exit:
 
-- equilateral $f_{\mathrm{NL}}$ from the transport against the in-in sum of
-  the three operators;
-- squeezed $f_{\mathrm{NL}}(r)$ for $1\ge r\ge0.01$ against the same sum,
-  including the amplitude of $r^{3/2-\nu}$;
-- the share of the gradient operator, reported separately.
+| $(\lambda,\mu^2/H^2)$ | $r$ | transport | in-in | relative difference |
+| --- | --- | --- | --- | --- |
+| $(1,1.25)$ | 1 | $-0.229501$ | $-0.229529$ | $-1.3\times10^{-4}$ |
+| | 0.1 | $-0.066440$ | $-0.066481$ | $-6.2\times10^{-4}$ |
+| | 0.01 | $-0.021281$ | $-0.021321$ | $-1.9\times10^{-3}$ |
+| $(2,1.25)$ | 1 | $0.104489$ | $0.104398$ | $8.7\times10^{-4}$ |
+| | 0.1 | $0.103045$ | $0.103021$ | $2.4\times10^{-4}$ |
+| | 0.01 | $0.031413$ | $0.031425$ | $-3.9\times10^{-4}$ |
+| $(1,2)$ | 1 | $-0.343492$ | $-0.343527$ | $-1.0\times10^{-4}$ |
+| | 0.1 | $-0.063482$ | $-0.063513$ | $-4.8\times10^{-4}$ |
+| | 0.01 | $-0.0077760$ | $-0.0078055$ | $-3.8\times10^{-3}$ |
+| $(2,2)$ | 1 | $-0.229110$ | $-0.229131$ | $-9.2\times10^{-5}$ |
+| | 0.1 | $-0.043307$ | $-0.043323$ | $-3.8\times10^{-4}$ |
+| | 0.01 | $-0.0094773$ | $-0.0094940$ | $-1.8\times10^{-3}$ |
+| $(2,0.81)$ | 1 | $0.332179$ | $0.331877$ | $9.1\times10^{-4}$ |
+| | 0.01 | $0.135855$ | $0.135849$ | $4.1\times10^{-5}$ |
 
-The expected agreement is the larger of the transport's start-depth error
-(about 0.2% from seven e-folds,
-[`three-point-transport.md`](three-point-transport.md)) and the in-in
-convergence. A difference at $O(\epsilon)$ or $O(1/z_0)$ is accepted; a larger
-one is a defect of one of the two codes and is resolved before the step
-closes.
+The two codes agree in sign and amplitude in every case, at strong mixing
+and in the squeezed limit. The differences are roughly constant in absolute
+terms, $1$–$9\times10^{-5}$, except for $3\times10^{-4}$ at $(2,0.81)$, $r=1$. That
+is why the relative difference grows where $|f_{\mathrm{NL}}|$ is small. Starting
+the transport seven e-folds before exit instead of five changes it by at most
+$1.2\times10^{-5}$ (checked for the first three cases). With $\epsilon=10^{-6}$ the
+differences fall to $0.7$–$1.9\times10^{-5}$, by a factor of 1.5 to 4 rather than
+ten. Part of the difference therefore scales with $\epsilon$, as the decoupling
+limit implies. The rest is at the level of the transport's start-depth error,
+not a physical difference.
+
+**The gradient coupling matters.** The in-in reference splits the orbit's
+$f_{\mathrm{NL}}$ into the operators of the [HMPS2] basis and the gradient operator
+$-\sigma(\nabla\phi)^2/(Ra^2)$ outside it:
+
+| $(\lambda,\mu^2/H^2)$ | $r$ | total | gradient | [HMPS2] basis |
+| --- | --- | --- | --- | --- |
+| $(1,1.25)$ | 1 | $-0.229$ | $-0.162$ | $-0.067$ |
+| $(2,1.25)$ | 1 | $0.104$ | $-0.136$ | $0.240$ |
+| $(1,2)$ | 1 | $-0.343$ | $-0.264$ | $-0.080$ |
+| $(2,2)$ | 1 | $-0.229$ | $-0.259$ | $0.030$ |
+| $(2,0.81)$ | 1 | $0.331$ | $-0.078$ | $0.409$ |
+| $(2,2)$ | 0.01 | $-0.0095$ | $-0.0052$ | $-0.0043$ |
+
+In the equilateral configuration the gradient operator is often the larger
+part, and for $(2,2)$ the [HMPS2] basis alone would give the wrong sign. In
+the squeezed limit it remains comparable. It does not change the squeezed
+exponent, which is why the earlier slope test could not see it.
+
+`constant_turn_transport_matches_the_in_in_amplitudes` (ignored, about three
+minutes in release) asserts the agreement to $5\times10^{-5}$ for $(1,1.25)$ and
+$(2,2)$, equilateral and $r=0.01$, with $\epsilon=10^{-6}$. It also asserts that
+dropping the gradient operator misses the transport by more than 0.1. The
+figure
+[`figures/constant_turn_squeezed.png`](figures/constant_turn_squeezed.png)
+shows the in-in values as crosses over the transport points, with the
+relative difference in its bottom panel.
 
 ## Migration
 
@@ -196,7 +243,7 @@ closes.
 | --- | --- |
 | A0 | this design |
 | A1 | numerical in-in reference in `phys-type-models` and its validation (done) |
-| A2 | the comparison with the transport, as an ignored test and a figure |
+| A2 | the comparison with the transport, as an ignored test and a figure (done) |
 | A3 | the comparison with the closed forms of [HMPS2]: the squeezed $C_\pm(\lambda,\nu)$ of its Sec. X, the equilateral $f^{(\alpha)}_{\mathrm{NL}}/\alpha$ of its Fig. 1, and the quasi-single-field limit; differences go to [`literature-discrepancies.md`](literature-discrepancies.md) |
 
 ## Open questions

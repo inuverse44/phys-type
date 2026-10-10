@@ -8,6 +8,12 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `phys-type-models/tests/constant_turn_amplitudes.rs`: the transport
+  bispectrum on the constant-turn orbit against the in-in reference of its
+  decoupling-limit cubic action, equilateral and squeezed, to `5e-5` in
+  `f_NL`. `examples/constant_turn_squeezed.rs` writes the in-in value as a
+  new `f_nl_in_in` column (golden data refrozen; the transport columns are
+  unchanged), and the figure shows it with the relative difference.
 - `phys_type_models::in_in`, a numerical in-in reference for the
   constant-mixing two-field theory of arXiv:2607.14529, independent of the
   engine: modes from the paper's Eqs. (24)-(25) with a Bunch-Davies vacuum
