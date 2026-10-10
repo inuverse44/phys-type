@@ -265,8 +265,33 @@ reference.
   $r$; for $\nu=0.4$ it agrees to 1%.
 - **Weak mixing.** The case $\lambda=0.05$ is among the fifteen. With the
   linear scaling of A1, this confirms the paper's statement that its result
-  reduces to the one-transfer quasi-single-field limit. The quasi-single-field
-  paper itself was not evaluated.
+  reduces to the one-transfer quasi-single-field limit.
+- **Quasi-single-field inflation itself.** Chen and Wang,
+  [arXiv:0911.3380](https://arxiv.org/abs/0911.3380), treat the same polar
+  orbit with the transfer vertex $c_2=2R\dot\theta_0=\lambda R$ and
+  $\mathcal L_3=-c_3\sigma^3$ at first order in each transfer. Their Eq. (5.10)
+  gives the squeezed limit through a coefficient $s(\nu)$, a triple
+  time-ordered integral of Hankel functions, Eq. (5.11), evaluated by
+  [`scripts/chen_wang_squeezed.py`](../scripts/chen_wang_squeezed.py). With
+  $\phi=-R\delta\theta$ and $c=R\dot\theta_0$, a unit coefficient of $\sigma^3$ has
+  $r^2B=s(\nu)\lambda^3r^{1/2-\nu}+\dots$. The in-in coefficient at $\lambda=0.01$ and
+  0.02, extrapolated to $\lambda\to0$, matches $s(\nu)$:
+
+  | $\nu$ | in-in | $s(\nu)$ |
+  | --- | --- | --- |
+  | 0.4 | 3.10714 | 3.10712 |
+  | 0.6 | 3.32887 | 3.32887 |
+  | 0.8 | 5.43802 | 5.43805 |
+  | 1.0 | 14.3955 | 14.3957 |
+  | 1.2 | 84.392 | 84.4–84.5 |
+
+  For $\nu=1.2$ the integrals of Eq. (5.11) converge at small time only as
+  $s^{3/2-\nu}$ and cancel to roundoff below $e^{-20}$, so $s$ is extrapolated in
+  the cutoff. The match fixes a label: only $\langle\delta\theta^3\rangle$ scales as
+  $\lambda^3$, so the left side of Eq. (5.10), printed as $\zeta$, is $\delta\theta$
+  ([`literature-discrepancies.md`](literature-discrepancies.md), entry 13).
+  This also covers $\sigma^3$ for $\nu\ge1/2$, where the integrals $J$ of
+  [HMPS2] need continuation in $\nu$.
 
 Two numerical points matter for the script. The integrals $J$ of a curvature
 leg, $\int dt\,t^{-1+a}\dots$ with imaginary $a$, are defined by analytic
@@ -278,7 +303,12 @@ and must not be subtracted: the $1/(1+t)$ tail does not decay when
 $\mathrm{Re}(1+a)=1$, and doing so had put $\beta$ and $\gamma$ off by up to a
 factor of ten. The integrals converge at large $t$ only for $\nu<1$ ($\beta$) and
 $\nu<1/2$ ($\gamma$); continuation in $\nu$ is not implemented, so those are the
-ranges tested.
+ranges tested. Beyond them the divergence comes also from the region where
+both $t_1$ and $t_2$ are large (for $\beta$ as $R^{3\nu-9/2}$), so a
+continuation would need a Mellin–Barnes split of $(1+t_1+t_2)^{\nu-5/2}$. It
+was not pursued: the in-in result and the coefficients $c_\pm$ are both
+analytic in $\nu$ and agree at several points of the convergent range, and
+$\sigma^3$ for $\nu\ge1/2$ is checked against Chen and Wang instead.
 
 ## Migration
 

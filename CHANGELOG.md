@@ -8,6 +8,10 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `scripts/chen_wang_squeezed.py` evaluates the squeezed coefficient `s(nu)`
+  of quasi-single-field inflation (arXiv:0911.3380, Eq. (5.11)); the
+  weak-mixing limit of the in-in reference reproduces it for
+  `0.4 <= nu <= 1.2` (`tests/in_in_vs_paper.rs`).
 - `scripts/hmps2_squeezed.py` evaluates the squeezed closed forms and the
   exact bispectrum representations of arXiv:2607.14529.
   `tests/in_in_vs_paper.rs` checks them against the in-in reference: the

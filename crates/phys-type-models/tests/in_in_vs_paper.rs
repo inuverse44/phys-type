@@ -171,3 +171,47 @@ fn in_in_matches_the_exact_integral_representations() {
         }
     }
 }
+
+/// The squeezed coefficient `s(nu)` of Chen and Wang, arXiv:0911.3380,
+/// Eq. (5.11), evaluated by `uv run scripts/chen_wang_squeezed.py --nu NU`,
+/// with the relative tolerance of each value. For `nu = 1.2` the integrand
+/// near `s = 0` converges only as `s^{3/2 - nu}` and roundoff limits the
+/// cutoff, so the value is extrapolated in the cutoff and uncertain at 1e-3.
+const CHEN_WANG: [(f64, f64, f64); 5] = [
+    (0.4, 3.107_12, 5.0e-5),
+    (0.6, 3.328_87, 5.0e-5),
+    (0.8, 5.438_05, 5.0e-5),
+    (1.0, 14.395_7, 5.0e-5),
+    (1.2, 84.48, 3.0e-3),
+];
+
+#[test]
+#[ignore = "expensive; run with `cargo test --release -- --ignored`"]
+fn weak_mixing_sigma_cubed_matches_chen_wang() {
+    // Quasi-single-field inflation (arXiv:0911.3380) is the constant-turn
+    // theory at first order in each transfer. For p3 << p1 = p2 its Eq. (5.10)
+    // gives <dtheta^3> = s(nu) c2^3 c3 / (H R^6) p1^(nu-7/2) p2^-1 p3^(-3/2-nu),
+    // with c2 = 2 R thetadot = lambda R and L_3 = -c3 sigma^3. With
+    // phi = -R dtheta and c = R thetadot, a unit coefficient of sigma^3 then
+    // has r^2 B = s(nu) lambda^3 r^(1/2 - nu) + ..., with B the in-in
+    // bispectrum of phi times c. (The paper labels the left side of Eq. (5.10)
+    // zeta; only <dtheta^3>, as in its letter version, arXiv:0909.0496,
+    // Eq. (13), scales as lambda^3.)
+    let ratios: Vec<f64> = (0..=32)
+        .map(|i| 10f64.powf(-2.0 - 0.125 * f64::from(i)))
+        .collect();
+    for (nu, s, tolerance) in CHEN_WANG {
+        let leading = |lambda: f64| {
+            // A unit coefficient of sigma^3 is gamma = 6.
+            let y = squeezed(lambda, nu, [0.0, 0.0, 6.0], &ratios, (-40.0_f64).exp());
+            fit(&ratios, &y, &[0.5 - nu, 0.5 + nu, 1.0, 2.0])[0] / lambda.powi(3)
+        };
+        // Remove the O(lambda^2) correction.
+        let (small, larger) = (leading(0.01), leading(0.02));
+        let limit = (4.0 * small - larger) / 3.0;
+        assert!(
+            (limit / s - 1.0).abs() < tolerance,
+            "nu {nu}: in-in {limit} vs Chen-Wang {s}"
+        );
+    }
+}
