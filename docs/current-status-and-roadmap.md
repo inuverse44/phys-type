@@ -148,6 +148,12 @@ prefactor is multiplied by $10/9$
 in the weak-mixing limit the squeezed coefficient $s(\nu)$ of quasi-single-field
 inflation (arXiv:0911.3380).
 
+At the end of the 2026-10-11 session the last step, the quasi-single-field
+comparison, is PR #61 (CI green, not yet merged); merge it first. The
+amplitude comparison (A1--A3) is then complete, and the next candidates are
+the remaining P3 items below: general nonminimal inflation and reheating.
+The session log is [`daily/2026-10-12.md`](../daily/2026-10-12.md).
+
 ### Reading order for the active P3 work
 
 1. [`non-gaussianity-architecture.md`](non-gaussianity-architecture.md)
