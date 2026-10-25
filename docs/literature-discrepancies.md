@@ -32,6 +32,9 @@ differ from the typeset numbering.
 - **[HMPS2]** the companion article, *Pushing the Primordial Frontier:
   Cosmological Collider Signatures at Strong Mixing*,
   [arXiv:2607.14529v2](https://arxiv.org/abs/2607.14529).
+- **[CW]** X. Chen and Y. Wang, *Quasi-Single Field Inflation and
+  Non-Gaussianities*, [arXiv:0911.3380](https://arxiv.org/abs/0911.3380);
+  letter version [arXiv:0909.0496](https://arxiv.org/abs/0909.0496).
 - **[M]** J. Maldacena, *Non-Gaussian features of primordial fluctuations in
   single field inflationary models*, JHEP 05 (2003) 013,
   [arXiv:astro-ph/0210603](https://arxiv.org/abs/astro-ph/0210603).
@@ -302,6 +305,19 @@ The coefficients $c_\pm$ themselves, with their $C^{(w)}_\pm$, $F^{(w)}_0$, $N^{
 the double integrals $J$, are correct. The equations were read from the
 typeset PDF of v2.
 
+### 13. Left side of [CW] Eq. (5.10) — label note
+
+[CW] Eq. (5.10) writes the squeezed limit as
+$\langle\zeta\zeta\zeta\rangle\to s(\nu)c_2^3c_3/(HR^6)\,p_1^{\nu-7/2}p_2^{-1}p_3^{-3/2-\nu}$. With
+$c_2=2R\dot\theta_0$ the right side is $\propto\dot\theta_0^3$, the three transfers of
+Fig. 3, but $\zeta=-H\delta\theta/\dot\theta_0$ would add $\dot\theta_0^{-3}$ and make the
+curvature bispectrum independent of the transfer. The letter version
+(arXiv:0909.0496, Eq. (13)) states the same expression for the $\delta\theta$
+correlator, Eqs. (11)–(12) there. Read as $\langle\delta\theta^3\rangle$, the
+independent in-in reference reproduces $s(\nu)$ of [CW] Eq. (5.11) to
+$2\times10^{-5}$ for $0.4\le\nu\le1$
+([`constant-turn-bispectrum-amplitudes.md`](constant-turn-bispectrum-amplitudes.md)).
+
 ## Agreements checked
 
 Recording these makes clear which published results have been independently
@@ -336,6 +352,9 @@ reproduced here:
   modes to $2\times10^{-6}$; Eqs. (3) and (8), the reshuffled couplings; and
   the exact bispectrum representations (199)/(203), (207)/(209), and
   (212)/(214) against the in-in reference to $10^{-8}$.
+- [CW] Eq. (5.11), the squeezed coefficient $s(\nu)$ of quasi-single-field
+  inflation, against the weak-mixing limit of the in-in reference for
+  $0.4\le\nu\le1.2$, with the label of entry 13.
 - [HMPS2] Sec. X, the squeezed exponents $r^{1/2\pm\nu}$ for all three
   interactions and, with entry 12, the leading coefficients $c_{\alpha,\beta,\gamma,+}$
   (and $c_-$ where the fit resolves it).
