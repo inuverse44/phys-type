@@ -148,11 +148,13 @@ prefactor is multiplied by $10/9$
 in the weak-mixing limit the squeezed coefficient $s(\nu)$ of quasi-single-field
 inflation (arXiv:0911.3380).
 
-At the end of the 2026-10-11 session the last step, the quasi-single-field
-comparison, is PR #61 (CI green, not yet merged); merge it first. The
-amplitude comparison (A1--A3) is then complete, and the next candidates are
-the remaining P3 items below: general nonminimal inflation and reheating.
-The session log is [`daily/2026-10-12.md`](../daily/2026-10-12.md).
+The quasi-single-field comparison was merged as PR #61, which completes the
+amplitude comparison (A1--A3). The next work is general nonminimal inflation,
+designed in
+[`general-nonminimal-inflation.md`](general-nonminimal-inflation.md): two
+nonminimally coupled fields with the published trajectories, $n_s$, and
+$f_{\mathrm{NL}}$ of arXiv:1210.7487, then the Palatini counterpart. The
+session log is [`daily/2026-10-25.md`](../daily/2026-10-25.md).
 
 ### Reading order for the active P3 work
 
@@ -322,7 +324,9 @@ turn and the complete 41-point benchmark.
 - general nonminimal inflation: Jordan-to-Einstein-frame providers for an
   inflaton coupled to curvature (Higgs-like $\xi\phi^2R$), general couplings
   $f(\phi,s)$, several nonminimal fields, and the Palatini formulation. The
-  assisted model of arXiv:2302.05866 is only one subclass of these;
+  assisted model of arXiv:2302.05866 is only one subclass of these. The
+  validation plan, with two nonminimally coupled fields (arXiv:1210.7487)
+  first, is [`general-nonminimal-inflation.md`](general-nonminimal-inflation.md);
 - reheating and post-inflationary transfer;
 - dynamically sized field spaces if a concrete model requires more than the
   current const-generic representation.
