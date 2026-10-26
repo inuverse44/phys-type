@@ -14,7 +14,9 @@
 //!   solutions of arXiv:2606.18248 and 2607.14529;
 //! - [`hmps`]: the closed-form power spectra of those solutions;
 //! - [`in_in`]: a numerical in-in reference for their bispectra, independent
-//!   of the engine.
+//!   of the engine;
+//! - [`kms`]: two nonminimally coupled fields (arXiv:1210.7487), the first
+//!   model whose conformal factor depends on every field.
 
 pub mod assisted;
 pub mod constant_turn;
@@ -22,3 +24,4 @@ pub mod higgs;
 pub mod hkkpt;
 pub mod hmps;
 pub mod in_in;
+pub mod kms;
