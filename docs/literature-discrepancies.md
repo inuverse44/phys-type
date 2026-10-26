@@ -38,6 +38,9 @@ differ from the typeset numbering.
 - **[M]** J. Maldacena, *Non-Gaussian features of primordial fluctuations in
   single field inflationary models*, JHEP 05 (2003) 013,
   [arXiv:astro-ph/0210603](https://arxiv.org/abs/astro-ph/0210603).
+- **[KMS]** D. I. Kaiser, E. A. Mazenc, and E. I. Sfakianakis, *Primordial
+  bispectrum from multifield inflation with nonminimal couplings*, Phys. Rev. D
+  87 (2013) 064004, [arXiv:1210.7487](https://arxiv.org/abs/1210.7487).
 
 ## Discrepancies
 
@@ -318,6 +321,29 @@ independent in-in reference reproduces $s(\nu)$ of [CW] Eq. (5.11) to
 $2\times10^{-5}$ for $0.4\le\nu\le1$
 ([`constant-turn-bispectrum-amplitudes.md`](constant-turn-bispectrum-amplitudes.md)).
 
+### 14. Field-space Ricci scalar, [KMS] Eq. (115)
+
+**Printed.** For the two-field metric of Eq. (110), with
+$C=M_{\mathrm{pl}}^2+\xi_\phi(1+6\xi_\phi)\phi^2+\xi_\chi(1+6\xi_\chi)\chi^2$ (Eq. 112),
+
+$$
+\mathcal R=2\mathcal K=\frac{2}{3M_{\mathrm{pl}}^2C^2}\left[(1+6\xi_\phi)(1+6\xi_\chi)(4f^2)-C^2\right].
+$$
+
+**Used.** Half of it:
+$\mathcal R=2\mathcal K=\left[(1+6\xi_\phi)(1+6\xi_\chi)(4f^2)-C^2\right]/(3M_{\mathrm{pl}}^2C^2)$.
+
+**Evidence.** The Riemann tensor that `einstein_frame` builds by automatic
+differentiation of Eq. (110), and an independent symbolic evaluation of the
+Gaussian curvature by Brioschi's formula, agree with each other and are half
+the printed value at every tested point
+(`crates/phys-type-models/tests/kms.rs`). The metric, Eq. (110), and $C$ agree
+with the repository. [KMS] drop the curvature terms of the bispectrum as
+slow-roll suppressed, so their $f_{\mathrm{NL}}$ does not depend on this
+factor; it affects only the magnitude of $\mathcal R$ in their Fig. 1. The
+equation was read from the TeX source of the arXiv version
+(`Bispectrumv2.tex`, label `Ricci2d`), numbered as in the arXiv HTML rendering.
+
 ## Agreements checked
 
 Recording these makes clear which published results have been independently
@@ -358,6 +384,8 @@ reproduced here:
 - [HMPS2] Sec. X, the squeezed exponents $r^{1/2\pm\nu}$ for all three
   interactions and, with entry 12, the leading coefficients $c_{\alpha,\beta,\gamma,+}$
   (and $c_-$ where the fit resolves it).
+- [KMS] Eq. (110), the two-field Einstein-frame metric, against
+  `einstein_frame` to $10^{-13}$, with the Palatini $\kappa=0$ form added.
 - [HKKPT] Eq. (3.1) for the Class II power-law and hybrid examples, given the
   numerical end surface and $s_e$, against the mode solver to
   $1.5\times10^{-3}$.

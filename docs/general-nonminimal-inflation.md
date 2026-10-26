@@ -1,6 +1,6 @@
 # General nonminimal inflation
 
-Status: design. This is the P3 item "general nonminimal inflation" of
+Status: G1 done; G2 next. This is the P3 item "general nonminimal inflation" of
 [`current-status-and-roadmap.md`](current-status-and-roadmap.md).
 
 ## Goal
@@ -81,10 +81,21 @@ shape-level observables below are independent of it.
 The end of inflation is $\ddot a=0$ ($\epsilon_H=1$), and e-folds and $\zeta$
 are Einstein-frame quantities ([KMS] Sec. II), so
 `EndOfInflation::SlowRollViolation` and the reported $\zeta$ correspond
-directly. Before implementing, the following must be read off the full text
-and recorded here: the initial velocities of the trajectories, the exact
-definition of $N_{40}$ in $T_{\mathcal{RS}}(N_{40})$, and the sign convention of
-$f_{\mathrm{NL}}$ (the text gives $|f_{\mathrm{NL}}|$).
+directly. The full text (TeX source of the arXiv version) settles the rest
+as follows.
+
+- **Initial velocities** are not stated for trajectories 1–3 (only for the
+  potential-free geodesic of Fig. 1). The runs here start from the slow-roll
+  velocity at $\tau_0$, and the dependence of the observables on that choice
+  is reported.
+- **$N_{40}$** is not defined. The text says $T_{\mathcal{RS}}$ "remains small
+  between $N_*=60$ and 40", so $T_{\mathcal{RS}}(N_{40})$ is read as the transfer
+  from horizon crossing at $N_*=60$ to 40 e-folds before the end.
+- **$f_{\mathrm{NL}}$** is plotted as $|f_{\mathrm{NL}}|$ (Fig. 11), so only the
+  magnitude is compared; the sign is reported in the convention of
+  [`curvature-projection.md`](curvature-projection.md).
+- **The total e-folds** count from $\tau_0$: the fields fall off the ridge at
+  $N=66.6$ and inflate 4.9 more e-folds, giving 71.5 (Fig. 3).
 
 ### What the published $f_{\mathrm{NL}}$ is
 
@@ -113,7 +124,7 @@ tolerance chosen to pass.
 
 | step | content | acceptance |
 | --- | --- | --- |
-| G1 | `phys_type_models::kms::KmsTheory` as a `GeneralizedNonminimal<2>`; closed-form Einstein-frame metric, potential, and Ricci scalar ([KMS] Eq. 115) as test oracles | `einstein_frame` reproduces the closed forms to $10^{-12}$, including $\nabla R$; metric positive along all three trajectories |
+| G1 (done) | `phys_type_models::kms::KmsTheory` as a `GeneralizedNonminimal<2>`; closed-form Einstein-frame metric ([KMS] Eq. 110) and Gaussian curvature as test oracles | `einstein_frame` reproduces the metric to $10^{-13}$, the Riemann tensor to $10^{-10}$, and $\nabla R$ to the finite-difference error, metric and Palatini. [KMS] Eq. (115) prints twice the Ricci scalar ([`literature-discrepancies.md`](literature-discrepancies.md) entry 14) |
 | G2 | background of the three trajectories | total e-folds and turn-rate peaks of the table; Figs. 2–3 and 7 reproduced as a tracked figure |
 | G3 | spectra at $N_*=60$ | $n_s$ to the precision printed; $T_{\mathcal{RS}}$ once $N_{40}$ is fixed |
 | G4 | equilateral $f_{\mathrm{NL}}$ at $N_*=60$ | transport against phase-space $\delta N$ to $\lesssim10^{-3}$ for all three; trajectory 2 against 43.3 with the slow-roll-velocity and Riemann-term differences quantified; scan of $f_{\mathrm{NL}}$ against $\chi(\tau_0)$ around trajectory 2 (Fig. 11) |
