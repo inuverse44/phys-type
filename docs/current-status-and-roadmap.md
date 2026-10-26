@@ -153,8 +153,14 @@ amplitude comparison (A1--A3). The next work is general nonminimal inflation,
 designed in
 [`general-nonminimal-inflation.md`](general-nonminimal-inflation.md): two
 nonminimally coupled fields with the published trajectories, $n_s$, and
-$f_{\mathrm{NL}}$ of arXiv:1210.7487, then the Palatini counterpart. The
-session log is [`daily/2026-10-25.md`](../daily/2026-10-25.md).
+$f_{\mathrm{NL}}$ of arXiv:1210.7487, then the Palatini counterpart. The model
+and its closed-form geometry (G1) and the background of the three
+trajectories (G2) are done, and the crossing-time $\delta N$ reproduces the
+published $|f_{\mathrm{NL}}|=43.3$. The tree-level transport does not
+converge on this model (its $f_{\mathrm{NL}}$ scales with the tolerance); that
+is the next work, see
+[`general-nonminimal-inflation.md`](general-nonminimal-inflation.md#results).
+The session log is [`daily/2026-10-25.md`](../daily/2026-10-25.md).
 
 ### Reading order for the active P3 work
 
