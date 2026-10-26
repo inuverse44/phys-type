@@ -1,6 +1,6 @@
 # General nonminimal inflation
 
-Status: G1 and G2 done; the crossing-time $\delta N$ of G4 reproduces [KMS]; the transport $f_{\mathrm{NL}}$ of G4 does not converge (see [Results](#results)). This is the P3 item "general nonminimal inflation" of
+Status: G1 and G2 done, with the figure; the crossing-time $\delta N$ of G4 reproduces [KMS]; the transport $f_{\mathrm{NL}}$ of G4 does not converge (see [Results](#results)). This is the P3 item "general nonminimal inflation" of
 [`current-status-and-roadmap.md`](current-status-and-roadmap.md).
 
 ## Goal
@@ -125,7 +125,7 @@ tolerance chosen to pass.
 | step | content | acceptance |
 | --- | --- | --- |
 | G1 (done) | `phys_type_models::kms::KmsTheory` as a `GeneralizedNonminimal<2>`; closed-form Einstein-frame metric ([KMS] Eq. 110) and Gaussian curvature as test oracles | `einstein_frame` reproduces the metric to $10^{-13}$, the Riemann tensor to $10^{-10}$, and $\nabla R$ to the finite-difference error, metric and Palatini. [KMS] Eq. (115) prints twice the Ricci scalar ([`literature-discrepancies.md`](literature-discrepancies.md) entry 14) |
-| G2 (done) | background of the three trajectories | total e-folds and turn-rate peaks of the table; the tracked figure of Figs. 2–3 and 7 is still to be made |
+| G2 (done) | background of the three trajectories | total e-folds and turn-rate peaks of the table; the tracked figure `figures/kms_trajectories.png` (Figs. 2–3, 7, and 11) |
 | G3 | spectra at $N_*=60$ | $n_s$ to the precision printed; $T_{\mathcal{RS}}$ once $N_{40}$ is fixed |
 | G4 | equilateral $f_{\mathrm{NL}}$ at $N_*=60$ | transport against phase-space $\delta N$ to $\lesssim10^{-3}$ for all three; trajectory 2 against 43.3 with the slow-roll-velocity and Riemann-term differences quantified; scan of $f_{\mathrm{NL}}$ against $\chi(\tau_0)$ around trajectory 2 (Fig. 11) |
 | G5 | the Palatini counterpart (below) | consistency checks only |
@@ -138,12 +138,36 @@ The tests are `crates/phys-type-models/tests/kms.rs` (G1) and
 
 **Background (G2).** Starting from rest, trajectory 2 inflates for 71.517
 e-folds, against 71.5 in Fig. 3; the slow-roll initial velocity gives 71.19,
-so [KMS] evidently start from rest. The turn rate peaks 32.9 (trajectory 1)
-and 4.59 (trajectory 2) e-folds before the end, against 34.5 and 4.9 in
-Fig. 7. The spacing of the two, which the tachyonic growth of $\chi$ on the
-ridge sets and the initial velocity does not, is 28.3 e-folds here, 27.7 in
-a slow-roll integration of the same potential and metric, and 29.6 in
-[KMS]. Trajectory 3 stays on the ridge until inflation ends.
+so [KMS] evidently start from rest. As the fields fall off the ridge the turn
+rate has a first maximum, $|\eta_\perp|\simeq0.8$ and 1.7, 34.06 (trajectory 1)
+and 5.15 (trajectory 2) e-folds before the end, against 34.5 and 4.9 in
+Fig. 7; the spacing of the two is 28.9 e-folds here and 29.6 in [KMS]. The
+heavy oscillation of $\phi$ in the $\chi$ valley afterwards drives
+$|\eta_\perp|$ to $10^2$–$10^3$ in spikes, which are not the peaks of Fig. 7.
+Trajectory 3 stays on the ridge until inflation ends.
+
+**Trajectory 2 nearly stops inflating.** At the turn, $\epsilon_H$ reaches
+0.990 on trajectory 2 (0.954 on trajectory 1). For $6.9\times10^{-4}\lesssim
+\chi(\tau_0)\lesssim1.0\times10^{-3}$ it reaches one, the survey ends at that
+first crossing with $\chi\simeq0.5$–$0.8$ (inflation would resume in the
+valley), and the total falls to 67.8–71.4 e-folds. The large $|f_{\mathrm{NL}}|$
+of [KMS] sits on the edge of that window: the crossing-time $\delta N$ rises
+to $+2\times10^2$ at $\chi(\tau_0)=1.05\times10^{-3}$ and $-1.6\times10^3$ at
+$6.3\times10^{-4}$, on either side of it. The "dramatic changes" with the
+initial conditions that [KMS] report are this proximity to an interruption
+of inflation, which also makes the result depend on how the end of
+inflation is defined.
+
+![KMS trajectories](figures/kms_trajectories.png)
+
+[`figures/kms_trajectories.png`](figures/kms_trajectories.png)
+([PDF](figures/kms_trajectories.pdf)) is generated, in about half a minute,
+by
+
+```sh
+cargo run --release --example kms_trajectories
+uv run plots/kms_trajectories.py diagnostics
+```
 
 **Crossing-time $\delta N$ (G4, the method of [KMS]).** With the field
 derivatives of $N$ at the crossing of the pivot and slow-roll velocities,
