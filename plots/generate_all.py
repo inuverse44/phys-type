@@ -30,6 +30,7 @@ CONSTANT_TURN_PLOT = ("constant_turn.py", "constant_turn_spectra")
 ASSISTED_PLOT = ("assisted_inflation.py", "assisted_inflation")
 SQUEEZED_PLOT = ("constant_turn_squeezed.py", "constant_turn_squeezed")
 HIGGS_PLOT = ("higgs_inflation.py", "higgs_inflation")
+KMS_PLOT = ("kms_trajectories.py", "kms_trajectories")
 # The n_s-r figure overlays the BICEP/Keck 2018 contours, which are fetched
 # into data/bk18_rns rather than redistributed.
 NS_R_PLOT = ("higgs_ns_r.py", "higgs_ns_r")
@@ -66,7 +67,8 @@ def main() -> None:
 
     # The assisted-inflation grid runs the three-point transport for 72
     # couplings and takes about five minutes; the squeezed constant-turn
-    # triangles take about nine, and the Higgs n_s-r grid about one.
+    # triangles take about nine, the Higgs n_s-r grid about one, and the KMS
+    # f_NL scan about half a minute.
     for example in (
         "diagnostics",
         "two_field_spectra",
@@ -75,6 +77,7 @@ def main() -> None:
         "constant_turn_squeezed",
         "higgs_inflation",
         "higgs_ns_r",
+        "kms_trajectories",
     ):
         run(
             ["cargo", "run", "--release", "--example", example, "--", str(output)],
@@ -103,7 +106,7 @@ def main() -> None:
     )
     verify(output, stem)
 
-    for script, stem in (CONSTANT_TURN_PLOT, ASSISTED_PLOT, SQUEEZED_PLOT, HIGGS_PLOT):
+    for script, stem in (CONSTANT_TURN_PLOT, ASSISTED_PLOT, SQUEEZED_PLOT, HIGGS_PLOT, KMS_PLOT):
         run([sys.executable, str(scripts / script), str(output)], repository)
         verify(output, stem)
 
@@ -112,7 +115,7 @@ def main() -> None:
     run([sys.executable, str(scripts / script), str(output)], repository)
     verify(output, stem)
 
-    print(f"verified {(len(PLOTS) + 8) * 2} plot files in {output}")
+    print(f"verified {(len(PLOTS) + 9) * 2} plot files in {output}")
 
 
 if __name__ == "__main__":

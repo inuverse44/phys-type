@@ -47,6 +47,7 @@ STEP_SAMPLED = {
     "two_field_background.csv",
     "two_field_modes.csv",
     "assisted_trajectories.csv",
+    "kms_trajectories.csv",
 }
 
 # Round-off diagnostics -> the column whose scale bounds them.
@@ -87,6 +88,7 @@ SLOW = {
     "assisted_inflation": ["assisted_predictions.csv", "assisted_trajectories.csv"],
     "constant_turn_squeezed": ["constant_turn_squeezed.csv"],
     "higgs_ns_r": ["higgs_ns_r.csv"],
+    "kms_trajectories": ["kms_trajectories.csv", "kms_f_nl.csv"],
 }
 
 

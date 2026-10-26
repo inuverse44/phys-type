@@ -23,7 +23,10 @@
 //! See `docs/general-nonminimal-inflation.md`.
 
 use phys_type::{
-    Dimensionless, EnergyDensity, Field, Formulation, GeneralizedNonminimal, Quantity, TheoryScalar,
+    BackgroundSurvey, CovariantMultifieldSystem, Dimensionless, EinsteinGeometry,
+    EinsteinPotential, EnergyDensity, Field, FieldSpaceGeometry, FieldVelocity, Formulation,
+    GeneralizedNonminimal, MultifieldState, Quantity, ScaleFactor, SpectrumRunError,
+    SpectrumRunSettings, TheoryScalar, einstein_frame,
 };
 
 /// The two-field model of KMS Eqs. (16)--(17), in reduced Planck units.
@@ -134,4 +137,133 @@ impl GeneralizedNonminimal<2> for KmsTheory {
                 + chi2 * chi2 * (0.25 * self.lambda_chi),
         )
     }
+}
+
+/// The Einstein-frame system of a [`KmsTheory`].
+pub type KmsSystem =
+    CovariantMultifieldSystem<EinsteinPotential<KmsTheory>, EinsteinGeometry<KmsTheory>, 2>;
+
+/// `phi(tau_0) / M_pl` of the KMS trajectories, Fig. 2.
+pub const PHI_START: f64 = 3.1;
+
+/// `chi(tau_0) / M_pl` of trajectories 1--3, KMS Fig. 2.
+pub const TRAJECTORIES: [f64; 3] = [1.1e-2, 1.1e-3, 1.1e-4];
+
+/// The benchmark system with `lambda_phi = 10^-2`, which sets only the
+/// amplitude of the spectra.
+pub fn benchmark_system(formulation: Formulation) -> KmsSystem {
+    let (potential, geometry) = einstein_frame(KmsTheory::benchmark(1.0e-2, formulation));
+    CovariantMultifieldSystem::in_planck_units(potential, geometry)
+}
+
+/// The fields `(phi, chi)` at rest. KMS do not state the initial velocities
+/// of trajectories 1--3; starting from rest reproduces their 71.5 e-folds of
+/// Fig. 3, where the slow-roll velocity gives 71.2.
+pub fn at_rest(phi: f64, chi: f64) -> MultifieldState<2> {
+    MultifieldState::new(
+        [Field::new(phi), Field::new(chi)],
+        [FieldVelocity::new(0.0), FieldVelocity::new(0.0)],
+        ScaleFactor::new(1.0),
+    )
+}
+
+/// The crossing-time delta N of KMS Sec. V.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CrossingDeltaN {
+    /// `f_NL` in the convention of this repository; KMS Eq. (92) carries the
+    /// opposite sign.
+    pub f_nl: f64,
+    /// `P_zeta = (H_* / 2 pi)^2 N_a N^a`.
+    pub power: f64,
+}
+
+/// The delta N of KMS Sec. V: `N` to the end of inflation from the field
+/// values at the crossing of the pivot, `pivot_before_end` e-folds before
+/// the end of `survey`, with slow-roll velocities. The derivatives are
+/// central differences with steps `3e-4` of each field, and the second
+/// derivative is covariant, `N_;ab = N_,ab - Gamma^c_ab N_,c`.
+pub fn crossing_delta_n(
+    system: &KmsSystem,
+    survey: &BackgroundSurvey<2>,
+    settings: &SpectrumRunSettings,
+    pivot_before_end: f64,
+) -> Result<CrossingDeltaN, SpectrumRunError> {
+    let star = survey
+        .trajectory
+        .state_at(survey.e_folds_at_end - pivot_before_end);
+    let x0 = [star.phi[0].into_value(), star.phi[1].into_value()];
+    let quiet = SpectrumRunSettings {
+        background_sample_every: usize::MAX,
+        ..*settings
+    };
+    let h = [3.0e-4 * x0[0].abs(), 3.0e-4 * x0[1].abs()];
+    let e_folds = |a: f64, b: f64| {
+        let rest = at_rest(x0[0] + a * h[0], x0[1] + b * h[1]);
+        let state = MultifieldState {
+            pi: system.slow_roll_velocity(&rest),
+            ..rest
+        };
+        system.survey(state, &quiet).map(|run| run.e_folds_at_end)
+    };
+    let centre = e_folds(0.0, 0.0)?;
+    let axis = [
+        [e_folds(1.0, 0.0)?, e_folds(-1.0, 0.0)?],
+        [e_folds(0.0, 1.0)?, e_folds(0.0, -1.0)?],
+    ];
+    let mixed = (e_folds(1.0, 1.0)? - e_folds(1.0, -1.0)? - e_folds(-1.0, 1.0)?
+        + e_folds(-1.0, -1.0)?)
+        / (4.0 * h[0] * h[1]);
+    let first: [f64; 2] = core::array::from_fn(|a| (axis[a][0] - axis[a][1]) / (2.0 * h[a]));
+    let partial: [[f64; 2]; 2] = core::array::from_fn(|a| {
+        core::array::from_fn(|b| {
+            if a == b {
+                (axis[a][0] - 2.0 * centre + axis[a][1]) / (h[a] * h[a])
+            } else {
+                mixed
+            }
+        })
+    });
+    let position = [Field::new(x0[0]), Field::new(x0[1])];
+    let connection = system.geometry.christoffel(&position);
+    let inverse = system.geometry.inverse_metric(&position);
+    let covariant: [[f64; 2]; 2] = core::array::from_fn(|a| {
+        core::array::from_fn(|b| {
+            partial[a][b]
+                - (0..2)
+                    .map(|c| connection.components()[c][a][b].value() * first[c])
+                    .sum::<f64>()
+        })
+    });
+    let raised: [f64; 2] = core::array::from_fn(|a| {
+        (0..2)
+            .map(|b| inverse.components()[a][b].into_value() * first[b])
+            .sum()
+    });
+    let norm: f64 = (0..2).map(|a| raised[a] * first[a]).sum();
+    let curvature: f64 = (0..4)
+        .map(|m| raised[m / 2] * raised[m % 2] * covariant[m / 2][m % 2])
+        .sum();
+    let hubble = system.hubble(&star).into_value();
+    Ok(CrossingDeltaN {
+        f_nl: 5.0 / 6.0 * curvature / (norm * norm),
+        power: (hubble / (2.0 * core::f64::consts::PI)).powi(2) * norm,
+    })
+}
+
+/// The turn as the fields fall off the ridge: the first local maximum of
+/// `|eta_perp|` above `0.1`, with the e-folds before the end at which it
+/// occurs, or `None` if the fields never turn that sharply. The heavy
+/// oscillation of `phi` in the valley afterwards drives `|eta_perp|` far
+/// higher, but in spikes; the first maximum is the peak of KMS Fig. 7.
+pub fn turn_peak(survey: &BackgroundSurvey<2>) -> Option<(f64, f64)> {
+    let turns: Vec<(f64, f64)> = survey
+        .samples
+        .iter()
+        .filter(|sample| sample.eta_perp.is_finite())
+        .map(|sample| (sample.eta_perp, survey.e_folds_at_end - sample.e_folds))
+        .collect();
+    turns
+        .windows(3)
+        .find(|w| w[1].0 > 0.1 && w[1].0 >= w[0].0 && w[1].0 >= w[2].0)
+        .map(|w| w[1])
 }
