@@ -1,6 +1,6 @@
 # General nonminimal inflation
 
-Status: G1 done; G2 next. This is the P3 item "general nonminimal inflation" of
+Status: G1 and G2 done; the crossing-time $\delta N$ of G4 reproduces [KMS]; the transport $f_{\mathrm{NL}}$ of G4 does not converge (see [Results](#results)). This is the P3 item "general nonminimal inflation" of
 [`current-status-and-roadmap.md`](current-status-and-roadmap.md).
 
 ## Goal
@@ -125,11 +125,49 @@ tolerance chosen to pass.
 | step | content | acceptance |
 | --- | --- | --- |
 | G1 (done) | `phys_type_models::kms::KmsTheory` as a `GeneralizedNonminimal<2>`; closed-form Einstein-frame metric ([KMS] Eq. 110) and Gaussian curvature as test oracles | `einstein_frame` reproduces the metric to $10^{-13}$, the Riemann tensor to $10^{-10}$, and $\nabla R$ to the finite-difference error, metric and Palatini. [KMS] Eq. (115) prints twice the Ricci scalar ([`literature-discrepancies.md`](literature-discrepancies.md) entry 14) |
-| G2 | background of the three trajectories | total e-folds and turn-rate peaks of the table; Figs. 2–3 and 7 reproduced as a tracked figure |
+| G2 (done) | background of the three trajectories | total e-folds and turn-rate peaks of the table; the tracked figure of Figs. 2–3 and 7 is still to be made |
 | G3 | spectra at $N_*=60$ | $n_s$ to the precision printed; $T_{\mathcal{RS}}$ once $N_{40}$ is fixed |
 | G4 | equilateral $f_{\mathrm{NL}}$ at $N_*=60$ | transport against phase-space $\delta N$ to $\lesssim10^{-3}$ for all three; trajectory 2 against 43.3 with the slow-roll-velocity and Riemann-term differences quantified; scan of $f_{\mathrm{NL}}$ against $\chi(\tau_0)$ around trajectory 2 (Fig. 11) |
 | G5 | the Palatini counterpart (below) | consistency checks only |
 | G6 | the Jordan-frame $\zeta$ (below) | separate design; not part of this step |
+
+## Results
+
+The tests are `crates/phys-type-models/tests/kms.rs` (G1) and
+`tests/kms_trajectories.rs` (G2, G4; ignored, release mode).
+
+**Background (G2).** Starting from rest, trajectory 2 inflates for 71.517
+e-folds, against 71.5 in Fig. 3; the slow-roll initial velocity gives 71.19,
+so [KMS] evidently start from rest. The turn rate peaks 32.9 (trajectory 1)
+and 4.59 (trajectory 2) e-folds before the end, against 34.5 and 4.9 in
+Fig. 7. The spacing of the two, which the tachyonic growth of $\chi$ on the
+ridge sets and the initial velocity does not, is 28.3 e-folds here, 27.7 in
+a slow-roll integration of the same potential and metric, and 29.6 in
+[KMS]. Trajectory 3 stays on the ridge until inflation ends.
+
+**Crossing-time $\delta N$ (G4, the method of [KMS]).** With the field
+derivatives of $N$ at the crossing of the pivot and slow-roll velocities,
+$|f_{\mathrm{NL}}|=43.38$ for trajectory 2 (43.3 in [KMS]) and 0.013 for
+trajectories 1 and 3, stable to $10^{-3}$ in the step size. In the
+convention of this repository the sign is positive; [KMS] Eq. (92) carries
+the opposite sign. Its $P_\zeta$ is 5% below the exact mode solver at the
+end, the size expected from the slow-roll velocities.
+
+**Transport $f_{\mathrm{NL}}$ (G4, open).** The tree-level transport does not
+converge for trajectory 2. At the end of inflation its $P_\zeta$ agrees with
+the mode solver only for a relative tolerance of $10^{-11}$ or below, and its
+$f_{\mathrm{NL}}$ scales with the tolerance: $-6\times10^4$, $-6\times10^3$,
+and $-670$ at $10^{-11}$, $10^{-12}$, and $10^{-13}$, dominated entirely by the
+intrinsic term $N_aN_bN_c\alpha^{abc}$. The background tolerance and the
+start depth do not change it. $P_\zeta$ itself rises to $5\times10^5$ times
+its final value during the turn and then cancels to $7.2\times10^{-4}$ once
+the isocurvature mode decays, so the final three-point function is a small
+remainder of large intermediate correlators. The steps that follow are to
+locate the loss of precision (the sharp turn, $\eta_\perp\simeq50$, or the
+heavy oscillation of $\phi$ in the valley afterwards) and to evaluate the
+transport in a better-conditioned basis or to end it on a slice where the
+remainder is not yet small. Until then the transport is not validated on
+this model, and phase-space $\delta N$ is the reference for G4.
 
 Discrepancies with [KMS] go to
 [`literature-discrepancies.md`](literature-discrepancies.md), as before.
