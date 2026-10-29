@@ -3,8 +3,9 @@
 //! earlier slice give? `<index>` is 0, 1, 2 for trajectories 1--3; slices
 //! are given in e-folds before the end of inflation.
 //!
-//! - `transport <index> <tol,...>`: P_zeta and f_NL of the equilateral pivot
-//!   triangle on a list of slices, once per relative tolerance.
+//! - `transport <index> <tol,...> [<slice,...>]`: P_zeta and f_NL of the
+//!   equilateral pivot triangle on a list of slices (decreasing), once per
+//!   relative tolerance.
 //! - `delta-n <index> <tol> <target> <n_c,...> <phi,chi,velocity>`:
 //!   phase-space delta N from each slice `n_c` to the surface of uniform
 //!   `H` at `target`, with the transport (tolerance `tol`) up to `n_c`; the
@@ -318,14 +319,17 @@ fn main() {
     let k = (pivot.a * system.hubble(&pivot)).into_value();
     match mode {
         "transport" => {
-            let slices = [
-                57.0, 50.0, 40.0, 20.0, 10.0, 8.0, 7.0, 6.5, 6.0, 5.5, 5.2, 5.0, 4.8, 4.5, 4.0,
-                3.0, 2.0, 1.0, 0.5, 0.01,
-            ];
+            let slices = args.get(4).map_or(
+                vec![
+                    57.0, 50.0, 40.0, 20.0, 10.0, 8.0, 7.0, 6.5, 6.0, 5.5, 5.2, 5.0, 4.8, 4.5, 4.0,
+                    3.0, 2.0, 1.0, 0.5, 0.01,
+                ],
+                |s| list(s),
+            );
             println!("tol,before_end,p_zeta,f_nl");
             for tol in list(&args[3]) {
                 let mut transport = Transport::new(&system, trajectory, k, tol);
-                for before in slices {
+                for &before in &slices {
                     transport.advance(end - before);
                     let (f_nl, p) = transport.f_nl();
                     println!("{tol:e},{before},{p:.6e},{f_nl:.6e}");
