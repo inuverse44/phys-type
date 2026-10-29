@@ -916,6 +916,12 @@ impl<const N: usize> BackgroundTrajectory<N> {
         )
     }
 
+    /// Elapsed e-folds of the checkpoints, between which the interpolated
+    /// state is a cubic polynomial and only `C^1` across them.
+    pub(crate) fn checkpoint_e_folds(&self) -> impl Iterator<Item = f64> + '_ {
+        self.checkpoints.iter().map(|checkpoint| checkpoint.e_folds)
+    }
+
     /// The first elapsed e-fold at which `event` falls from positive to
     /// zero or below, refined by bisection to `1e-13` e-folds and returned on
     /// the positive side; `None` if it never does.

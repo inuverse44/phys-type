@@ -8,6 +8,19 @@ the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `phys_type::split`: `CovariantMultifieldSystem::split_curvature_correlators`
+  stops the tree-level transport on a superhorizon slice and continues with
+  the response of the final `zeta`, integrated backwards with the adjoint of
+  the transport's own flows. Where the correlators grow during a turn and
+  then cancel, the transport carried to the end keeps an error of the
+  tolerance times that growth; the split does not, and its result does not
+  depend on the slice. `phys-type-models/tests/kms_trajectories.rs` checks
+  it on the three KMS trajectories (G4): trajectory 2 gives `f_NL = 38.287`,
+  the same on two slices to `1e-6`, and the split reproduces the transport
+  to `1e-5` where the transport converges.
+- `phys-type-models/examples/kms_transport_probe.rs`, the diagnostics of
+  issue #67.
+
 - `scripts/chen_wang_squeezed.py` evaluates the squeezed coefficient `s(nu)`
   of quasi-single-field inflation (arXiv:0911.3380, Eq. (5.11)); the
   weak-mixing limit of the in-in reference reproduces it for

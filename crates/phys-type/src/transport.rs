@@ -3425,7 +3425,7 @@ where
 }
 
 /// Linear phase-space flow of each Fourier leg in elapsed e-folds.
-fn linear_phase_space_flows<P, G, const N: usize>(
+pub(crate) fn linear_phase_space_flows<P, G, const N: usize>(
     system: &CovariantMultifieldSystem<P, G, N>,
     background: &MultifieldState<N>,
     wavenumbers: [Mass; 3],
@@ -3474,11 +3474,11 @@ where
 }
 
 #[derive(Clone, Copy)]
-struct LinearPhaseSpaceFlow<const N: usize> {
-    qq: [[f64; N]; N],
-    qp: [[f64; N]; N],
-    pq: [[f64; N]; N],
-    pp: [[f64; N]; N],
+pub(crate) struct LinearPhaseSpaceFlow<const N: usize> {
+    pub(crate) qq: [[f64; N]; N],
+    pub(crate) qp: [[f64; N]; N],
+    pub(crate) pq: [[f64; N]; N],
+    pub(crate) pp: [[f64; N]; N],
 }
 
 impl<const N: usize> LinearPhaseSpaceFlow<N> {

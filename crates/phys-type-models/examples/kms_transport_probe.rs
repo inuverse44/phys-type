@@ -15,9 +15,7 @@
 //!   zeta on the surface `target` to the phase space on a slice, integrated
 //!   backwards from `target` with RK4 steps of at most `step` e-folds,
 //!   combined with the transport (tolerance `tol`) up to each slice `n_c`.
-//!   This is the delta N split without finite differences or the
-//!   coordinate map: `n_a` and `n_ab` obey the adjoint of the transport's
-//!   own flows `u^a_b` and `u^a_bc`.
+//!   This calls `CovariantMultifieldSystem::split_curvature_correlators`.
 //! - `noise <index> <n_c> <target>`: `N` along `chi` from `n_c`, to the `H`
 //!   surface and to `epsilon_H = 1`, to measure the noise of the endpoint.
 //!
@@ -36,9 +34,9 @@ use phys_type::{
     CanonicalThreePointTransportSystem, CanonicalThreePointTransportTolerance,
     ConformalPerturbationTolerance, Dimensionless, ErrorTolerances, Field, FieldSpaceGeometry,
     FieldVelocity, Formulation, MomentumTriangle, MultifieldState, ScaleFactor,
-    SpectrumRunSettings, StepSizeLimits, adaptive_step, canonical_cubic_hamiltonian_vertices,
-    canonical_three_point_transport_initial_state, curvature_correlators,
-    curvature_gauge_coefficients, next_step_size, velocity_three_point_from_transport_state,
+    SpectrumRunSettings, SplitSettings, StepSizeLimits, adaptive_step,
+    canonical_three_point_transport_initial_state, curvature_correlators, next_step_size,
+    velocity_three_point_from_transport_state,
 };
 use phys_type_models::kms::{KmsSystem, PHI_START, TRAJECTORIES, at_rest, benchmark_system};
 
@@ -310,181 +308,6 @@ fn phase_space_delta_n(
     )
 }
 
-/// `u^a_b` on the canonical phase space `(Q^1, Q^2, P^1, P^2)`.
-type LinearFlow = [[f64; 4]; 4];
-/// `u^a_bc` for output legs 1, 2, 3, inputs in ascending leg order.
-type QuadraticFlows = [[[[f64; 4]; 4]; 4]; 3];
-
-/// The block `[i][j][l]` of a quadratic kernel as plain numbers.
-fn block<A, B, C, D, const N: usize>(
-    kernel: &phys_type::ThreePointBlock<A, B, C, D, f64, N>,
-) -> [[[f64; N]; N]; N] {
-    let components = kernel.components();
-    core::array::from_fn(|i| {
-        core::array::from_fn(|j| core::array::from_fn(|l| *components[i][j][l].value()))
-    })
-}
-
-/// The linear flow and the three quadratic kernels on the background at
-/// `e_folds`, the same ones the canonical transport uses.
-fn flows(
-    system: &KmsSystem,
-    trajectory: &BackgroundTrajectory<2>,
-    triangle: MomentumTriangle,
-    e_folds: f64,
-) -> (LinearFlow, QuadraticFlows) {
-    let background = trajectory.state_at(e_folds);
-    let hubble = system.hubble(&background);
-    let h = hubble.into_value();
-    let connection = system.geometry.christoffel(&background.phi);
-    let mass = system.perturbation_mass_matrix(&background);
-    let k = triangle.canonical_wavenumbers()[0] / background.a.into_value();
-    let mut u = [[0.0; 4]; 4];
-    for i in 0..2 {
-        for j in 0..2 {
-            let flow: f64 = (0..2)
-                .map(|v| connection.components()[i][v][j].value() * background.pi[v].value() / h)
-                .sum();
-            let delta = f64::from(i == j);
-            u[i][j] = -flow;
-            u[i][2 + j] = delta / h;
-            u[2 + i][j] = -(mass.components()[i][j].value() + delta * k * k) / h;
-            u[2 + i][2 + j] = -3.0 * delta - flow;
-        }
-    }
-    let kernels = canonical_cubic_hamiltonian_vertices(system, &background, triangle)
-        .unwrap()
-        .e_fold_kernels(hubble)
-        .unwrap();
-    let quadratic = kernels.map(|kernel| {
-        // Blocks in the order QQQ, QQP, QPQ, QPP, PQQ, PQP, PPQ, PPP.
-        let blocks = [
-            block(&kernel.q_qq),
-            block(&kernel.q_qp),
-            block(&kernel.q_pq),
-            block(&kernel.q_pp),
-            block(&kernel.p_qq),
-            block(&kernel.p_qp),
-            block(&kernel.p_pq),
-            block(&kernel.p_pp),
-        ];
-        core::array::from_fn(|a| {
-            core::array::from_fn(|b| {
-                core::array::from_fn(|c| {
-                    blocks[4 * (a / 2) + 2 * (b / 2) + c / 2][a % 2][b % 2][c % 2]
-                })
-            })
-        })
-    });
-    (u, quadratic)
-}
-
-/// The response of the final zeta to the phase space at a slice:
-/// `zeta_e = n_a X^a + (1/2) n^(r)_ab X^a X^b`, one quadratic part per output leg.
-#[derive(Clone, Copy)]
-struct Response {
-    linear: [f64; 4],
-    quadratic: [[[f64; 4]; 4]; 3],
-}
-
-impl Response {
-    fn axpy(&self, scale: f64, other: &Self) -> Self {
-        Self {
-            linear: core::array::from_fn(|a| self.linear[a] + scale * other.linear[a]),
-            quadratic: core::array::from_fn(|r| {
-                core::array::from_fn(|a| {
-                    core::array::from_fn(|b| {
-                        self.quadratic[r][a][b] + scale * other.quadratic[r][a][b]
-                    })
-                })
-            }),
-        }
-    }
-
-    /// `d n / dN` from the adjoint of the flow `dX = u X + (1/2) u_bc X X`.
-    fn derivative(&self, u: &LinearFlow, kernels: &QuadraticFlows) -> Self {
-        Self {
-            linear: core::array::from_fn(|a| {
-                -(0..4).map(|b| self.linear[b] * u[b][a]).sum::<f64>()
-            }),
-            quadratic: core::array::from_fn(|r| {
-                core::array::from_fn(|a| {
-                    core::array::from_fn(|b| {
-                        -(0..4)
-                            .map(|c| {
-                                self.linear[c] * kernels[r][c][a][b]
-                                    + self.quadratic[r][c][b] * u[c][a]
-                                    + self.quadratic[r][a][c] * u[c][b]
-                            })
-                            .sum::<f64>()
-                    })
-                })
-            }),
-        }
-    }
-}
-
-/// f_NL and the dimensionless P_zeta from the response on a slice and the
-/// transport state there.
-fn split_f_nl(response: &Response, transport: &Transport) -> (f64, f64) {
-    let state = &transport.state;
-    let n = &response.linear;
-    let sigma: [[[f64; 4]; 4]; 3] = core::array::from_fn(|leg| {
-        core::array::from_fn(|a| {
-            core::array::from_fn(|b| covariance_entry(&state.covariances[leg], a, b))
-        })
-    });
-    let power: [f64; 3] = core::array::from_fn(|leg| {
-        (0..16)
-            .map(|m| n[m / 4] * n[m % 4] * sigma[leg][m / 4][m % 4])
-            .sum()
-    });
-    let projected: [[f64; 4]; 3] = core::array::from_fn(|leg| {
-        core::array::from_fn(|a| (0..4).map(|c| n[c] * sigma[leg][c][a]).sum())
-    });
-    let intrinsic: f64 = (0..64)
-        .map(|m| {
-            let [a, b, c] = [m / 16, (m / 4) % 4, m % 4];
-            n[a] * n[b] * n[c] * canonical_entry(&state.alpha, a, b, c)
-        })
-        .sum();
-    let gauge: f64 = [(0, 1, 2), (1, 0, 2), (2, 0, 1)]
-        .into_iter()
-        .map(|(r, s, t)| {
-            (0..16)
-                .map(|m| {
-                    response.quadratic[r][m / 4][m % 4] * projected[s][m / 4] * projected[t][m % 4]
-                })
-                .sum::<f64>()
-        })
-        .sum();
-    let pairs = power[0] * power[1] + power[0] * power[2] + power[1] * power[2];
-    let k = transport.triangle.canonical_wavenumbers()[0];
-    (
-        5.0 / 6.0 * (intrinsic + gauge) / pairs,
-        k.powi(3) * power[0] / (2.0 * core::f64::consts::PI.powi(2)),
-    )
-}
-
-fn canonical_entry(
-    alpha: &phys_type::CanonicalThreePointPhaseSpaceCorrelation<2>,
-    a: usize,
-    b: usize,
-    c: usize,
-) -> f64 {
-    let (i, j, k) = (a % 2, b % 2, c % 2);
-    match (a < 2, b < 2, c < 2) {
-        (true, true, true) => alpha.qqq.components()[i][j][k].value().re,
-        (true, true, false) => alpha.qqp.components()[i][j][k].value().re,
-        (true, false, true) => alpha.qpq.components()[i][j][k].value().re,
-        (false, true, true) => alpha.pqq.components()[i][j][k].value().re,
-        (true, false, false) => alpha.qpp.components()[i][j][k].value().re,
-        (false, true, false) => alpha.pqp.components()[i][j][k].value().re,
-        (false, false, true) => alpha.ppq.components()[i][j][k].value().re,
-        (false, false, false) => alpha.ppp.components()[i][j][k].value().re,
-    }
-}
-
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let mode = args[1].as_str();
@@ -554,84 +377,37 @@ fn main() {
             println!("transport,{f_nl:.8e},,{p:.8e}");
         }
         "response" => {
-            // Integrate the response backwards from the surface `target` with
-            // fixed RK4 steps `step`, and combine it with the transport on
-            // each slice.
+            // The split of `phys_type::split`: the transport up to each slice
+            // and the backward response from the surface `target`.
             let tol: f64 = args[3].parse().unwrap();
             let target_before: f64 = args[4].parse().unwrap();
             let slices = list(&args[5]);
             let step: f64 = args[6].parse().unwrap();
             let target = end - target_before;
             let triangle = MomentumTriangle::try_new(k, k, k).unwrap();
-            let surface = trajectory.state_at(target);
-            let gauge = curvature_gauge_coefficients(&system, &surface, triangle, 0.1).unwrap();
-            let mut response = Response {
-                linear: core::array::from_fn(|a| {
-                    if a < 2 {
-                        gauge.linear[a].into_value()
-                    } else {
-                        0.0
-                    }
-                }),
-                quadratic: gauge.quadratic.map(|q| {
-                    core::array::from_fn(|a| {
-                        core::array::from_fn(|b| match (a < 2, b < 2) {
-                            (true, true) => q.field_field[a][b].into_value(),
-                            (true, false) => q.field_momentum[a][b - 2].into_value(),
-                            (false, true) => q.momentum_field[a - 2][b].into_value(),
-                            (false, false) => 0.0,
-                        })
-                    })
-                }),
+            let split = SplitSettings {
+                relative_tolerance: tol,
+                response_step: step,
+                ..SplitSettings::default()
             };
-            let rate = |n: f64, y: &Response| {
-                let (u, kernels) = flows(&system, trajectory, triangle, n);
-                y.derivative(&u, &kernels)
-            };
-            let mut transport = Transport::new(&system, trajectory, k, tol);
-            let mut responses = Vec::new();
-            let mut e_folds = target;
-            let mut sorted = slices.clone();
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            // Never step across a checkpoint of the background: the cubic
-            // Hermite interpolation is only C^1 there, which would cost RK4
-            // its order.
-            let knots: Vec<f64> = survey.samples.iter().map(|sample| sample.e_folds).collect();
-            for before in sorted {
-                let stop = end - before;
-                let mut nodes: Vec<f64> = knots
-                    .iter()
-                    .copied()
-                    .filter(|&n| n < e_folds - 1.0e-12 && n > stop + 1.0e-12)
-                    .collect();
-                nodes.push(stop);
-                nodes.sort_by(|a, b| b.partial_cmp(a).unwrap());
-                for node in nodes {
-                    let width = e_folds - node;
-                    let count = (width / step).ceil().max(1.0);
-                    let h = -width / count;
-                    for _ in 0..count as usize {
-                        let k1 = rate(e_folds, &response);
-                        let k2 = rate(e_folds + 0.5 * h, &response.axpy(0.5 * h, &k1));
-                        let k3 = rate(e_folds + 0.5 * h, &response.axpy(0.5 * h, &k2));
-                        let k4 = rate(e_folds + h, &response.axpy(h, &k3));
-                        response = response
-                            .axpy(h / 6.0, &k1)
-                            .axpy(h / 3.0, &k2)
-                            .axpy(h / 3.0, &k3)
-                            .axpy(h / 6.0, &k4);
-                        e_folds += h;
-                    }
-                    e_folds = node;
-                }
-                responses.push((before, response));
-            }
+            let results = system
+                .split_curvature_correlators(
+                    trajectory,
+                    triangle,
+                    &slices.iter().map(|before| end - before).collect::<Vec<_>>(),
+                    target,
+                    &split,
+                )
+                .unwrap();
             println!("n_c,f_nl,p_zeta");
-            for (before, response) in responses.iter().rev() {
-                transport.advance(end - before);
-                let (f_nl, p) = split_f_nl(response, &transport);
-                println!("{before},{f_nl:.8e},{p:.8e}");
+            for (before, correlators) in slices.iter().zip(&results) {
+                println!(
+                    "{before},{:.8e},{:.8e}",
+                    correlators.reduced_f_nl(),
+                    correlators.dimensionless_power()[0]
+                );
             }
+            let mut transport = Transport::new(&system, trajectory, k, tol);
             transport.advance(target);
             let (f_nl, p) = transport.f_nl();
             println!("transport,{f_nl:.8e},{p:.8e}");

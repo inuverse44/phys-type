@@ -362,52 +362,104 @@ where
     P: ThriceDifferentiableMultifieldPotential<N> + Copy,
     G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N> + Copy,
 {
-    let depth = e_folds_before_exit.exp();
-    let shortest = Mass::new(triangle.canonical_wavenumbers()[2]);
-    let start = trajectory
-        .crossing(|state| (shortest / (state.a * system.hubble(state))).into_value() - depth)
-        .ok_or(ThreePointEvolutionError::StartNotFound)?;
-    // The crossing is found by root refinement, so allow its rounding.
-    let mut state = canonical_three_point_transport_initial_state(
-        system,
-        &BackgroundNeighborhood::from_trajectory(trajectory, start, 1.0e-3),
-        triangle,
-        depth * (1.0 - 1.0e-6),
-    )
-    .map_err(ThreePointEvolutionError::InitialCondition)?;
-    let transport = CanonicalThreePointTransportSystem::new(system, trajectory, triangle);
-    let tolerances = ErrorTolerances::new(
-        CanonicalThreePointTransportTolerance::pure_relative(),
-        relative_tolerance,
-    );
-    let limits = StepSizeLimits {
-        min: Dimensionless::new(1.0e-9),
-        max: Dimensionless::new(5.0e-2),
-    };
-    let mut e_folds = start;
-    let mut step: Dimensionless = Dimensionless::new(1.0e-3);
+    let mut evolution =
+        ThreePointEvolution::start(system, trajectory, triangle, e_folds_before_exit)?;
+    evolution.advance(target_e_folds, relative_tolerance, max_steps)?;
+    Ok((evolution.start, evolution.state))
+}
 
-    for _ in 0..max_steps {
-        let remaining = target_e_folds - e_folds;
-        if remaining <= 1.0e-13 {
-            return Ok((start, state));
-        }
-        let attempted = Dimensionless::new(step.into_value().min(remaining));
-        let outcome = adaptive_step(
-            &transport,
-            Dimensionless::new(e_folds),
-            &state,
-            attempted,
-            &tolerances,
-        );
-        if outcome.accepted {
-            state = outcome.state;
-            e_folds += attempted.into_value();
-        }
-        step = next_step_size(attempted, outcome.error_ratio, &limits);
+/// The canonical transport of one triangle, advanced in stages so that the
+/// state can be read on several slices of one run.
+pub(crate) struct ThreePointEvolution<'a, P, G, const N: usize> {
+    system: &'a CovariantMultifieldSystem<P, G, N>,
+    trajectory: &'a BackgroundTrajectory<N>,
+    triangle: MomentumTriangle,
+    /// Elapsed e-folds of the subhorizon start.
+    pub(crate) start: f64,
+    /// Elapsed e-folds of `state`.
+    pub(crate) e_folds: f64,
+    pub(crate) state: CanonicalThreePointTransportState<N>,
+    step: Dimensionless,
+}
+
+impl<'a, P, G, const N: usize> ThreePointEvolution<'a, P, G, N>
+where
+    P: ThriceDifferentiableMultifieldPotential<N> + Copy,
+    G: ThirdOrderFieldSpaceGeometry<N> + CurvatureDerivativeGeometry<N> + Copy,
+{
+    /// The subhorizon initial condition where the shortest leg has
+    /// `k/(aH) = exp(e_folds_before_exit)`.
+    pub(crate) fn start(
+        system: &'a CovariantMultifieldSystem<P, G, N>,
+        trajectory: &'a BackgroundTrajectory<N>,
+        triangle: MomentumTriangle,
+        e_folds_before_exit: f64,
+    ) -> Result<Self, ThreePointEvolutionError> {
+        let depth = e_folds_before_exit.exp();
+        let shortest = Mass::new(triangle.canonical_wavenumbers()[2]);
+        let start = trajectory
+            .crossing(|state| (shortest / (state.a * system.hubble(state))).into_value() - depth)
+            .ok_or(ThreePointEvolutionError::StartNotFound)?;
+        // The crossing is found by root refinement, so allow its rounding.
+        let state = canonical_three_point_transport_initial_state(
+            system,
+            &BackgroundNeighborhood::from_trajectory(trajectory, start, 1.0e-3),
+            triangle,
+            depth * (1.0 - 1.0e-6),
+        )
+        .map_err(ThreePointEvolutionError::InitialCondition)?;
+        Ok(Self {
+            system,
+            trajectory,
+            triangle,
+            start,
+            e_folds: start,
+            state,
+            step: Dimensionless::new(1.0e-3),
+        })
     }
 
-    Err(ThreePointEvolutionError::StepLimit)
+    /// Advances the state to `target_e_folds` within `max_steps` attempted
+    /// steps.
+    pub(crate) fn advance(
+        &mut self,
+        target_e_folds: f64,
+        relative_tolerance: f64,
+        max_steps: usize,
+    ) -> Result<(), ThreePointEvolutionError> {
+        let transport =
+            CanonicalThreePointTransportSystem::new(self.system, self.trajectory, self.triangle);
+        let tolerances = ErrorTolerances::new(
+            CanonicalThreePointTransportTolerance::pure_relative(),
+            relative_tolerance,
+        );
+        let limits = StepSizeLimits {
+            min: Dimensionless::new(1.0e-9),
+            max: Dimensionless::new(5.0e-2),
+        };
+
+        for _ in 0..max_steps {
+            let remaining = target_e_folds - self.e_folds;
+            if remaining <= 1.0e-13 {
+                return Ok(());
+            }
+            let attempted = Dimensionless::new(self.step.into_value().min(remaining));
+            let outcome = adaptive_step(
+                &transport,
+                Dimensionless::new(self.e_folds),
+                &self.state,
+                attempted,
+                &tolerances,
+            );
+            if outcome.accepted {
+                self.state = outcome.state;
+                self.e_folds += attempted.into_value();
+            }
+            self.step = next_step_size(attempted, outcome.error_ratio, &limits);
+        }
+
+        Err(ThreePointEvolutionError::StepLimit)
+    }
 }
 
 /// Failure of [`CovariantMultifieldSystem::three_point_state`].

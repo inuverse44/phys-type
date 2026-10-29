@@ -1249,7 +1249,7 @@ $10^{-13}$, $10^{-14}$ と詰めると、38.2886, 38.2868 と収束する。
 G1 & 完了 & 幾何の閉じた式と自動微分の一致。Eq.~115 の誤植を発見 \\
 G2 & 完了 & 三本の軌道、図、インフレーションの中断に近いことの発見 \\
 G3 & 未着手 & $n_s$（[KMS] は 0.967）と $T_{\mathcal{RS}}$ \\
-G4 & 一部完了 & crossing-time $\delta N$ は一致。transport は谷で精度を失うので、スライスでつなぐ（軌道 2 で 38.287）。43.3 との差の内訳は未 \\
+G4 & 一部完了 & crossing-time $\delta N$ は一致。スライスでつなぐ計算をライブラリとテストにした（軌道 2 で 38.287）。43.3 との差の内訳は未 \\
 G5 & 未着手 & Palatini 版。比べられる文献値がないので整合性のチェックだけ \\
 G6 & 範囲外 & Jordan frame の $\zeta$。別に設計する \\
 \bottomrule
@@ -1586,6 +1586,7 @@ B_\zeta=\frac{(2\pi)^4\mathcal P_\zeta^2}{\prod_ik_i^3}\Big[\frac\eta8\sum_ik_i^
 
 本文 \S\ref{sec:kms-transport} の内容を式で述べる。
 数値はすべて \href{\repourl/blob/f53b557/crates/phys-type-models/examples/kms_transport_probe.rs}{\texttt{kms\_transport\_probe}}（コミット \code{f53b557}）で得た。
+応答の計算はライブラリの \code{split\_curvature\_correlators}（\href{\repourl/blob/main/crates/phys-type/src/split.rs}{\texttt{split.rs}}）にあり、G4 のテストは \href{\repourl/blob/main/crates/phys-type-models/tests/kms_trajectories.rs}{\texttt{tests/kms\_trajectories.rs}} にある。
 記録は \href{\repourl/issues/67}{issue \#67} にある。
 特に断らない限り、対象は KMS の軌道 2 と pivot の等辺三角形である。
 終わりの面は $\epsilon_H=1$ の 0.01 e-fold 前の一様な $H$ の面とする。
@@ -1820,7 +1821,6 @@ $P_\zeta$ も応答の $7.17210\times10^{-4}$ と合う。
 
 \begin{enumerate}
 \item 38.287 と [KMS] の 43.3 との約 12\% の差を、slow roll の速度、Riemann の項、地平線を出たときの評価の三つに分けて説明する。
-\item 応答の計算はいま診断用の example にある。ライブラリに移し、G4 のテストにする。
 \item 背景の誤差が効く仕組みを調べ、$\kappa_1$ の見積もりを数値で確かめる。
 \end{enumerate}
 

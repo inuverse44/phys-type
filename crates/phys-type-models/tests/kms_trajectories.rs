@@ -1,10 +1,13 @@
 //! The three trajectories of arXiv:1210.7487 (KMS) off the ridge `chi = 0`:
-//! their background (Figs. 3 and 7) and the crossing-time delta N of
-//! Sec. V (Fig. 11). The tests are expensive in debug builds; run them with
+//! their background (Figs. 3 and 7), the crossing-time delta N of Sec. V
+//! (Fig. 11), and the tree-level f_NL split at a slice (G4). The tests are expensive in debug builds; run them with
 //! `cargo test --release -- --ignored`. See
 //! `docs/general-nonminimal-inflation.md`.
 
-use phys_type::{BackgroundSurvey, Formulation, Mass, SpectrumRunSettings};
+use phys_type::{
+    BackgroundSurvey, ConformalPerturbationTolerance, ErrorTolerances, Formulation, Mass,
+    MomentumTriangle, SpectrumRunSettings, SplitSettings, curvature_correlators,
+};
 use phys_type_models::kms::{
     KmsSystem, PHI_START, TRAJECTORIES, at_rest, benchmark_system, crossing_delta_n, turn_peak,
 };
@@ -105,4 +108,106 @@ fn the_crossing_delta_n_reproduces_kms_fig_11() {
             delta_n.power
         );
     }
+}
+
+#[test]
+#[ignore = "expensive; run in release mode"]
+fn the_split_f_nl_converges_for_all_three_trajectories() {
+    // G4. The transport carried to the end of inflation does not converge
+    // on trajectories 1 and 2: the correlators grow during the turn and then
+    // cancel. Split at a slice before that growth, the result is the same on
+    // every slice. The background must be solved to 1e-13: at the default
+    // 1e-10, f_NL of trajectory 2 is 1.5% off (appendix F of the note).
+    let system = benchmark_system(Formulation::Metric);
+    let precise = SpectrumRunSettings {
+        tolerances: ErrorTolerances::new(
+            ConformalPerturbationTolerance::<2>::background_in_planck_units(1.0e-23),
+            1.0e-13,
+        ),
+        background_sample_every: usize::MAX,
+        ..settings()
+    };
+    let split = SplitSettings::default();
+    // (slices in e-folds before the end, expected f_NL): the slices precede
+    // the growth, which starts near 34 e-folds before the end on trajectory 1
+    // and near 10 on trajectory 2.
+    let cases = [
+        ([50.0, 45.0], 0.013_545),
+        ([20.0, 10.0], 38.287),
+        ([20.0, 10.0], 0.013_530),
+    ];
+    for (index, (chi0, (before, expected))) in TRAJECTORIES.into_iter().zip(cases).enumerate() {
+        let survey = system.survey(at_rest(PHI_START, chi0), &precise).unwrap();
+        let end = survey.e_folds_at_end;
+        let pivot = survey.trajectory.state_at(end - 60.0);
+        let k = (pivot.a * system.hubble(&pivot)).into_value();
+        let triangle = MomentumTriangle::try_new(k, k, k).unwrap();
+        let output = end - 0.01;
+        let f_nl: Vec<f64> = system
+            .split_curvature_correlators(
+                &survey.trajectory,
+                triangle,
+                &before.map(|n| end - n),
+                output,
+                &split,
+            )
+            .unwrap()
+            .iter()
+            .map(|correlators| correlators.reduced_f_nl())
+            .collect();
+        let label = index + 1;
+        assert!(
+            (f_nl[0] - f_nl[1]).abs() < 1.0e-6 * f_nl[0].abs(),
+            "trajectory {label}: {f_nl:?} on two slices"
+        );
+        assert!(
+            (f_nl[0] - expected).abs() < 1.0e-3 * expected,
+            "trajectory {label}: f_NL {} against {expected}",
+            f_nl[0]
+        );
+    }
+}
+
+#[test]
+#[ignore = "expensive; run in release mode"]
+fn the_split_matches_the_transport_where_the_transport_converges() {
+    // On trajectory 2, the transport converges up to 3 e-folds before the
+    // end; there the split must reproduce it.
+    let system = benchmark_system(Formulation::Metric);
+    let survey = survey(&system, TRAJECTORIES[1]);
+    let end = survey.e_folds_at_end;
+    let pivot = survey.trajectory.state_at(end - 60.0);
+    let k = (pivot.a * system.hubble(&pivot)).into_value();
+    let triangle = MomentumTriangle::try_new(k, k, k).unwrap();
+    let output = end - 3.0;
+    let split = SplitSettings::default();
+    let transport = system
+        .three_point_state(
+            &survey.trajectory,
+            triangle,
+            split.e_folds_before_exit,
+            output,
+            split.relative_tolerance,
+            split.max_steps,
+        )
+        .unwrap();
+    let direct = curvature_correlators(
+        &system,
+        &survey.trajectory.state_at(output),
+        triangle,
+        &transport,
+        split.maximum_output_k_over_ah,
+    )
+    .unwrap()
+    .reduced_f_nl();
+    let split = system
+        .split_curvature_correlators(&survey.trajectory, triangle, &[end - 10.0], output, &split)
+        .unwrap()[0]
+        .reduced_f_nl();
+    // 40.9458 in both, issue #67.
+    assert!(
+        (split - direct).abs() < 1.0e-5 * direct.abs(),
+        "split {split} vs transport {direct}"
+    );
+    assert!((direct - 40.9458).abs() < 1.0e-3, "transport {direct}");
 }
