@@ -191,7 +191,9 @@ locate the loss of precision (the sharp turn, $\eta_\perp\simeq50$, or the
 heavy oscillation of $\phi$ in the valley afterwards) and to evaluate the
 transport in a better-conditioned basis or to end it on a slice where the
 remainder is not yet small. Until then the transport is not validated on
-this model, and phase-space $\delta N$ is the reference for G4.
+this model. Phase-space $\delta N$ is the intended reference for G4, but
+it has not yet been run on this model; the only comparison so far is the
+crossing-time $\delta N$ above.
 
 Discrepancies with [KMS] go to
 [`literature-discrepancies.md`](literature-discrepancies.md), as before.
