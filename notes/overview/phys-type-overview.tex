@@ -628,7 +628,7 @@ V=\frac{V_J}{\Omega^4}.
 metric 形式では $\kappa=1$、Palatini 形式では $\kappa=0$ である。
 Palatini 形式では接続が計量から独立なので、共形変換をしても $\Omega$ の微分の項が出てこない\cite{BauerDemir2008}。
 多場の計量の形は Kaiser\cite{Kaiser2010} による。
-実装は \repo{crates/phys-type/src/theory.rs} にあり、フレームの対応の詳細は付録~\ref{app:frames} にまとめた。
+実装は \repo{crates/phys-type/src/theory.rs} にあり、フレームの対応の詳細は\ref{app:frames} にまとめた。
 
 いま扱えるのは、式\eqref{eq:jordan}の形の理論（一般化された非最小結合のクラス）だけである。
 Higgs inflation、nonminimally assisted inflation、KMS はすべてこのクラスに入る。
@@ -709,7 +709,7 @@ U^a{}_A\simeq\frac{\delta^a{}_A}{a\sqrt{2k}}e^{-ik\tau},\qquad
 pivot は $k_*=a_*H_*$（end の $N_*$ e-fold 前）で決め、出力の座標は $k/k_*$ とする。
 多場では $\mathcal R$ が地平線の外でも変化しうるので（Wands ほかの transfer の行列\cite{Wands2002}、数値的な扱いは Lalak ほか\cite{Lalak2007}）、観測量はインフレーションの終わりで評価する。
 地平線を出たときの値を使う近似とは、ここが違う。
-数値計算の詳細（変数の取り方、許容誤差、検証）は付録~\ref{app:numerics} にまとめた。
+数値計算の詳細（変数の取り方、許容誤差、検証）は\ref{app:numerics} にまとめた。
 
 \begin{figure}[t]
 \centering
@@ -796,7 +796,7 @@ $u^a{}_{de}$ は $d,e$ について対称なので、二つの項は等しく、
 $\Sigma^{ad}$ と $\Sigma^{da}$ は複素共役の関係にあり、等しくない（虚部が交換子にあたる）。
 2次の挿入より左にある足は $\Sigma^{ad}$、右にある足は $\Sigma^{db}$ と、順序を保って縮約しなければならない。
 これは DFMS の Eq.~(5.14)\cite{DFMS2016} と一致する。
-以前の実装ではこれを間違えていて、de Sitter での整合性テストが $O(1)$ ずれた（付録~\ref{app:discrepancies} の 5）。
+以前の実装ではこれを間違えていて、de Sitter での整合性テストが $O(1)$ ずれた（\ref{app:discrepancies} の 5）。
 
 \subsection{インフレーションでの transport}
 
@@ -826,7 +826,7 @@ toy model との違いは三つある。
 \]
 である。
 これが正しいことは、独立に作ったモードソルバー（\S\ref{sec:pipeline}）の結果 $\Sigma^{IJ}=\sum_AU^I{}_AU^{J*}{}_A$ と照合して確かめた。
-$QQ,QP,PQ,PP$ の四つのブロックすべてが、地平線の中・地平線を出るとき・回転の最中・最後のスライスで $2\times10^{-7}$ 以内で一致する（P3c。モード解から共分散への変換は付録~\ref{app:oracle}）。
+$QQ,QP,PQ,PP$ の四つのブロックすべてが、地平線の中・地平線を出るとき・回転の最中・最後のスライスで $2\times10^{-7}$ 以内で一致する（P3c。モード解から共分散への変換は\ref{app:oracle}）。
 
 三点の transport 方程式は式\eqref{eq:toy3}の運動量の引数を明示して
 \begin{align}
@@ -841,7 +841,7 @@ $QQ,QP,PQ,PP$ の四つのブロックすべてが、地平線の中・地平線
 \subsection{2次の流れ \texorpdfstring{$u^a{}_{bc}$}{u\^{}a\_bc} は 3次の作用から来る}
 \label{sec:canonical}
 
-$u^a{}_{bc}$ は平坦ゲージでの 3次の作用\cite{BS2018}から決まる（Eqs.~(2.9)--(2.15)。係数の全式は付録~\ref{app:cubic}）。
+$u^a{}_{bc}$ は平坦ゲージでの 3次の作用\cite{BS2018}から決まる（Eqs.~(2.9)--(2.15)。係数の全式は\ref{app:cubic}）。
 \[
 S^{(3)}=\frac12\int dt\,a^3\Big\{A_{IJK}Q^IQ^JQ^K+B_{IJK}Q^IQ^J\Dt Q^K+C_{IJK}\Dt Q^I\Dt Q^JQ^K\Big\}.
 \]
@@ -877,7 +877,7 @@ P3b で 3階の自動微分と $\nabla R$ を先に実装したのはこのた�
 \subsection{\texorpdfstring{$\zeta$}{ζ} への射影}
 \label{sec:projection}
 
-最後に、地平線の外のスライスで、場の揺らぎを曲率摂動 $\zeta$ に 2次まで変換する（Dias ほか\cite{DEFMS2015}の ``simple'' 表示、実装は \repo{crates/phys-type/src/curvature.rs}。全式は付録~\ref{app:gauge}）。
+最後に、地平線の外のスライスで、場の揺らぎを曲率摂動 $\zeta$ に 2次まで変換する（Dias ほか\cite{DEFMS2015}の ``simple'' 表示、実装は \repo{crates/phys-type/src/curvature.rs}。全式は\ref{app:gauge}）。
 \[
 \zeta=N_aX^a+\tfrac12N_{ab}X^aX^b,\qquad N_I=-\frac{\dot\phi_I}{2H\Mpl^2\epsilon}\quad(\text{線形では }\zeta=-\mathcal R),
 \]
@@ -893,7 +893,7 @@ B_\zeta=\frac65\fnl\big[P_\zeta(k_1)P_\zeta(k_2)+P_\zeta(k_1)P_\zeta(k_3)+P_\zet
 と定める。
 この符号の規約だと、単一場の squeezed 極限で $\fnl\to\tfrac5{12}(1-n_s)>0$ となる。
 $N_{Q\Pi}$ の係数はDFMS の Eq.~(7.4b)\cite{DFMS2016} の $1/3$ ではなく $1/6$ が正しい。
-$1/3$ のままだと Maldacena の結果と合わず、$\zeta$ も保存しない（付録~\ref{app:discrepancies} の 1）。
+$1/3$ のままだと Maldacena の結果と合わず、$\zeta$ も保存しない（\ref{app:discrepancies} の 1）。
 
 \subsection{\texorpdfstring{$\delta N$}{δN} との関係}
 
@@ -1000,7 +1000,7 @@ R^I{}_{JKL}=K\big(\delta^I{}_KG_{JL}-\delta^I{}_LG_{JK}\big).
 metric と Palatini の両方で、一般のパラメータでも確かめている（\repo{crates/phys-type-models/tests/kms.rs}）。
 
 なお、[KMS] Eq.~(115) は場空間の Ricci スカラー $\mathcal R=2K$ を載せているが、その値は正しい値の 2 倍になっている（印刷された式は $4K$ に等しい）。
-TeX のソースで式を確かめ、sympy（Brioschi の公式）で独立に計算して確認した（付録~\ref{app:discrepancies} の 14）。
+TeX のソースで式を確かめ、sympy（Brioschi の公式）で独立に計算して確認した（\ref{app:discrepancies} の 14）。
 
 \subsection{ポテンシャルの地形：ボールが転がる絵で見る}
 \label{sec:kms-landscape}
@@ -1151,11 +1151,11 @@ $P_\zeta$ と厳密なモードソルバー & 5\% 低い（slow roll の速度�
 刻み幅を変えても $10^{-3}$ の範囲で安定している（テストは \repo{crates/phys-type-models/tests/kms_trajectories.rs}）。
 このリポジトリの規約では符号は正になる（[KMS] Eq.~(92) は逆の符号）。
 
-\subsection{\texorpdfstring{$\fnl$}{fNL}：transport（G4、精度が落ちる場所）}
+\subsection{\texorpdfstring{$\fnl$}{fNL}：transport とスライスでつなぐ計算（G4）}
 \label{sec:kms-transport}
 
-軌道 2 では、インフレーションの終わりで評価した tree level の transport の $\fnl$ が収束しない。
-相対許容誤差 $\varepsilon$ に比例して変わる。
+軌道 2 では tree level の transport をインフレーションの終わりまで解くと、$\fnl$ が収束しない。
+相対許容誤差 $\varepsilon$ を小さくするほど絶対値が小さくなり、値はほぼ $\varepsilon$ に比例する。
 \begin{center}
 \begin{tabular}{cc}
 \toprule
@@ -1168,14 +1168,14 @@ $10^{-13}$ & $-6.1\times10^2$ \\
 \bottomrule
 \end{tabular}
 \end{center}
-$10^{-13}$ の値は、途中で積分を止めるスライスの取り方を変えるだけで $-754$ にも $-605$ にもなる。
-この $\fnl$ はほぼすべて intrinsic の項 $N_aN_bN_c\alpha^{abc}$ から来ている。
+$\varepsilon=10^{-13}$ でも、途中で積分を止めるスライスの取り方を変えるだけで $-754$ にも $-605$ にもなる。
+この $\fnl$ のほとんどは intrinsic の項 $N_aN_bN_c\alpha^{abc}$ から来ている。
 
-精度が落ちる場所を調べるため、同じ transport を途中の各スライスで $\zeta$ に射影した（図~\ref{fig:kms-transport}）。
-終わりの 4 e-fold 前までは、四つの許容誤差で $\fnl$ が 6 桁一致する（4 e-fold 前で 297.445）。
-回転率が最初に極大になる 5.15 e-fold 前の曲がりは、正しく解けている。
-値が分かれるのは 3 e-fold 前より後である。
-この区間では $\phi$ が $\chi$ の谷で振動し、$P_\zeta$ は 4.8 e-fold 前の最大値（最終値の $5.7\times10^5$ 倍）から最終値まで打ち消し合って小さくなる。
+精度が落ちる場所を調べるため、同じ transport を途中のスライスごとに $\zeta$ へ射影した（図~\ref{fig:kms-transport}）。
+終わりの 4 e-fold 前までは、四つの許容誤差の $\fnl$ が 6 桁一致する（4 e-fold 前で 297.445）。
+5.15 e-fold 前の曲がり（回転率の最初の極大）も正しく解けている。
+値が分かれ始めるのは 3 e-fold 前からで、$\phi$ が $\chi$ の谷で振動している区間である。
+この区間で $P_\zeta$ は 4.8 e-fold 前の最大値（最終値の $5.7\times10^5$ 倍）から最終値まで減っていく。
 
 \begin{figure}[t]
 \centering
@@ -1183,33 +1183,61 @@ $10^{-13}$ の値は、途中で積分を止めるスライスの取り方を変
 \caption{軌道 2 の transport を途中のスライスで $\zeta$ に射影したもの。
 上：$P_\zeta$ を最終値で割ったもの（$\varepsilon=10^{-13}$）。
 下：各スライスでの $|\fnl|$。四つの許容誤差の線は 3 e-fold 前まで重なり、谷（赤の帯）で分かれる。
-破線はスライス 50 e-fold 前から phase-space $\delta N$ で求めた暫定値 38.30（付録~\ref{app:conditioning}）。
+破線はスライスでつないで求めた値 38.287（\ref{app:conditioning}）。曲線は背景を既定の許容誤差 $10^{-10}$ で解いたもの。
 灰色の縦線は回転率の最初の極大。}
 \label{fig:kms-transport}
 \end{figure}
 
-これは積分法の次数や刻み幅の問題ではなく、問題そのものの条件の悪さである。
-最終的な相関関数は、途中で大きく育った相関関数どうしが打ち消し合った小さな残りになっている。
-そのため、各ステップの相対誤差 $\varepsilon$ が条件数の分だけ増幅されて最終値に残る。
-誤差の比例係数（$\fnl$ でおよそ $6\times10^{15}\varepsilon$）から見積もると、倍精度の丸め誤差の限界 $\varepsilon\sim10^{-16}$ まで下げても $\fnl$ に 0.6 程度の誤差が残る。
-順方向に transport を最後まで積分する限り、G4 の目標の $10^{-3}$ には届かない。
+原因は積分法ではなく計算する量の性質にある。
+終わりの相関関数は、途中で大きく育った相関関数どうしが打ち消し合った小さな残りである。
+積分の各ステップでは、育った値に対して相対 $\varepsilon$ の誤差が入る。
+この誤差は打ち消されずに残るので、小さな最終値に対しては何桁も大きな相対誤差になる。
+$\fnl$ の誤差はおよそ $6\times10^{15}\varepsilon$ で、倍精度の限界 $\varepsilon\sim10^{-16}$ まで下げても 0.6 程度残る。
+したがって、transport を終わりまで解く方法では、G4 の目標の $10^{-3}$ に届かない。
 
-そこで、transport を収束しているスライス $t_c$ まで進め、そこから終わりまでを phase-space $\delta N$ で計算する。
-ある e-fold で計算法を切り替える近似のように見えるが、そうではない。
-地平線の外では、終わりの $\zeta$ はスライス $t_c$ での位相空間の揺らぎの関数として厳密に書ける。
-その関数を背景の解から作るのが $\delta N$ で、$t_c$ での揺らぎの統計を作るのが transport である。
-結果が $t_c$ に依らないことは式の上で保証されているので、$t_c$ を動かしたときの変化は検算になる。
-$\delta N$ の側では背景の解だけを積分するので、誤差は背景の値に対する相対誤差で決まり、途中の揺らぎの大きさで増幅されない。
-式と数値は付録~\ref{app:conditioning} にまとめた。
+そこで計算を二つに分ける。
+相関関数がまだ育っていないスライス $t_c$ までは transport を解き、$\Sigma(t_c)$ と $\alpha(t_c)$ を求める。
+$t_c$ から先は、$t_c$ での揺らぎ $X$ に終わりの $\zeta$ がどう応答するかを求める。
+地平線の外では、この応答は 2次まで次の形に厳密に書ける。
+\[
+\zeta_e=\tilde n_a(t_c)\,X^a(t_c)+\tfrac12\tilde n_{ab}(t_c)\,X^a(t_c)X^b(t_c) .
+\]
+応答の係数 $\tilde n_a$, $\tilde n_{ab}$ は終わりの面での射影の係数 $N_a$, $N_{ab}$ から出発し、時間を逆向きに解いて求める。
+その方程式は transport と同じ流れ $u^a{}_b$, $u^a{}_{bc}$ から作るので、差分も座標の変換も使わない。
+二つを合わせた結果は $t_c$ に依らないことが示せるので、$t_c$ は結果を合わせるために調整する量ではない。
+$t_c$ を動かしても結果が変わらないことが、計算の検算になる。
+式と数値の詳細は\ref{app:conditioning} にまとめた。
 
-結果は次のとおりである。
-transport が収束する面（終わりの 3 e-fold 前）で比べると、スライス 20 e-fold 前からの $\delta N$ は 40.9476 で、transport の 40.9458 と $4\times10^{-5}$ で一致する。
-終わりの面の $P_\zeta$ は、50--12 e-fold 前のどのスライスからでも $7.17207\times10^{-4}$ から $7.17210\times10^{-4}$ に入る。
-$\fnl$ は、スライス上の場の三点関数が無視できる 55--45 e-fold 前のスライスから $38.29$--$38.31$ で、刻み幅をゼロへ外挿すると約 38.30 になる。
-ただし、スライスを終わりに近づけると $\fnl$ が系統的に上がっていき（20 e-fold 前で 39.7）、式が保証する $t_c$ への無依存性が成り立っていない。
-終わりの $P_\zeta$ も transport の極限と $2.6\times10^{-4}$ ずれている。
-この二点が説明できるまで、38.30 は参照値ではなく暫定値である。
-[KMS] の 43.3 や crossing-time $\delta N$ の 43.38 と比べるのはそのあとにする。
+まず、transport が収束している面で確かめた。
+終わりの面を 3 e-fold 前に置くと、transport の 40.9458096 に対し、6--50 e-fold 前のどのスライスでつないでも 40.9458532 になる。
+
+本来の終わりの面で計算すると、背景をどれだけ精密に解くかで結果が変わった。
+背景を既定の相対許容誤差 $10^{-10}$ で解くと $\fnl$ は 38.85 になる。
+$10^{-13}$, $10^{-14}$ と詰めると、38.2886, 38.2868 と収束する。
+背景の小さな誤差がなぜこれほど効くかは、まだ詰めていない（付録~\ref{app:numerical-precision}）。
+背景を精密に解いたときの結果は次のとおりである（等辺の pivot、$N_*=60$、終わりの面は $\epsilon_H=1$ の 0.01 e-fold 前の一様な $H$ の面）。
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+軌道 & $\fnl$（スライスでつなぐ） & transport を終わりまで解いた値 \\
+\midrule
+1 & 0.0135450 & $-287$ から $-304$（収束しない） \\
+2 & 38.287 & $-6\times10^3$ 前後（収束しない） \\
+3 & 0.0135301 & 0.0135301（9 桁一致） \\
+\bottomrule
+\end{tabular}
+\end{center}
+軌道 2 の値の不確かさは $10^{-5}$ 程度で、G4 の目標の $10^{-3}$ を満たす。
+軌道 1 でも、曲がり（終わりの 34 e-fold 前）のあとで transport が収束しなくなる。
+尾根から落ちない軌道 3 では打ち消しが起きず、二つの計算が一致する。
+
+応答の計算は transport と同じ $u^a{}_{bc}$ を使う。
+そこで、$u^a{}_{bc}$ を使わない独立な検算として、背景の解の差分で応答を求める phase-space $\delta N$ でも計算した。
+結果は 38.303--38.305 で、38.287 と $4\times10^{-4}$ で合う。
+
+38.287 は [KMS] の 43.3 や crossing-time $\delta N$ の 43.38 より約 12\% 小さい。
+この二つは地平線を出たときの値から、slow roll の速度を使い、Riemann の項を落として計算している。
+差をこれらの項ごとに分けるのは次の作業である。
 
 \subsection{KMS の残り}
 
@@ -1221,7 +1249,7 @@ $\fnl$ は、スライス上の場の三点関数が無視できる 55--45 e-fol
 G1 & 完了 & 幾何の閉じた式と自動微分の一致。Eq.~115 の誤植を発見 \\
 G2 & 完了 & 三本の軌道、図、インフレーションの中断に近いことの発見 \\
 G3 & 未着手 & $n_s$（[KMS] は 0.967）と $T_{\mathcal{RS}}$ \\
-G4 & 一部完了 & crossing-time $\delta N$ は一致。transport は谷で精度を失う。phase-space $\delta N$ は暫定値 38.30 \\
+G4 & 一部完了 & crossing-time $\delta N$ は一致。transport は谷で精度を失うので、スライスでつなぐ（軌道 2 で 38.287）。43.3 との差の内訳は未 \\
 G5 & 未着手 & Palatini 版。比べられる文献値がないので整合性のチェックだけ \\
 G6 & 範囲外 & Jordan frame の $\zeta$。別に設計する \\
 \bottomrule
@@ -1264,7 +1292,7 @@ Higgs inflation\cite{BezrukovShaposhnikov2008,BauerDemir2008}（metric / Palatin
 二点 transport & 完了 & モードソルバーと一致 \\
 三点 transport と $\fnl$ & 完了 & tree level、インフレーション中のみ、再加熱なし \\
 非最小結合の理論から Einstein frame & 完了 & metric と Palatini \\
-KMS & 途中 & transport の $\fnl$ は谷で精度を失う（付録~\ref{app:conditioning}） \\
+KMS & 途中 & $\fnl$ はスライスでつないで求める（\ref{app:conditioning}） \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1462,7 +1490,7 @@ S_\phi=\frac12\int dt\,a^3\Big\{&G_{IJ}\Dt Q^I\Dt Q^J+M_{IJ}Q^IQ^J\\
 A_{IJK}=\mathrm{Sym}_{IJK}\widetilde A_{IJK},\qquad B_{IJK}=\mathrm{Sym}_{IJ}\widetilde B_{IJK},\qquad C_{IJK}=\mathrm{Sym}_{IJ}\widetilde C_{IJK}
 \]
 で、置換は対応する $\mathbf k_r$ も同時に入れ替える。
-成分の添字だけを入れ替えて運動量の引数を固定するのは誤りで、二つの入力の波数が等しいとき（正三角形）にしか正しくない（付録~\ref{app:discrepancies} の 4）。
+成分の添字だけを入れ替えて運動量の引数を固定するのは誤りで、二つの入力の波数が等しいとき（正三角形）にしか正しくない（\ref{app:discrepancies} の 4）。
 
 \subsection{速度と正準運動量}
 $\Pi_I\equiv a^{-3}p_I$ とすると、2次まで
@@ -1557,8 +1585,10 @@ B_\zeta=\frac{(2\pi)^4\mathcal P_\zeta^2}{\prod_ik_i^3}\Big[\frac\eta8\sum_ik_i^
 %----------------------------------------------------------------------
 
 本文 \S\ref{sec:kms-transport} の内容を式で述べる。
-数値はすべて \href{\repourl/blob/df99e07/crates/phys-type-models/examples/kms_transport_probe.rs}{\texttt{kms\_transport\_probe}}（コミット \code{df99e07}）で得たもので、記録は \href{\repourl/issues/67}{issue \#67} にある。
-対象は KMS の軌道 2、pivot の等辺三角形、終わりの面は一様な $H$ の面（$\epsilon_H=1$ の 0.01 e-fold 前）である。
+数値はすべて \href{\repourl/blob/f53b557/crates/phys-type-models/examples/kms_transport_probe.rs}{\texttt{kms\_transport\_probe}}（コミット \code{f53b557}）で得た。
+記録は \href{\repourl/issues/67}{issue \#67} にある。
+特に断らない限り、対象は KMS の軌道 2 と pivot の等辺三角形である。
+終わりの面は $\epsilon_H=1$ の 0.01 e-fold 前の一様な $H$ の面とする。
 
 \subsection{終わりの \texorpdfstring{$\zeta$}{ζ} への応答}
 
@@ -1567,65 +1597,71 @@ B_\zeta=\frac{(2\pi)^4\mathcal P_\zeta^2}{\prod_ik_i^3}\Big[\frac\eta8\sum_ik_i^
 X^a(t)=\mathcal U^a{}_b(t,t')\,X^b(t'),\qquad
 \DN\mathcal U^a{}_b(t,t')=u^a{}_c(t)\,\mathcal U^c{}_b(t,t'),\qquad \mathcal U(t',t')=1 .
 \end{equation}
-共分散は $\Sigma(t)=\mathcal U(t,t')\,\Sigma(t')\,\mathcal U(t,t')^T$ で運ばれる。
-終わりの $\zeta$ は、線形では終わりのスライスでの射影 $\zeta_e=N_a(t_e)X^a(t_e)$ である（\S\ref{sec:projection}）。
-これを途中の時刻 $t$ の揺らぎで書くと
+共分散も同じ $\mathcal U$ で、$\Sigma(t)=\mathcal U(t,t')\,\Sigma(t')\,\mathcal U(t,t')^T$ と運ばれる。
+線形では、終わりの $\zeta$ は終わりのスライスでの射影 $\zeta_e=N_a(t_e)X^a(t_e)$ である（\S\ref{sec:projection}）。
+これを途中の時刻 $t$ の揺らぎで書き直す。
 \begin{equation}
-\zeta_e=\tilde n_a(t)\,X^a(t),\qquad \tilde n_a(t)\equiv N_b(t_e)\,\mathcal U^b{}_a(t_e,t)
+\zeta_e=\tilde n_a(t)\,X^a(t),\qquad \tilde n_a(t)\equiv N_b(t_e)\,\mathcal U^b{}_a(t_e,t) .
 \end{equation}
-となる。
-$\tilde n_a(t)$ は、時刻 $t$ の揺らぎに終わりの $\zeta$ がどれだけ応答するかを表す。
-これを使うと、終わりのパワースペクトルはどの時刻の $\Sigma$ からでも同じ形に書ける。
+$\tilde n_a(t)$ は、時刻 $t$ の揺らぎが終わりの $\zeta$ にどれだけ効くかを表す。
+これを応答と呼ぶ。
+応答を使うと、終わりのパワースペクトルはどの時刻の $\Sigma$ からでも同じ形に書ける。
 \begin{equation}
 P_\zeta(t_e)=\tilde n_a(t)\,\tilde n_b(t)\,\mathrm{Re}\,\Sigma^{ab}(t)\qquad(\text{すべての }t) .
 \label{eq:response}
 \end{equation}
 
-\subsection{条件数}
+\subsection{打ち消しと条件数}
+\label{app:condition-number}
 
-式~\eqref{eq:response} の右辺は、成分ごとの積 $\tilde n_a\tilde n_b\Sigma^{ab}$ の和である。
-個々の項の大きさは $|\tilde n|^2\|\Sigma\|$ 程度まであり得る（$\|\Sigma\|$ は成分の絶対値の最大）。
-その比を条件数と呼ぶ。
+式~\eqref{eq:response} の右辺は $\tilde n_a\tilde n_b\Sigma^{ab}$ の項の和である。
+一つの項は $|\tilde n|^2\|\Sigma\|$ の大きさまでなり得る（$\|\Sigma\|$ は成分の絶対値の最大）。
+この大きさと和との比を条件数と呼ぶ。
 \begin{equation}
 \kappa_2(t)\equiv\frac{|\tilde n(t)|^2\,\|\Sigma(t)\|}{P_\zeta(t_e)} .
 \end{equation}
-$\kappa_2\gg1$ なら、和の中で大きな項どうしが打ち消し合っている。
-$\Sigma$ が大きく育った方向に、$\tilde n$ がほとんど直交しているときにこうなる。
+$\kappa_2\gg1$ のとき、和の中で大きな項どうしが打ち消し合っている。
+$\Sigma$ が大きく育った方向に、$\tilde n$ がほとんど直交しているとこうなる。
 
 二成分の例で見る。
 適当な基底で $\Sigma=\mathrm{diag}(\Lambda^2,\lambda^2)$（$\Lambda\gg\lambda$）、$\tilde n=(\lambda/\Lambda,\,1)$ とすると、
 \[
 P_\zeta(t_e)=\Big(\frac{\lambda}{\Lambda}\Big)^2\Lambda^2+\lambda^2=2\lambda^2,\qquad
-\kappa_2\simeq\frac{\Lambda^2}{2\lambda^2} .
+\kappa_2\simeq\frac{\Lambda^2}{2\lambda^2}
 \]
-大きい方向の $\Lambda^2$ が、小さい応答 $\lambda/\Lambda$ で抑えられて、最終値に $\lambda^2$ しか残さない。
-この $\Sigma$ に $\varepsilon\Lambda^2$ の絶対誤差が乗ると、$\lambda^2$ の成分の相対誤差は $\varepsilon\Lambda^2/\lambda^2\sim\varepsilon\kappa_2$ になる。
+となる。
+$\Sigma$ の大きい方向の $\Lambda^2$ は小さな応答 $\lambda/\Lambda$ を掛けられて、最終値に $\lambda^2$ だけを残す。
+この $\Sigma$ に $\varepsilon\Lambda^2$ の誤差が乗ると、最終値の相対誤差は $\varepsilon\Lambda^2/\lambda^2\sim\varepsilon\kappa_2$ になる。
 
-適応刻みの積分は、各ステップの局所誤差を $\varepsilon$ と相関関数の大きさの積に抑える（付録~\ref{app:numerics}、三点の transport ではブロックの成分の最大で割る）。
-ステップ $n$ で $\Sigma$ に入った誤差 $\delta\Sigma_n\lesssim\varepsilon\|\Sigma(t_n)\|$ は、そこから先は線形の流れで運ばれるので、終わりには $\tilde n(t_n)\,\delta\Sigma_n\,\tilde n(t_n)$ として現れる。
+適応刻みの積分は各ステップの局所誤差を $\varepsilon$ と相関関数の大きさの積に抑える（\ref{app:numerics}。三点の transport ではブロックの成分の最大を大きさとする）。
+ステップ $n$ で入った誤差 $\delta\Sigma_n\lesssim\varepsilon\|\Sigma(t_n)\|$ は、その後は線形の流れで運ばれ、終わりには $\tilde n(t_n)\,\delta\Sigma_n\,\tilde n(t_n)$ として現れる。
 したがって
 \begin{equation}
-\frac{|\delta P_\zeta(t_e)|}{P_\zeta(t_e)}\lesssim\varepsilon\sum_n\kappa_2(t_n) .
+\frac{|\delta P_\zeta(t_e)|}{P_\zeta(t_e)}\lesssim\varepsilon\sum_n\kappa_2(t_n)
 \end{equation}
-三点関数でも同じで、$\kappa_3\equiv|\tilde n|^3\|\alpha\|/|B_\zeta(t_e)|$ が係数になる。
-積分法の次数を上げるとステップ数（和の項数）は減るが、一つ一つの項の $\varepsilon\kappa$ は減らない。
-$\varepsilon$ は倍精度の丸め誤差 $\sim10^{-16}$ より小さくできない。
+となる。
+三点関数でも同じで、係数は $\kappa_3\equiv|\tilde n|^3\|\alpha\|/|B_\zeta(t_e)|$ になる。
+積分法の次数を上げると、ステップの数、つまり和の項の数は減る。
+しかし一つ一つの項 $\varepsilon\kappa$ は減らず、$\varepsilon$ を倍精度の丸め誤差 $\sim10^{-16}$ より小さくすることもできない。
 
 KMS の軌道 2 では、スライス上の $P_\zeta$ が最終値の $5.7\times10^5$ 倍まで育つ（図~\ref{fig:kms-transport}）。
-$\kappa_2$ そのものは計算していないが、終わりの $\fnl$ の誤差は $\varepsilon$ に比例し、$10^{-10}$ から $10^{-12}$ でおよそ $6\times10^{15}\varepsilon$ である。
-この係数をそのまま $\varepsilon=10^{-16}$ に当てはめると、誤差は約 0.6 で、$\fnl\approx38$ に対して 1.5\% になる。
-これが本文で「順方向の transport では $10^{-3}$ に届かない」と述べた根拠である。
+$\kappa_2$ そのものは計算していない。
+終わりの $\fnl$ の誤差は $\varepsilon=10^{-10}$ から $10^{-12}$ で $\varepsilon$ に比例し、およそ $6\times10^{15}\varepsilon$ である。
+この係数を $\varepsilon=10^{-16}$ に当てはめると誤差は約 0.6 で、$\fnl\approx38$ の 1.5\% にあたる。
+本文で「transport を終わりまで解く方法では $10^{-3}$ に届かない」と述べたのは、この見積もりによる。
 
-\subsection{スライスでつなぐ：二つの厳密な部分への分解}
+\subsection{二つの厳密な部分への分解}
 
-地平線の外では、空間勾配の寄与は $(k/aH)^2$ の大きさで、これを落とすと各点が一様な宇宙として独立に進化する（separate universe）。
-スライス $t_c$（平坦なスライス）で位相空間の点 $\bar X+\delta X$ から出発した一様な宇宙が、終わりの面 $H=H_e$ に達するまでの e-fold 数を $\mathcal N_{t_c}(\bar X+\delta X)$ と書く。
+地平線の外では、空間勾配の寄与は $(k/aH)^2$ の大きさしかない。
+これを落とすと、各点は一様な宇宙として独立に進化する（separate universe）。
+平坦なスライス $t_c$ で位相空間の点 $\bar X+\delta X$ から出発した一様な宇宙が、終わりの面 $H=H_e$ に達するまでの e-fold 数を $\mathcal N_{t_c}(\bar X+\delta X)$ と書く。
 終わりの $\zeta$ はその差である。
 \begin{equation}
 \zeta_e=\mathcal N_{t_c}(\bar X+\delta X)-\mathcal N_{t_c}(\bar X)
 =\mathcal N_A\,\delta X^A+\tfrac12\mathcal N_{AB}\,\delta X^A\delta X^B+\cdots .
 \end{equation}
-ここで $\delta X^A=(\delta\phi^I,\delta\dot\phi^I)$ は座標の揺らぎで、$\mathcal N_A$, $\mathcal N_{AB}$ は $\bar X(t_c)$ での微分である。
+$\delta X^A$ は位相空間の揺らぎで、座標の取り方は問わない。
+$\mathcal N_A$, $\mathcal N_{AB}$ は $\bar X(t_c)$ での微分である。
 tree level の相関関数は
 \begin{align}
 P_\zeta(t_e)&=\mathcal N_A\mathcal N_B\,\mathrm{Re}\,\Sigma^{AB}(t_c),\\
@@ -1633,46 +1669,135 @@ B_\zeta(t_e)&=\mathcal N_A\mathcal N_B\mathcal N_C\,\alpha^{ABC}(t_c)
 +\sum_{r<s}\mathcal N_{AB}\,\big[\mathcal N_C\Sigma^{CA}(k_r)\big]\big[\mathcal N_D\Sigma^{DB}(k_s)\big]
 \label{eq:split}
 \end{align}
-で、$\Sigma(t_c)$ と $\alpha(t_c)$ は transport で $t_c$ まで進めたものである。\footnote{%
-transport の変数（共変な $Q$ と速度 $V$）から座標の揺らぎへは、$\delta\phi=Q-\tfrac12\Gamma QQ$、$\delta\dot\phi=V-\Gamma\dot\phi Q+(\text{2次})$ で移る（$\Gamma$ は Christoffel 記号）。
-実装では $\delta\dot\phi$ の 2次の部分を落としている。
-assisted 模型ではその影響は $10^{-5}$ 以下だった（\repo{crates/phys-type-models/tests/assisted.rs}）。}
+となる。
+$\Sigma(t_c)$ と $\alpha(t_c)$ は transport で $t_c$ まで解いたものである。
 
-この分け方で、計算は二つの部分になる。
-$t_c$ までは、地平線の内側の量子的な揺らぎから相関関数を作る部分で、transport が受け持つ。
-$t_c$ から先は、揺らぎを古典的な初期値として背景の方程式で運ぶ部分で、その効果はすべて関数 $\mathcal N_{t_c}$ に入る。
-どちらも近似ではない（落としているのは $(k/aH)^2$ だけである）。
+この式で、計算は二つの部分に分かれる。
+$t_c$ までは地平線の内側の量子的な揺らぎから相関関数を作る部分で、transport が受け持つ。
+$t_c$ から先は揺らぎを古典的な初期値として背景の方程式で運ぶ部分で、その効果はすべて関数 $\mathcal N_{t_c}$ に入る。
+落としているのは $(k/aH)^2$ だけで、どちらの部分も近似ではない。
 
 分け目 $t_c$ を動かしても結果は変わらない。
-背景の流れを $\Phi_{t'\leftarrow t}$ と書くと、平坦なスライスの間では e-fold 数の揺らぎはないので
+背景の流れを $\Phi_{t'\leftarrow t}$ と書く。
+平坦なスライスどうしの間では e-fold 数が揺らがないので、次が成り立つ。
 \begin{equation}
-\mathcal N_{t_c}(X)=(N_{c'}-N_c)+\mathcal N_{t_{c'}}\big(\Phi_{t_{c'}\leftarrow t_c}(X)\big)
+\mathcal N_{t_c}(X)=(N_{c'}-N_c)+\mathcal N_{t_{c'}}\big(\Phi_{t_{c'}\leftarrow t_c}(X)\big) .
 \end{equation}
-が成り立つ。
-一方、transport で $t_c$ から $t_{c'}$ まで進めることは、揺らぎを同じ流れ $\Phi$ で 2次まで運ぶことにほかならない。
+一方、transport で $t_c$ から $t_{c'}$ まで解くことは、揺らぎを同じ流れ $\Phi$ で 2次まで運ぶことと同じである。
 したがって式~\eqref{eq:split} は $t_c$ に依らない。
-$t_c$ を終わりまで遅らせた極限では、$\mathcal N$ の微分は \S\ref{sec:projection} の射影の係数 $N_a$, $N_{ab}$ になり、transport を最後まで解く計算そのものに戻る。
-つまり「transport を最後まで解く」と「$t_c$ から $\delta N$ でつなぐ」は同じ式で、境目の位置だけが違う。
-$t_c$ は調整する量ではなく、動かして結果が変わらないことを確かめる検算の量である。
+$t_c$ を終わりまで遅らせると、$\mathcal N$ の微分は \S\ref{sec:projection} の射影の係数 $N_a$, $N_{ab}$ になり、transport を終わりまで解く計算に戻る。
+つまり、transport を終わりまで解く計算とスライスでつなぐ計算は同じ式で、分け目の位置だけが違う。
+$t_c$ は結果を合わせるために調整する量ではなく動かしても結果が変わらないことを確かめる検算に使う。
 
 $t_c$ に課す条件は三つある。
-地平線の外にあること（50 e-fold 前で $k/aH\approx e^{-10}$）、transport がそこまで収束していること（4 e-fold 前まで 6 桁一致）、スライス上の $\alpha$ が小さく、脚注の 2次の項が効かないことである。
+地平線の外にあること（50 e-fold 前で $k/aH\approx e^{-10}$）、transport がそこまで収束していること、スライス上の相関関数がまだ育っていないことである。
+三つ目が要るのは、育ったあとのスライスでつなぐと、式~\eqref{eq:split} の中で大きな項どうしが打ち消し合い、transport の誤差がそのまま残るからである。
+軌道 2 では、6 e-fold 前までのスライスなら結果はほとんど変わらない（差は $5\times10^{-6}$）。
+4 e-fold 前より後のスライスでつなぐと、transport の誤った値に戻る。
 
-\subsection{なぜ \texorpdfstring{$\mathcal N$}{N} の側では打ち消しが増幅されないか}
+\subsection{応答を逆向きに解く}
 
-$\mathcal N$ の微分は、ずらした点から背景を解き直して差分で求める。
+式~\eqref{eq:split} の $\mathcal N_A$, $\mathcal N_{AB}$ は背景を解き直さなくても、transport の変数のまま方程式から求められる。
+地平線の外の揺らぎは 2次まで次の式で運ばれる。
+\begin{equation}
+\DN X^a=u^a{}_bX^b+\tfrac12u^a{}_{bc}X^bX^c .
+\end{equation}
+$u^a{}_b$ と $u^a{}_{bc}$ は transport の線形と 2次の流れそのもので、$k$ への依存は $(k/aH)^2$ の大きさしかない。\footnote{%
+2次の流れは、三角形の出力の足 $r$ ごとに別の核 $u^{(r)a}{}_{bc}$ を持つ。応答の 2次の部分も、それに合わせて足ごとに $\tilde n^{(r)}_{ab}$ を持たせる。}
+終わりの $\zeta$ を時刻 $t$ の揺らぎで書く。
+\begin{equation}
+\zeta_e=\tilde n_a(t)\,X^a(t)+\tfrac12\tilde n_{ab}(t)\,X^a(t)X^b(t) .
+\end{equation}
+左辺は $t$ に依らない。
+右辺を $N$ で微分し、$X$ の 1次と 2次の係数をそれぞれゼロとおくと、次の方程式（流れの随伴方程式）を得る。
+\begin{equation}
+\DN\tilde n_a=-\tilde n_b\,u^b{}_a,\qquad
+\DN\tilde n_{ab}=-\tilde n_c\,u^c{}_{ab}-\tilde n_{cb}\,u^c{}_a-\tilde n_{ac}\,u^c{}_b .
+\label{eq:adjoint}
+\end{equation}
+初期条件は終わりの面での射影の係数で、$\tilde n_a(t_e)=N_a$, $\tilde n_{ab}(t_e)=N_{ab}$ である（\S\ref{sec:projection}）。
+式~\eqref{eq:adjoint} を $t_e$ から逆向きに一度解くと、すべてのスライスの応答が得られる。
+式~\eqref{eq:split} の $\mathcal N_A$, $\mathcal N_{AB}$ をこの $\tilde n_a$, $\tilde n_{ab}$ に置き換えたものが、本文の結果である。
+
+\subsection{逆向きの応答で増幅が小さい理由（見積もり）}
+
+付録~\ref{app:condition-number} の評価は上限で、どの方法でも誤差が $\varepsilon\kappa$ まで残りうることを示すだけである。
+実際にどれだけ増幅されるかは、誤差がどの形で入るかで決まる。
+
+transport の誤差 $\delta\Sigma$ はどの向きにも入る。
+$\Sigma(t)=\mathcal U\Sigma(t_c)\mathcal U^T$ は $\mathcal U$ の 2乗で育つので、誤差は $\delta\Sigma\sim\varepsilon\|\mathcal U\|^2\|\Sigma(t_c)\|$ の大きさになる。
+終わりへの寄与は $\varepsilon\,|\tilde n(t)|^2\|\mathcal U\|^2\|\Sigma(t_c)\|$ である。
+
+応答の誤差は $\delta\tilde n(t)\sim\varepsilon|\tilde n(t)|$ で、スライスまで運ばれると $\delta\tilde n(t)\,\mathcal U(t,t_c)$ になる。
+終わりへの寄与は
+\[
+2\,\delta\tilde n(t)\,\mathcal U(t,t_c)\,\Sigma(t_c)\,\tilde n(t_c)^T\lesssim2\varepsilon\,|\tilde n(t)|\,\|\mathcal U(t,t_c)\|\,\|\Sigma(t_c)\|\,|\tilde n(t_c)|
+\]
+で、$\mathcal U$ は 1乗でしか入らない。
+
+$\kappa_1(t)\equiv|\tilde n(t)|\,\|\mathcal U(t,t_c)\|/|\tilde n(t_c)|$ とおくと、$P_\zeta$ の誤差は transport で $\varepsilon\kappa_1^2$、応答で $\varepsilon\kappa_1$ の大きさになる。
+三点関数では、transport の $\alpha$ は $\mathcal U$ の 3乗で育つが、応答の $\tilde n_{ab}$ の誤差は $\mathcal U$ の 2乗までしか拾わない。
+$P_\zeta$ が最終値の $5.7\times10^5$ 倍まで育つことから $\kappa_1\sim10^3$ とすると、倍精度で応答は十分に解けるが、transport は届かない。
+ただし $\kappa_1$ そのものは計算していないので、これは見積もりである。
+
+\subsection{数値計算の精度}
+\label{app:numerical-precision}
+
+応答の計算で効いた数値上の条件は、刻みと背景の精度の二つである。
+
+一つ目は刻みである。
+背景はチェックポイントの間を 3次の Hermite 補間でつないでいるので、状態は $C^1$ までしか滑らかでない。
+RK4 のステップがチェックポイントをまたぐと、収束は 1次程度に落ちた。
+ステップをチェックポイントの区間の内側に収めると、4次で収束する。
+刻みを $5\times10^{-4}$ から $6.25\times10^{-5}$ まで半分ずつにすると、$\fnl$ の変化は $5\times10^{-4}$, $3\times10^{-5}$, $5\times10^{-6}$ と減る。
+
+二つ目は背景の精度で、結果はこれに強く依る。
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+背景の相対許容誤差 & $\fnl$ & $P_\zeta(t_e)$ \\
+\midrule
+$10^{-10}$（既定） & 38.8546 & $7.17395\times10^{-4}$ \\
+$10^{-12}$ & 38.29992 & $7.17215\times10^{-4}$ \\
+$10^{-13}$ & 38.28858 & $7.17211\times10^{-4}$ \\
+$3\times10^{-14}$ & 38.28728 & $7.17210\times10^{-4}$ \\
+$10^{-14}$ & 38.28682 & $7.17210\times10^{-4}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+変化は許容誤差にほぼ比例する。
+$10^{-13}$ と $10^{-14}$ の値からゼロへ外挿すると 38.2866 になる。
+本文の 38.287 はこの値で、不確かさは $10^{-5}$ 程度である。
+以前、transport と差分の $\delta N$ で $P_\zeta$ が $2.6\times10^{-4}$ ずれていた。
+transport の側の背景を既定の精度で解いていたことが原因である。
+背景の誤差がなぜこれほど効くかは、まだ式で詰めていない。
+軌道 2 は曲がりで $\epsilon_H=0.99$ に達し、インフレーションが止まりかける。
+このことと関係していると考えている。
+
+そのほかの条件への依存は小さい。
+背景を $10^{-13}$ で解いたとき、RK4 の刻みを $6.25\times10^{-5}$ に半分にしても、$\fnl$ は $4\times10^{-7}$ しか変わらない。
+スライスまでの transport の許容誤差を $10^{-10}$ と $10^{-12}$ で比べても、変化は $10^{-8}$ 未満である。
+スライス 10, 40, 50 e-fold 前の値は 9 桁そろう。
+
+\subsection{差分による \texorpdfstring{$\delta N$}{δN} との比較}
+
+応答の計算は transport と同じ $u^a{}_{bc}$ を使うので、$u^a{}_{bc}$ に誤りがあればそれも引き継ぐ。
+そこで、$u^a{}_{bc}$ を使わない独立な検算として、$\mathcal N_{t_c}$ を背景の解の差分で求める phase-space $\delta N$ でも計算した。
+ずらした点から背景を相対許容誤差 $10^{-13}$ で解き直し、差分で微分を取る。
 \begin{gather*}
 \mathcal N_A\simeq\frac{\mathcal N(\bar X+h_A e_A)-\mathcal N(\bar X-h_A e_A)}{2h_A},\\
 \mathcal N_{AA}\simeq\frac{\mathcal N(\bar X+h_A e_A)-2\mathcal N(\bar X)+\mathcal N(\bar X-h_A e_A)}{h_A^2} .
 \end{gather*}
-背景の積分の誤差は背景の値（Planck 単位で $O(1)$ の場と速度）に対して測るので、$\mathcal N$ に乗る雑音 $\delta\mathcal N$ は途中の揺らぎの成長に依らない。
-スライス 40 e-fold 前から $\chi$ 方向にずらして測ると、$\delta\mathcal N\approx1.6\times10^{-13}$ だった。
-差分の誤差は $\delta\mathcal N/h$（1階）、$\delta\mathcal N/h^2$（2階）と打ち切り誤差 $O(h^2)$ の和で、条件数 $\kappa$ は掛からない。
+この方法では座標の揺らぎ $\delta X^A=(\delta\phi^I,\delta\dot\phi^I)$ を使うので、transport の変数を座標の揺らぎに直す必要がある。\footnote{%
+$\delta\phi=Q-\tfrac12\Gamma QQ$、$\delta\dot\phi=V-\Gamma\dot\phi Q+(\text{2次})$ で直す（$\Gamma$ は Christoffel 記号）。
+実装では $\delta\dot\phi$ の 2次の部分を落としている。
+assisted 模型ではその影響は $10^{-5}$ 以下だった（\repo{crates/phys-type-models/tests/assisted.rs}）。}
 
-その代わり、打ち消しは刻み幅 $h$ の上限として現れる。
-ずらした軌道と元の軌道の差は曲がりで大きく育つので、$h$ が大きいとその差が線形の範囲を出て、高次の微分が効く。
-雑音は小さい $h$ を、非線形性は大きい $h$ を嫌うので、使える $h$ の幅は狭い。
-スライス 50 e-fold 前で刻みを変えた結果は次のとおりである（$h$ は各座標の値に対する比）。
+差分の刻みは狭い範囲でしか選べない。
+刻みが小さいと、$\mathcal N$ に乗る雑音が効く。
+雑音は、スライス 40 e-fold 前から $\chi$ 方向にずらして測ると約 $1.6\times10^{-13}$ である。
+刻みが大きいと、ずらした軌道との差が曲がりで育ち、線形の範囲を出てしまう。
+結果に効くのは $\chi$ の刻みだけで、スライス 50 e-fold 前での結果は次のとおりである（$h$ は各座標の値に対する比）。
 \begin{center}
 \begin{tabular}{ccc}
 \toprule
@@ -1684,45 +1809,19 @@ $3\times10^{-3}$ & 38.214 & $7.17189\times10^{-4}$ \\
 \bottomrule
 \end{tabular}
 \end{center}
-$\phi$ と速度の刻みを 10 倍変えても $\fnl$ の変化は $5\times10^{-4}$ 以下で、効くのは $h_\chi$ だけである。
-隣り合う差の比は 7.5 で、$h^2$ の打ち切り誤差から期待される 8.8 に近い。
-$h^2$ でゼロへ外挿すると、どちらの組からも $\fnl=38.303$--$38.305$ になる。
+$h^2$ でゼロへ外挿すると 38.303--38.305 になり、応答の 38.287 と $4\times10^{-4}$ で合う。
+$P_\zeta$ も応答の $7.17210\times10^{-4}$ と合う。
 
-\subsection{結果と、まだ固まっていないこと}
+ただし差分の $\delta N$ では、スライスを終わりに近づけると $\fnl$ が上がっていく（20 e-fold 前で 39.7、12 e-fold 前で 55）。
+応答の計算ではこのずれが出ないので、差分の側の問題である。
+脚注の $\delta\dot\phi$ の 2次の項を落としたことが、打ち消しで増幅されて効いていると考えているが、まだ確かめていない。
 
-まず、transport が収束する面（終わりの 3 e-fold 前）で式~\eqref{eq:split} を確かめた。
-transport の 40.9458 に対し、スライス 20 e-fold 前からは 40.9476、10 e-fold 前からは 40.9593 である。
+\subsection{残っていること}
 
-終わりの面での結果を、スライスごとに並べる（$h=(10^{-4},10^{-3},10^{-2})$）。
-\begin{center}
-\begin{tabular}{ccc}
-\toprule
-スライス（終わりの何 e-fold 前） & $\fnl$ & $\fnl$ のガウス部分（第 2 項） \\
-\midrule
-55 & 38.285 & 38.291 \\
-50 & 38.293 & 38.310 \\
-45 & 38.309 & 38.349 \\
-40 & 38.343 & 38.433 \\
-30 & 38.541 & 38.991 \\
-20 & 39.673 & 42.072 \\
-12 & 55.07 & 66.96 \\
-\bottomrule
-\end{tabular}
-\end{center}
-$P_\zeta(t_e)$ は 50--12 e-fold 前のスライスからは $7.17207\times10^{-4}$ から $7.17210\times10^{-4}$ の間に入り、55 e-fold 前からだけ $7.17218\times10^{-4}$ になる。
-
-固まっていないことは四つある。
 \begin{enumerate}
-\item スライスを終わりに近づけると $\fnl$ が上がる。
-式~\eqref{eq:split} は $t_c$ に依らないはずなので、実装に何かが欠けている。
-上がり方はスライス上の場の三点関数（第 1 項）の大きさと連動している。
-脚注の $\delta\dot\phi$ の 2次の項が、打ち消しで増幅されて効いているのではないかと疑っているが、まだ確かめていない。
-\item 終わりの $P_\zeta$ が、transport の極限 $7.1739\times10^{-4}$ と $\delta N$ の $7.1721\times10^{-4}$ で $2.6\times10^{-4}$ ずれる。
-モードソルバーで判定する。
-\item 差分をやめ、背景の積分に jet（\S\ref{sec:types} の自動微分）を通して $\mathcal N_A$, $\mathcal N_{AB}$ を直接求めれば、刻み幅の窓の問題はなくなる。
-ただし jet が運ぶ微分は $\mathcal U$ そのもので、曲がりで育つ。
-その積分誤差がどう増幅されるかは試して確かめる必要がある。
-\item 軌道 1 と 3 はまだ計算していない。
+\item 38.287 と [KMS] の 43.3 との約 12\% の差を、slow roll の速度、Riemann の項、地平線を出たときの評価の三つに分けて説明する。
+\item 応答の計算はいま診断用の example にある。ライブラリに移し、G4 のテストにする。
+\item 背景の誤差が効く仕組みを調べ、$\kappa_1$ の見積もりを数値で確かめる。
 \end{enumerate}
 
 
@@ -1735,7 +1834,7 @@ $P_\zeta(t_e)$ は 50--12 e-fold 前のスライスからは $7.17207\times10^{-
 どの項目も、著者のコードが間違っていると言っているのではない（印刷された式が違っていても、公開されたコードは正しいことがある）。
 式の番号は arXiv 版のもので、PDF で直接確かめた（14 だけは TeX のソースで読み、番号は arXiv の HTML 版に合わせた）。
 \begin{enumerate}
-\item DFMS Eq.~(7.4b)\cite{DFMS2016}、ゲージ変換の交差項。印刷は $1/(3H^2\Mpl^2\epsilon)$、正しくは $1/6$（付録~\ref{app:gauge}）。$1/3$ だと直線の軌道で $\fnl\approx0.73$（Maldacena は 0.19）になり、$\zeta$ も保存しない。
+\item DFMS Eq.~(7.4b)\cite{DFMS2016}、ゲージ変換の交差項。印刷は $1/(3H^2\Mpl^2\epsilon)$、正しくは $1/6$（\ref{app:gauge}）。$1/3$ だと直線の軌道で $\fnl\approx0.73$（Maldacena は 0.19）になり、$\zeta$ も保存しない。
 \item DFMS Eq.~(6.7c)、運動量が二つの初期条件の $B$ の項。前因子 $k_1^2k_3^2$ が足 1 と 2 の入れ替えについて対称でない。他のブロックと寄与はすべて独立な in-in の導出と一致し、差は $(k_2-k_3)(k_2+k_3)$ に比例する。導出から得た式を使い、de Sitter の transport の方程式を満たすことを確かめた。
 \item DFMS Eqs.~(6.7b)--(6.7d)、三点の初期条件の運動量の規格化。$\delta\pi$ を宇宙時間の正準運動量とすると次元が合わず、各運動量のスロットを $H$ で割った（$d\delta\phi/dN$ と読んだ）ときに一致する。ここでは宇宙時間の正準運動量を使う。
 \item DFMS Eq.~(5.17)、置換した 3 次のテンソルの運動量の引数（規約の注意）。添字を置換すると運動量も置換する。以前は配列の添字だけを入れ替えていて、正三角形のテストでは見つからず、de Sitter の整合性テストで見つかった。
