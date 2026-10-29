@@ -33,9 +33,9 @@ HERE = Path(__file__).resolve().parent
 # The first maximum of the turn rate, 5.15 e-folds before the end
 # (docs/general-nonminimal-inflation.md, Results).
 TURN = 5.15
-# Phase-space delta N from the slice 50 e-folds before the end, with the chi
-# step extrapolated to zero (issue #67).
-DELTA_N = 38.30
+# The split at a slice with the adjoint response, background tolerance
+# extrapolated to zero (issue #67, appendix F of the note).
+DELTA_N = 38.287
 COLORS = {1e-10: "tab:blue", 1e-11: "tab:green", 1e-12: "tab:orange", 1e-13: "tab:red"}
 
 
@@ -57,7 +57,7 @@ def main():
             color=color,
             label=rf"transport, $\varepsilon=10^{{{exponent}}}$",
         )
-    bottom.axhline(DELTA_N, color="gray", ls="--", label=r"phase-space $\delta N$ (38.30)")
+    bottom.axhline(DELTA_N, color="gray", ls="--", label=r"split at a slice (38.287)")
     bottom.set_ylabel(r"$|f_{\mathrm{NL}}|$ on the slice")
     bottom.set_xlabel("e-folds before the end of inflation")
     bottom.legend(fontsize=8, loc="upper left")
