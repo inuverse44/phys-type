@@ -82,7 +82,7 @@
 \begin{abstract}
 このノートは phys-type リポジトリで実装・検証した内容を一か所にまとめたものである。
 柱は二つある。一つは物理を型に載せることで、質量次元や添字の上下などを間違えたコードはコンパイルできない。
-もう一つは作用から予言までを近似なしに計算することで、作用を与えると、背景・線形摂動・tree level の三点関数を厳密に時間発展させ、$P_\zeta$、$n_s$、$r$、$\fnl$ を定義つきで返す。
+もう一つは作用から予言までを slow roll などの近似を使わずに計算することで、作用を与えると、背景・線形摂動・tree level の三点関数をインフレーションの終わりまで数値的に時間発展させ、$P_\zeta$、$n_s$、$r$、$\fnl$ を定義つきで返す。
 第\ref{sec:types}節で型の仕組み、第\ref{sec:pipeline}節で作用から予言までの流れ、第\ref{sec:transport}節で transport の考え方を、一次元の toy model から順に説明する。
 第\ref{sec:kms}節では、いま取り組んでいる Kaiser--Mazenc--Sfakianakis（KMS）\cite{KMS2013}の再現について、結果と未解決の問題をまとめる。
 文中のファイル名はリポジトリへのリンクで、文献番号は巻末の参考文献へのリンクである。
@@ -928,7 +928,7 @@ P3b で 3階の自動微分と $\nabla R$ を先に実装したのは、この�
 三点関数の初期値を $\alpha=0$ にするのは誤りである。
 地平線を出る前後の相互作用で生じる寄与を落としてしまうからである。
 実装では、地平線の十分内側の共通のスライスで、Bunch--Davies 真空に 3次の相互作用を一次まで入れた tree level の値を、8 ブロックすべてに与える。
-三本の足のうち、いちばん短い波数が $k/aH=e^{\Delta N}$ になる時刻を開始時刻にする。
+三角形のいちばん短い辺（最小の波数）が $k/aH=e^{\Delta N}$ になる時刻を開始時刻にする。ほかの二本の足は、そのときもっと深く地平線の内側にある。
 開始を深くしたときの収束は $x_{\rm init}^{-1}$ のように進み、許容誤差についても収束を確かめた。
 非線形な場の再定義のもとで、テンソルとして変換することも $4\times10^{-10}$ で確かめた。
 
@@ -994,10 +994,11 @@ constant turn での bispectrum の振幅\cite{HMPS2026b} & in-in の独立計�
 \subsection{なぜこの模型か}
 
 これまでに検証した非最小結合の模型（Higgs inflation\cite{BezrukovShaposhnikov2008}、nonminimally assisted inflation\cite{HKKPT2023}）では、$\Omega^2$ が一つの場にしか依存しなかった。
-その場合、Einstein frame の計量は一つの座標の関数で、二場の曲率も $K(s)$ という一変数の関数になる。
-KMS は\textbf{二つの場がともに $R$ に結合する}模型で、計量は非対角になり、等長変換もない。
-曲率は方向ごとに変わる。
-transport の曲率の項（質量行列の Riemann テンソルと、3次の係数に入る $\nabla R$）が大きく効く、一般的な状況をテストできる。
+Higgs inflation は単一場で、場空間の曲率がない。
+assisted の二場の模型では、Einstein frame の計量は一つの座標 $s$ の関数で、曲率も $K(s)$ という一変数の関数になる。
+KMS は\textbf{二つの場がともに $R$ に結合する}模型で、計量は非対角になり、連続的な等長変換もない（残るのは $\phi\to-\phi$, $\chi\to-\chi$ の反転だけ）。
+曲率は二つの場の両方に依存する。
+transport の曲率の項（質量行列の Riemann テンソルと、3次の係数に入る $\nabla R$）が、特別な対称性のない一般的な形で現れる状況をテストできる。
 コードは \repo{crates/phys-type-models/src/kms.rs} にある。
 
 \subsection{模型}
@@ -1021,7 +1022,7 @@ V\to\frac{\Mpl^4}{4}\frac{\lambda_\phi\phi^4+2g\phi^2\chi^2+\lambda_\chi\chi^4}{
 \]
 となる。
 $\phi$ 軸上の値 $\lambda_\phi/\xi_\phi^2$ は、$\chi$ 軸上の値 $\lambda_\chi/\xi_\chi^2$ の約 2 倍なので、\textbf{$\chi=0$ は尾根}である。
-三本の軌道は尾根の上の、尾根から少しだけ離れた点から出発する。
+三本の軌道は、尾根 $\chi=0$ からわずかにずれた点から出発する。
 尾根から落ちる時刻は軌道ごとに違い、落ちたあとは $\chi$ 方向の谷へ曲がっていく。
 地形の図と、「尾根」がどういう意味で尾根なのか（素朴に $\phi$ を固定して見ると谷に見える）は、\S\ref{sec:kms-landscape} で説明する。
 
@@ -1103,9 +1104,15 @@ $\phi$ を固定して $\chi$ の向きに見ると、$\phi=3.1$ で
 V_{;\chi\chi}=V_{,\chi\chi}-\Gamma^\phi{}_{\chi\chi}V_{,\phi},\qquad
 \Gamma^\phi{}_{\chi\chi}\simeq\frac1\phi\quad(\text{この模型では }\xi\phi^2\gg1\text{ でほぼ厳密}).
 \]
-$\Gamma^\phi{}_{\chi\chi}=1/\phi$ は、平らな平面を極座標で書いたときの値と同じである。
-つまり $(\phi,\chi)$ は、実質的に「動径と角度」としてふるまう。
-そのため $V_{;\chi\chi}$ は角度方向の2階微分 $r^{-2}\partial_\theta^2V$ に等しくなり、符号は\textbf{負}になる。
+この値は、計量の非対角成分の微分 $\partial_\chi G_{\phi\chi}$ から来る。
+意味は極座標で見るとわかる。
+$\phi$ を固定して $\chi$ を動かすと、動径 $r=\sqrt{\phi^2+\chi^2}$ も $\chi^2/2\phi$ だけ増えるので、$\chi=0$ で
+\[
+\partial_\chi^2V\big|_\phi=\frac1{r^2}\partial_\theta^2V+\frac1r\partial_rV
+\]
+となる。
+右辺第2項は、台地を外へ登る分の寄与で、尾根の形とは関係ない。
+$\Gamma^\phi{}_{\chi\chi}V_{,\phi}\simeq V_{,\phi}/\phi$ はちょうどこの項を引くので、$V_{;\chi\chi}$ は角度方向の2階微分 $r^{-2}\partial_\theta^2V$ に等しくなり、符号は\textbf{負}になる。
 \begin{center}
 \begin{tabular}{ccccc}
 \toprule
@@ -1123,7 +1130,7 @@ $\phi$ & $V_{,\chi\chi}$ & $V_{;\chi\chi}$ & $m^2/H^2=G^{\chi\chi}V_{;\chi\chi}/
 
 図\ref{fig:kms-potential}(c) は、場空間がほぼ平らに見える座標（角度 $\theta$ と正準な動径 $\rho=\int\sqrt{G_{rr}}\,dr$）で描いたもので、ボールの絵が正しく成り立つのはこの図である。
 ただし、角度方向の固有の長さは $\sqrt{G_{\theta\theta}}\,d\theta=(r/\Omega)\,d\theta\approx d\theta/\sqrt\xi$ である。
-したがって、度で描いた横軸は実際の距離を約 $\sqrt{10}\approx3$ 倍に引き伸ばしている。
+したがって、$\theta$（ラジアン）を $\rho$ と同じ尺度で読むと、角度方向は実際の距離の約 $\sqrt{10}\approx3$ 倍に引き伸ばされている（1 rad が約 $0.32\,\Mpl$ にあたる）。
 
 \paragraph{三本の軌道を定性的に読む。}
 尾根から離れる速さが一定なので、$\chi_0$ が 10 倍違う軌道は、$\ln10/0.078\approx30$ e-fold ずれて落ちる。
@@ -1216,7 +1223,7 @@ $10^{-13}$ & $-670$ \\
 \begin{itemize}
 \item すべて intrinsic の項 $N_aN_bN_c\alpha^{abc}$ から来ている。
 \item 背景の許容誤差と、開始の深さには依存しない。
-\item 線形の部分（$P_\zeta$, $n_s$）は、許容誤差が $10^{-11}$ 以下ならモードソルバーと一致する。
+\item 線形の部分（$P_\zeta$）は、許容誤差が $10^{-11}$ 以下ならモードソルバーと一致する。
 \item 回転の最中に $P_\zeta$ は最終値 $7.2\times10^{-4}$ の $5\times10^5$ 倍まで成長し、等曲率摂動が減衰すると打ち消し合って小さくなる。
 \end{itemize}
 \end{caution}
@@ -1236,7 +1243,8 @@ $10^{-13}$ & $-670$ \\
 \item 独立な参照として、KMS で phase-space $\delta N$ を実際に計算する（まだ実行していない）。
 \end{enumerate}
 解決するまでは、この模型で transport が検証されたとは言えない。
-G4 の参照は $\delta N$ である。
+G4 の受け入れ条件は transport と phase-space $\delta N$ の一致だが、KMS の phase-space $\delta N$ はまだ計算していない。
+いまある比較は、slow roll の速度と Riemann の項を落とした crossing-time $\delta N$ だけである。
 
 \subsection{KMS の残り}
 
@@ -1247,14 +1255,14 @@ G4 の参照は $\delta N$ である。
 \midrule
 G1 & 完了 & 幾何の閉じた式と自動微分の一致。Eq.~115 の誤植を発見 \\
 G2 & 完了 & 三本の軌道、図、インフレーションの中断に近いことの発見 \\
-G3 & 未着手 & $n_s$（[KMS] は 0.967）と $T_{\mathcal{RS}}$。軌道 2 の終わりでの厳密な $n_s$ は 0.936 \\
+G3 & 未着手 & $n_s$（[KMS] は 0.967）と $T_{\mathcal{RS}}$ \\
 G4 & 一部完了 & crossing-time $\delta N$ は一致。transport は収束しない \\
 G5 & 未着手 & Palatini 版。比べられる文献値がないので整合性のチェックだけ \\
 G6 & 範囲外 & Jordan frame の $\zeta$。別に設計する \\
 \bottomrule
 \end{tabular}
 \end{center}
-G3 の注意：[KMS] の $n_s=0.967$ は地平線を出たときの値で、終わりで評価した厳密な値（0.936）とは定義が違う。
+G3 の注意：[KMS] の $n_s=0.967$ は地平線を出たときの値で、このリポジトリが終わりで評価する厳密な $n_s$ とは定義が違う。軌道 2 のように地平線の外で等曲率摂動が曲率摂動に変わる場合、二つは一致しない。
 
 %======================================================================
 \section{その他の再現結果}
@@ -1519,7 +1527,7 @@ $u^{Q^I}{}_{\Pi^J\Pi^K}$ & $0$ & $u^{\Pi^I}{}_{\Pi^J\Pi^K}$ & $C_{JK}{}^I(\mathb
 \end{tabular}
 \end{center}
 e-fold 時間の式では、どの係数も $H^{-1}$ 倍になる。
-$\delta$ 関数を外したフーリエの規格化では、畳み込みの測度が $M^3$ を持つので、$[u^a{}_{bc}]=[X^a]-[X^b]-[X^c]-M^3$ となる。
+$\delta$ 関数を外したフーリエの規格化では、畳み込みの測度が $M^3$ を持つので、e-fold 時間での次元は $[u^a{}_{bc}]=[X^a]-[X^b]-[X^c]-M^3$ となる（宇宙時間では $M$ が一つ増える）。
 \begin{center}
 \begin{tabular}{lcccc}
 \toprule
@@ -1577,7 +1585,7 @@ B_\zeta=\frac{(2\pi)^4\mathcal P_\zeta^2}{\prod_ik_i^3}\Big[\frac\eta8\sum_ik_i^
 
 公式が文献と違うところ、規約で間違えかけたところをすべて記録している。
 どの項目も、著者のコードが間違っていると言っているのではない（印刷された式が違っていても、公開されたコードは正しいことがある）。
-式の番号は arXiv 版のもので、PDF で直接確かめた。
+式の番号は arXiv 版のもので、PDF で直接確かめた（14 だけは TeX のソースで読み、番号は arXiv の HTML 版に合わせた）。
 \begin{enumerate}
 \item \textbf{DFMS Eq.~(7.4b)\cite{DFMS2016}、ゲージ変換の交差項。}印刷は $1/(3H^2\Mpl^2\epsilon)$、正しくは $1/6$（付録~\ref{app:gauge}）。$1/3$ だと直線の軌道で $\fnl\approx0.73$（Maldacena は 0.19）になり、$\zeta$ も保存しない。
 \item \textbf{DFMS Eq.~(6.7c)、運動量が二つの初期条件の $B$ の項。}前因子 $k_1^2k_3^2$ が足 1 と 2 の入れ替えについて対称でない。他のブロックと寄与はすべて独立な in-in の導出と一致し、差は $(k_2-k_3)(k_2+k_3)$ に比例する。導出から得た式を使い、de Sitter の transport の方程式を満たすことを確かめた。
