@@ -90,8 +90,10 @@ impl KmsTheory {
     ///
     /// Metric: `K = [(1 + 6 xi_phi)(1 + 6 xi_chi) Omega^4 - C^2] / (6 C^2)`
     /// with `C = Omega^2 + 6 xi_phi^2 phi^2 + 6 xi_chi^2 chi^2`, KMS
-    /// Eq. (112); KMS Eq. (115) prints twice this. Palatini: `G = delta / Omega^2` is conformally
-    /// flat, so `K = (Omega^2 / 2) Laplacian ln Omega^2
+    /// Eq. (112). KMS Eq. (115) prints the Ricci scalar `R = 2 K` at twice its
+    /// correct value (`docs/literature-discrepancies.md` entry 14). Palatini:
+    /// `G = delta / Omega^2` is conformally flat, so
+    /// `K = (Omega^2 / 2) Laplacian ln Omega^2
     /// = xi_phi + xi_chi - 2 (xi_phi^2 phi^2 + xi_chi^2 chi^2) / Omega^2`.
     pub fn gaussian_curvature(&self, phi: f64, chi: f64) -> f64 {
         let omega2 = self.omega2(phi, chi);
