@@ -20,6 +20,7 @@ pub mod quantity;
 pub mod scalar_field;
 pub mod spectra;
 pub mod spectrum_run;
+pub mod split;
 pub mod state;
 #[cfg(test)]
 mod test_models;
@@ -94,6 +95,7 @@ pub use spectrum_run::{
     ModeEvolutionRecord, ModeSpectrum, Pivot, SpectrumRecord, SpectrumRun, SpectrumRunError,
     SpectrumRunSettings, SpectrumRunStage, write_metadata,
 };
+pub use split::{SplitError, SplitSettings};
 pub use state::{State, StateDelta, StateDerivative};
 pub use theory::{
     EinsteinFrame, EinsteinGeometry, EinsteinMetric, EinsteinPotential, Formulation,

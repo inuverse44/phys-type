@@ -1,6 +1,6 @@
 # General nonminimal inflation
 
-Status: G1 and G2 done, with the figure; the crossing-time $\delta N$ of G4 reproduces [KMS]; the transport $f_{\mathrm{NL}}$ of G4 does not converge (see [Results](#results)). This is the P3 item "general nonminimal inflation" of
+Status: G1 and G2 done, with the figure; the crossing-time $\delta N$ of G4 reproduces [KMS]; the tree-level $f_{\mathrm{NL}}$ of G4 converges once the transport is split at a slice before the turn (see [Results](#results)). This is the P3 item "general nonminimal inflation" of
 [`current-status-and-roadmap.md`](current-status-and-roadmap.md).
 
 ## Goal
@@ -177,23 +177,40 @@ convention of this repository the sign is positive; [KMS] Eq. (92) carries
 the opposite sign. Its $P_\zeta$ is 5% below the exact mode solver at the
 end, the size expected from the slow-roll velocities.
 
-**Transport $f_{\mathrm{NL}}$ (G4, open).** The tree-level transport does not
-converge for trajectory 2. At the end of inflation its $P_\zeta$ agrees with
-the mode solver only for a relative tolerance of $10^{-11}$ or below, and its
-$f_{\mathrm{NL}}$ scales with the tolerance: $-6\times10^4$, $-6\times10^3$,
-and $-670$ at $10^{-11}$, $10^{-12}$, and $10^{-13}$, dominated entirely by the
-intrinsic term $N_aN_bN_c\alpha^{abc}$. The background tolerance and the
-start depth do not change it. $P_\zeta$ itself rises to $5\times10^5$ times
-its final value during the turn and then cancels to $7.2\times10^{-4}$ once
-the isocurvature mode decays, so the final three-point function is a small
-remainder of large intermediate correlators. The steps that follow are to
-locate the loss of precision (the sharp turn, $\eta_\perp\simeq50$, or the
-heavy oscillation of $\phi$ in the valley afterwards) and to evaluate the
-transport in a better-conditioned basis or to end it on a slice where the
-remainder is not yet small. Until then the transport is not validated on
-this model. Phase-space $\delta N$ is the intended reference for G4, but
-it has not yet been run on this model; the only comparison so far is the
-crossing-time $\delta N$ above.
+**Transport $f_{\mathrm{NL}}$ (G4).** Carried to the end of inflation, the
+tree-level transport does not converge on trajectories 1 and 2: its
+$f_{\mathrm{NL}}$ scales with the relative tolerance ($-6\times10^4$,
+$-6\times10^3$, and $-670$ at $10^{-11}$, $10^{-12}$, and $10^{-13}$ on
+trajectory 2). On trajectory 2 the tolerances agree to six digits up to 4
+e-folds before the end; they part in the valley after the turn, where
+$P_\zeta$ falls from $5.7\times10^5$ times its final value. The final
+correlators are a small remainder of large intermediate ones, so the error
+is the tolerance times that growth, about $0.6$ in $f_{\mathrm{NL}}$ even
+at roundoff.
+
+`CovariantMultifieldSystem::split_curvature_correlators` (`phys_type::split`)
+stops the transport on a slice before the growth and continues with the
+response of the final $\zeta$ to the phase space there, integrated backwards
+with the adjoint of the transport's flows. The split is exact up to
+$(k/aH)^2$, so the slice is a check, not a parameter. With the background
+solved to a relative tolerance of $10^{-13}$ (the default $10^{-10}$ is off
+by 1.5%), equilateral at $N_*=60$, on the surface of uniform $H$ 0.01
+e-folds before $\epsilon_H=1$:
+
+| trajectory | split $f_{\mathrm{NL}}$ | transport to the end |
+| --- | --- | --- |
+| 1 | 0.0135450 | $-287$ to $-304$ |
+| 2 | 38.287 | about $-6\times10^3$ |
+| 3 | 0.0135301 | 0.0135301 |
+
+Two slices agree to $10^{-6}$, and where the transport converges (3 e-folds
+before the end on trajectory 2) the split reproduces it to $10^{-5}$
+(`tests/kms_trajectories.rs`). Phase-space $\delta N$ by finite differences,
+which does not use the cubic flow, gives 38.303–38.305 for trajectory 2.
+The gap to 43.3 (slow-roll velocities, Riemann terms, evaluation at
+crossing) is not yet split term by term. Details, with the derivation and
+the numerical checks, are in appendix F of
+[`notes/overview`](../notes/overview/phys-type-overview.pdf) and issue #67.
 
 Discrepancies with [KMS] go to
 [`literature-discrepancies.md`](literature-discrepancies.md), as before.
