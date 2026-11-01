@@ -1,0 +1,6 @@
+/target
+/diagnostics
+__pycache__/
+*.py[cod]
+/data
+.claude/settings.local.json

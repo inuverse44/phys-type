@@ -1,0 +1,12 @@
+[package]
+name = "phys-type-demo"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Demonstrations for the phys-type overview note"
+
+# A standalone package, not a member of the repository workspace.
+[workspace]
+
+[dependencies]
+phys-type = { path = "../../../crates/phys-type" }

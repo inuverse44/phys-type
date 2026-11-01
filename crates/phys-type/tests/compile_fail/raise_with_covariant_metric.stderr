@@ -1,0 +1,7 @@
+error[E0599]: no method named `raise` found for struct `FieldTensor2<phys_type::Lower, phys_type::Lower, MassPower<typenum::int::Z0>, f64, 2>` in the current scope
+  --> tests/compile_fail/raise_with_covariant_metric.rs:10:27
+   |
+10 |     let _invalid = metric.raise(&covector);
+   |                           ^^^^^ method not found in `FieldTensor2<phys_type::Lower, phys_type::Lower, MassPower<typenum::int::Z0>, f64, 2>`
+   |
+   = note: the method was found for `FieldTensor2<phys_type::Upper, phys_type::Upper, MassPower<typenum::int::Z0>, f64, N>`

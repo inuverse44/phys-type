@@ -1,0 +1,11 @@
+*.aux
+*.log
+*.fls
+*.fdb_latexmk
+*.out
+*.toc
+*.synctex.gz
+*.bbl
+*.blg
+demo/target/
+demo/Cargo.lock
